@@ -43,7 +43,7 @@ import {
   Ticket,
   Newspaper,
 } from 'lucide-react-native';
-
+import { getDiaDiem } from '../services/diaDiemService';
 import {
   allCategories,
   banners,
@@ -73,6 +73,23 @@ export function HomeScreen({
   onNavigateToTab,
   onNavigateToTour,
 }) {
+  //Địa điểm
+  const [diaDiem, setDiaDiem] = useState([]);
+//Hàm gọi API địa điểm
+    const fetchDiaDiem = async () => {
+      try {
+        const data = await getDiaDiem()
+          console.log("API trả về:", data);
+      setDiaDiem(data.slice(0,4));
+      } catch (error) {
+            console.log("Lỗi API:", error);
+      }
+    }
+
+    useEffect(() =>{
+      fetchDiaDiem();
+    },[])
+
   const rank = getRankDetails(currentUser.points || 0);
   const currentPoints = currentUser.points || 8250;
   const nextRankPoints = rank.maxPoints;
@@ -106,6 +123,7 @@ export function HomeScreen({
     return expandedCategories ? [...primary, ...secondary] : primary;
   }, [expandedCategories]);
 
+  
   const searchableFeatures = useMemo(() => {
     const categories = allCategories.map(cat => ({
       key: `cat-${cat.key}`,
@@ -124,6 +142,7 @@ export function HomeScreen({
       }
     }));
 
+  
     const appFeatures = [
       {
         key: 'feat-map',
@@ -810,20 +829,22 @@ export function HomeScreen({
           <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Điểm đến thịnh hành</Text>
           <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>Những điểm khám phá được yêu thích nhất</Text>
         </View>
-        <Pressable style={styles.seeAllBtn}>
+        <Pressable style={styles.seeAllBtn}
+        onPress={() => onNavigateToTab("allDiaDiem")}>
           <Text style={styles.seeAllText}>Xem tất cả</Text>
           <ChevronRight size={14} color="#3b82f6" />
         </Pressable>
       </View>
 
+{/* diaiem */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.trendingScroll}
       >
-        {destinations.map((item, index) => (
+        {diaDiem.map((item, index) => (
           <Pressable key={index} style={[styles.destCard, { borderColor: theme.border }]}>
-            <Image source={{ uri: item.image }} style={styles.destImg} resizeMode="cover" />
+            <Image source={{ uri: item.hinhAnh }} style={styles.destImg} resizeMode="cover" />
             <LinearGradient
               colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
               style={styles.destGrad}
@@ -840,26 +861,21 @@ export function HomeScreen({
             </View>
 
             <View style={[styles.destCardFooter, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
-              <Text style={[styles.destCity, { color: theme.textPrimary }]}>{item.city}</Text>
+              <Text style={[styles.destCity, { color: theme.textPrimary }]}>{item.ten}</Text>
               <View style={styles.destRow}>
                 <MapPin size={11} color={theme.textSecondary} />
-                <Text style={[styles.destRegion, { color: theme.textSecondary }]}>{item.region}</Text>
+                <Text style={[styles.destRegion, { color: theme.textSecondary }]}>{item.viTri}</Text>
               </View>
 
               <View style={styles.destRatingRow}>
                 <View style={styles.ratingStars}>
-                  <Star size={12} color="#facc15" fill="#facc15" />
-                  <Text style={[styles.ratingVal, { color: theme.textPrimary }]}>{item.rating}</Text>
-                  <Text style={[styles.ratingReviews, { color: theme.textSecondary }]}>({item.reviews})</Text>
+                  <Text style={[styles.ratingReviews, { color: theme.textSecondary }]}>Lượt xem:({item.danhGia})</Text>
                 </View>
-                <Text style={[styles.destPrice, { color: '#3b82f6' }]}>{item.price}</Text>
               </View>
             </View>
           </Pressable>
         ))}
       </ScrollView>
-
-
     </View>
   );
 }

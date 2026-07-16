@@ -10,14 +10,16 @@ import {
   MessageSquare,
   Newspaper,
 } from 'lucide-react-native';
-
+import { NavigationContainer } from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack'
 import {
   HomeScreen,
   ExploreScreen,
   CameraScreen,
   ProfileScreen,
 } from './screens';
-
+import AllDiaDiem from './screens/AllDiaDiem';
+import DiaDiemDetails from './screens/DiaDiemDetails';
 import { MapScreen, VirtualTourScreen, ProvinceGalleryScreen, TicketDetailScreen, TicketListScreen } from './map';
 import { SocialScreen } from './social';
 import { ChatScreen } from './chat';
@@ -66,6 +68,8 @@ export default function App() {
   const [expandedCategories, setExpandedCategories] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
+//Lưu chọn địa điểm
+  const [selectedDiaDiem, setSelectedDiaDiem] = useState(null);
   // Search & Navigation sync states
   const [exploreTag, setExploreTag] = useState('all');
   const [exploreSearch, setExploreSearch] = useState('');
@@ -247,6 +251,27 @@ export default function App() {
   // Helper render active tab screen
   const renderScreenContent = () => {
     switch (activeNav) {
+      case "allDiaDiem":
+    return (
+        <AllDiaDiem
+            theme={theme}
+            isDarkMode={isDarkMode}
+            onBack={() => setActiveNav("home")}
+             onSelectDiaDiem={(item) => {
+        setSelectedDiaDiem(item);
+        setActiveNav("diaDiemDetail");
+    }}
+        />
+    );
+    case "diaDiemDetail":
+  return (
+    <DiaDiemDetails
+      theme={theme}
+      isDarkMode={isDarkMode}
+      diaDiem={selectedDiaDiem}
+      onBack={() => setActiveNav("allDiaDiem")}
+    />
+  );
       case 'explore':
         return (
           <ExploreScreen

@@ -44,7 +44,7 @@ export function LoginScreen({ theme, isDarkMode, onRegisterPress, onLoginSuccess
         const user = userCredential.user;
         const displayName = user.displayName || user.email.split('@')[0];
         
-        // Gửi thông báo đẩy cục bộ chào mừng
+        // Gửi thông báo đẩy cục bộ chào mừngn
         sendLocalNotification(
           'Đăng nhập thành công! 🎉',
           `Chào mừng ${displayName} đã quay trở lại với Vivu360.`
