@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal, Dimensions, Alert, Platform, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { loadAppData, saveAppData } from '../services/appDataService';
 import {
   X,
   Plus,
@@ -165,10 +166,32 @@ const initialGroups = [
   }
 ];
 
-export function ChatScreen({ isDarkMode, theme, currentUser, onNavigateToTab, prevScreen }) {
+export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, prevScreen }) {
   const [groups, setGroups] = useState(initialGroups);
+  const [groupsOwnerId, setGroupsOwnerId] = useState(null);
   const [groupModalVisible, setGroupModalVisible] = useState(false);
   const [chatModalVisible, setChatModalVisible] = useState(false);
+
+  useEffect(() => {
+    if (!ownerId) return;
+    let active = true;
+    loadAppData(ownerId, 'chat')
+      .then(saved => {
+        if (active && Array.isArray(saved?.groups)) setGroups(saved.groups);
+      })
+      .catch(error => console.warn('Không thể tải nhóm chat:', error.message))
+      .finally(() => active && setGroupsOwnerId(ownerId));
+    return () => { active = false; };
+  }, [ownerId]);
+
+  useEffect(() => {
+    if (!ownerId || groupsOwnerId !== ownerId) return;
+    const timer = setTimeout(() => {
+      saveAppData(ownerId, 'chat', { groups })
+        .catch(error => console.warn('Không thể lưu nhóm chat:', error.message));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [ownerId, groupsOwnerId, groups]);
 
   // Form State
   const [newGroupName, setNewGroupName] = useState('');

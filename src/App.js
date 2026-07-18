@@ -29,6 +29,8 @@ import { auth } from './auth/firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import * as Notifications from 'expo-notifications';
 import { registerForPushNotificationsAsync } from './auth/notificationHelper';
+import { loadAppData, saveAppData } from './services/appDataService';
+import { syncUser } from './services/userService';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -47,8 +49,8 @@ import {
 } from './data';
 
 export default function App() {
-  const [activeNav, setActiveNav] = useState('home');
-  const [prevNav, setPrevNav] = useState('home');
+  const [activeNav, setActiveNav] = useState('social');
+  const [prevNav, setPrevNav] = useState('social');
   const [ticketFlowSource, setTicketFlowSource] = useState('profile');
   const activeNavRef = React.useRef(activeNav);
 
@@ -88,6 +90,8 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [authRoute, setAuthRoute] = useState('login'); // 'login' | 'register'
+  const [dataOwnerId, setDataOwnerId] = useState(null);
+  const [appDataLoaded, setAppDataLoaded] = useState(false);
 
   // Booked tickets state
   const [bookedTickets, setBookedTickets] = useState([
@@ -167,18 +171,66 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
+        setAppDataLoaded(false);
+        setDataOwnerId(user.uid);
         setUserInfo(prev => ({
           ...prev,
           name: user.displayName || user.email.split('@')[0],
           email: user.email,
         }));
       } else {
+        setDataOwnerId(null);
+        setAppDataLoaded(false);
         setIsLoggedIn(false);
       }
       setAuthLoading(false);
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!dataOwnerId) return;
+    let active = true;
+
+    loadAppData(dataOwnerId, 'main')
+      .then(saved => {
+        if (!active || !saved) return;
+        if (saved.userInfo) setUserInfo(saved.userInfo);
+        if (Array.isArray(saved.bookedTickets)) setBookedTickets(saved.bookedTickets);
+        if (typeof saved.isDarkMode === 'boolean') setIsDarkMode(saved.isDarkMode);
+      })
+      .catch(error => console.warn('Không thể tải dữ liệu MongoDB:', error.message))
+      .finally(() => active && setAppDataLoaded(true));
+
+    return () => { active = false; };
+  }, [dataOwnerId]);
+
+  useEffect(() => {
+    if (!dataOwnerId || !appDataLoaded) return;
+    const timer = setTimeout(() => {
+      saveAppData(dataOwnerId, 'main', { userInfo, bookedTickets, isDarkMode })
+        .catch(error => console.warn('Không thể lưu dữ liệu MongoDB:', error.message));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [dataOwnerId, appDataLoaded, userInfo, bookedTickets, isDarkMode]);
+
+  useEffect(() => {
+    if (!dataOwnerId || !userInfo.email || !userInfo.name) return;
+    const timer = setTimeout(() => {
+      syncUser({
+        firebaseUid: dataOwnerId,
+        email: userInfo.email,
+        name: userInfo.name,
+        phone: userInfo.phone,
+        avatar: userInfo.avatar,
+        bio: userInfo.bio,
+        points: userInfo.points,
+        level: userInfo.level,
+        checkedIn: userInfo.checkedIn,
+      }).catch(error => console.warn('Không thể đồng bộ người dùng:', error.message));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [dataOwnerId, userInfo]);
 
   useEffect(() => {
     // Đăng ký nhận thông báo đẩy
@@ -288,9 +340,9 @@ export default function App() {
           />
         );
       case 'social':
-        return <SocialScreen isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} />;
+        return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} />;
       case 'chat':
-        return <ChatScreen isDarkMode={isDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} prevScreen={prevNav} />;
+        return <ChatScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} prevScreen={prevNav} />;
       case 'camera':
         return (
           <CameraScreen
@@ -318,6 +370,7 @@ export default function App() {
             setIsDarkMode={setIsDarkMode}
             theme={theme}
             userInfo={userInfo}
+            ownerId={dataOwnerId}
             onCheckIn={handleCheckIn}
             onNavigateToTour={(tourId, spotIdx) => {
               setSelectedTourId(tourId);
@@ -364,6 +417,7 @@ export default function App() {
             setIsDarkMode={setIsDarkMode}
             theme={theme}
             userInfo={userInfo}
+            ownerId={dataOwnerId}
             setUserInfo={setUserInfo}
             bookedTickets={bookedTickets}
             onEditProfile={() => setActiveNav('editProfile')}
@@ -375,7 +429,7 @@ export default function App() {
                 .then(() => {
                   setIsLoggedIn(false);
                   setAuthRoute('login');
-                  setActiveNav('home');
+                  setActiveNav('social');
                   Alert.alert('Đăng xuất', 'Đã đăng xuất tài khoản thành công!');
                 })
                 .catch((error) => {
@@ -445,34 +499,7 @@ export default function App() {
         );
       case 'home':
       default:
-        return (
-          <HomeScreen
-            currentTime={currentTime}
-            banner={banner}
-            currentBanner={currentBanner}
-            setCurrentBanner={setCurrentBanner}
-            expandedCategories={expandedCategories}
-            setExpandedCategories={setExpandedCategories}
-            displayedCategories={displayedCategories}
-            isDarkMode={isDarkMode}
-            setIsDarkMode={setIsDarkMode}
-            theme={theme}
-            currentUser={userInfo}
-            onNavigateToExplore={(tag, search) => {
-              setExploreTag(tag);
-              setExploreSearch(search || '');
-              setActiveNav('explore');
-            }}
-            onNavigateToTab={(tab) => {
-              setActiveNav(tab);
-            }}
-            onNavigateToTour={(tourId, spotIdx) => {
-              setSelectedTourId(tourId);
-              setSelectedSpotIdx(spotIdx !== undefined ? spotIdx : 0);
-              setActiveNav('virtualTour');
-            }}
-          />
-        );
+        return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} />;
     }
   };
 
@@ -493,6 +520,7 @@ export default function App() {
           onRegisterPress={() => setAuthRoute('register')}
           onLoginSuccess={(user) => {
             setUserInfo({ ...userInfo, ...user });
+            setActiveNav('social');
             setIsLoggedIn(true);
           }}
         />
@@ -539,11 +567,11 @@ export default function App() {
               styles.navItem,
               pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 }
             ]}
-            onPress={() => setActiveNav('home')}
+            onPress={() => setActiveNav('social')}
           >
-            <Home size={20} color={activeNav === 'home' ? '#3b82f6' : theme.textSecondary} />
-            <Text style={[styles.navText, { color: activeNav === 'home' ? '#3b82f6' : theme.textSecondary }]}>Trang chủ</Text>
-            {activeNav === 'home' && <View style={styles.activeDot} />}
+            <Home size={20} color={activeNav === 'social' ? '#3b82f6' : theme.textSecondary} />
+            <Text style={[styles.navText, { color: activeNav === 'social' ? '#3b82f6' : theme.textSecondary }]}>Trang chủ</Text>
+            {activeNav === 'social' && <View style={styles.activeDot} />}
           </Pressable>
 
           <Pressable
@@ -568,18 +596,6 @@ export default function App() {
             <MapIcon size={20} color={activeNav === 'map' ? '#3b82f6' : theme.textSecondary} />
             <Text style={[styles.navText, { color: activeNav === 'map' ? '#3b82f6' : theme.textSecondary }]}>Bản đồ</Text>
             {activeNav === 'map' && <View style={styles.activeDot} />}
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.navItem,
-              pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 }
-            ]}
-            onPress={() => setActiveNav('social')}
-          >
-            <Newspaper size={20} color={activeNav === 'social' ? '#3b82f6' : theme.textSecondary} />
-            <Text style={[styles.navText, { color: activeNav === 'social' ? '#3b82f6' : theme.textSecondary }]}>Bảng tin</Text>
-            {activeNav === 'social' && <View style={styles.activeDot} />}
           </Pressable>
 
           <Pressable

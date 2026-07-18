@@ -1,1 +1,2 @@
-export { HomeScreen, ExploreScreen, CameraScreen, ProfileScreen } from './screens';
+export { HomeScreen, ExploreScreen, CameraScreen } from './screens';
+export { ProfileFeedScreen as ProfileScreen } from './ProfileFeed';

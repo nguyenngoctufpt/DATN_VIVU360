@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal, Dimensions, Share, Alert, Platform, StatusBar, Animated } from 'react-native';
+import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal, Dimensions, Share, Alert, Platform, StatusBar, Animated, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { loadAppData, saveAppData } from '../services/appDataService';
+import { searchFriends } from '../services/userService';
 import {
   Heart,
   MessageSquare,
@@ -24,7 +26,12 @@ import {
   Check,
   CheckCheck,
   Newspaper,
-  Search
+  Search,
+  Menu,
+  Compass,
+  Map,
+  Ticket,
+  User
 } from 'lucide-react-native';
 
 import { UserProfileModal } from './userProfile';
@@ -388,9 +395,32 @@ const initialGroups = [
   }
 ];
 
-export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }) {
+export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab }) {
   const [posts, setPosts] = useState(initialPosts);
+  const [postsOwnerId, setPostsOwnerId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  useEffect(() => {
+    if (!ownerId) return;
+    let active = true;
+    loadAppData(ownerId, 'social')
+      .then(saved => {
+        if (active && Array.isArray(saved?.posts)) setPosts(saved.posts);
+      })
+      .catch(error => console.warn('Không thể tải bài viết:', error.message))
+      .finally(() => active && setPostsOwnerId(ownerId));
+    return () => { active = false; };
+  }, [ownerId]);
+
+  useEffect(() => {
+    if (!ownerId || postsOwnerId !== ownerId) return;
+    const timer = setTimeout(() => {
+      saveAppData(ownerId, 'social', { posts })
+        .catch(error => console.warn('Không thể lưu bài viết:', error.message));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [ownerId, postsOwnerId, posts]);
 
   const mockStories = useMemo(() => [
     { id: 1, name: 'Tin của bạn', image: currentUser.avatar, isCreate: true },
@@ -442,6 +472,44 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
   const [newImgUrl, setNewImgUrl] = useState('');
 
   const [searchText, setSearchText] = useState('');
+  const [friendResults, setFriendResults] = useState([]);
+  const [isSearchingFriends, setIsSearchingFriends] = useState(false);
+  const [friendSearchError, setFriendSearchError] = useState('');
+
+  useEffect(() => {
+    const query = searchText.trim();
+    if (query.length < 2) {
+      setFriendResults([]);
+      setIsSearchingFriends(false);
+      setFriendSearchError('');
+      return;
+    }
+
+    let active = true;
+    setIsSearchingFriends(true);
+    setFriendSearchError('');
+    const timer = setTimeout(() => {
+      searchFriends(query, ownerId)
+        .then(users => active && setFriendResults(Array.isArray(users) ? users : []))
+        .catch(error => {
+          if (active) {
+            setFriendResults([]);
+            setFriendSearchError(
+              error.response
+                ? 'Máy chủ không thể xử lý tìm kiếm. Vui lòng thử lại.'
+                : 'Không thể kết nối Vivu360_API. Hãy kiểm tra API đang chạy ở cổng 3000.'
+            );
+            console.warn('Khong the tim ban be:', error.message);
+          }
+        })
+        .finally(() => active && setIsSearchingFriends(false));
+    }, 350);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [searchText, ownerId]);
 
   const filteredPosts = useMemo(() => {
     let result = posts;
@@ -507,6 +575,7 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
       likedByUser: false,
       comments: [],
       user: {
+        firebaseUid: ownerId,
         name: currentUser.name,
         avatar: currentUser.avatar,
         level: currentUser.level || 'Cấp 8',
@@ -588,24 +657,22 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
       {/* HEADER SECTION */}
       <View style={styles.socialHeader}>
         <View style={styles.headerTopRow}>
-          <Text style={[styles.socialTitle, { color: theme.textPrimary }]}>Khám phá điểm đến</Text>
-          <Pressable 
-            style={({ pressed }) => [
-              styles.messengerIconBtn, 
-              { backgroundColor: theme.searchBg },
-              pressed && { opacity: 0.7 }
-            ]}
-            onPress={() => {
-              if (onNavigateToTab) {
-                onNavigateToTab('chat');
-              } else {
-                Alert.alert('Lỗi điều hướng', 'onNavigateToTab prop is undefined!');
-              }
-            }}
-          >
-            <MessageCircle size={22} color={theme.textPrimary} />
-            <View style={styles.messengerBadge} />
-          </Pressable>
+          <Text style={[styles.socialTitle, { color: theme.textPrimary }]}>Vivu360</Text>
+          <View style={styles.headerActions}>
+            <Pressable
+              style={[styles.messengerIconBtn, { backgroundColor: theme.searchBg }]}
+              onPress={() => setMenuVisible(true)}
+            >
+              <Menu size={22} color={theme.textPrimary} />
+            </Pressable>
+            <Pressable 
+              style={({ pressed }) => [styles.messengerIconBtn, { backgroundColor: theme.searchBg }, pressed && { opacity: 0.7 }]}
+              onPress={() => onNavigateToTab && onNavigateToTab('chat')}
+            >
+              <MessageCircle size={22} color={theme.textPrimary} />
+              <View style={styles.messengerBadge} />
+            </Pressable>
+          </View>
         </View>
         <Text style={[styles.socialSubtitle, { color: theme.textSecondary }]}>
           Mạng xã hội chia sẻ hành trình du lịch Vivu360
@@ -615,7 +682,7 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
         <View style={[styles.socialSearchContainer, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
           <Search size={16} color={theme.textSecondary} />
           <TextInput
-            placeholder="Tìm kiếm bài viết, tỉnh thành hoặc bạn bè..."
+            placeholder="Tìm bài viết, email hoặc số điện thoại bạn bè..."
             placeholderTextColor={theme.textMuted}
             value={searchText}
             onChangeText={setSearchText}
@@ -672,44 +739,36 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
         contentContainerStyle={{ paddingBottom: 100 }} 
         showsVerticalScrollIndicator={false}
       >
-        {/* EXPLORE POPULAR CITIES */}
-        <View style={[styles.sectionContainer, { backgroundColor: theme.card, borderBottomColor: theme.border, paddingBottom: 18, borderBottomWidth: 1 }]}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitleLabel, { color: theme.textPrimary }]}>Điểm đến nổi bật</Text>
-            <Pressable>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#3b82f6' }}>Xem tất cả</Text>
-            </Pressable>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12, marginTop: 12 }}>
-            {popularCities.map((city) => (
-              <Pressable 
-                key={city.id} 
-                style={[styles.popularCityCard, { borderColor: theme.border }]}
-                onPress={() => setSearchText(city.city)}
+        {searchText.trim().length >= 2 && (
+          <View style={[styles.friendSearchResults, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+            <Text style={[styles.sectionTitleLabel, { color: theme.textPrimary }]}>Bạn bè trên Vivu360</Text>
+            {isSearchingFriends ? (
+              <ActivityIndicator color="#3b82f6" style={{ marginVertical: 14 }} />
+            ) : friendSearchError ? (
+              <Text style={[styles.emptyFriendSearch, { color: '#ef4444' }]}>{friendSearchError}</Text>
+            ) : friendResults.length > 0 ? friendResults.map(friend => (
+              <Pressable
+                key={friend.firebaseUid}
+                style={[styles.friendSearchItem, { borderTopColor: theme.border }]}
+                onPress={() => {
+                  setTargetUsername(friend.name);
+                  setProfileModalVisible(true);
+                }}
               >
-                <Image source={{ uri: city.image }} style={styles.popularCityImage} />
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.85)']}
-                  style={StyleSheet.absoluteFillObject}
-                />
-                <View style={styles.popularCityContent}>
-                  <Text style={styles.popularCityTitle}>{city.city}</Text>
-                  <Text style={styles.popularCitySub}>{city.region}</Text>
-                  
-                  {/* Companion avatars overlaid */}
-                  <View style={styles.popularCityAvatarsRow}>
-                    <View style={styles.avatarGroupContainer}>
-                      {city.avatars.map((av, idx) => (
-                        <Image key={idx} source={{ uri: av }} style={[styles.avatarGroupItem, { marginLeft: idx > 0 ? -10 : 0 }]} />
-                      ))}
-                    </View>
-                    <Text style={styles.activeFriendsCountText}>{city.activeFriends}</Text>
-                  </View>
+                <Image source={{ uri: friend.avatar || getUserAvatarByName(friend.name) }} style={styles.friendSearchAvatar} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.friendSearchName, { color: theme.textPrimary }]}>{friend.name}</Text>
+                  <Text style={[styles.friendSearchContact, { color: theme.textSecondary }]} numberOfLines={1}>
+                    {friend.email}{friend.phone ? ` · ${friend.phone}` : ''}
+                  </Text>
                 </View>
+                <ChevronRight size={18} color={theme.textMuted} />
               </Pressable>
-            ))}
-          </ScrollView>
-        </View>
+            )) : (
+              <Text style={[styles.emptyFriendSearch, { color: theme.textSecondary }]}>Không tìm thấy bạn bè bằng email hoặc số điện thoại này.</Text>
+            )}
+          </View>
+        )}
 
         {/* TRAVEL WITH FRIENDS ROW */}
         <View style={[styles.sectionContainer, { backgroundColor: theme.card, borderBottomColor: theme.border, paddingVertical: 14, borderBottomWidth: 1 }]}>
@@ -1045,6 +1104,49 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
         currentUser={currentUser}
       />
 
+      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
+        <View style={styles.menuOverlay}>
+          <Pressable style={styles.menuDismissArea} onPress={() => setMenuVisible(false)} />
+          <View style={[styles.sideMenu, { backgroundColor: theme.card, borderLeftColor: theme.border }]}>
+            <View style={[styles.sideMenuHeader, { borderBottomColor: theme.border }]}>
+              <Image source={{ uri: currentUser.avatar }} style={styles.sideMenuAvatar} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sideMenuName, { color: theme.textPrimary }]} numberOfLines={1}>{currentUser.name}</Text>
+                <Text style={[styles.sideMenuEmail, { color: theme.textSecondary }]} numberOfLines={1}>{currentUser.email}</Text>
+              </View>
+              <Pressable onPress={() => setMenuVisible(false)} style={styles.sideMenuClose}>
+                <X size={19} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+
+            {[
+              { key: 'social', label: 'Trang chủ', Icon: Newspaper },
+              { key: 'explore', label: 'Khám phá', Icon: Compass },
+              { key: 'map', label: 'Bản đồ du lịch', Icon: Map },
+              { key: 'chat', label: 'Tin nhắn', Icon: MessageCircle },
+              { key: 'ticketList', label: 'Vé & chuyến đi', Icon: Ticket },
+              { key: 'profile', label: 'Trang cá nhân', Icon: User },
+            ].map(item => {
+              const Icon = item.Icon;
+              return (
+                <Pressable
+                  key={item.key}
+                  style={({ pressed }) => [styles.sideMenuItem, pressed && { backgroundColor: theme.searchBg }]}
+                  onPress={() => {
+                    setMenuVisible(false);
+                    if (item.key !== 'social' && onNavigateToTab) onNavigateToTab(item.key);
+                  }}
+                >
+                  <View style={[styles.sideMenuIcon, { backgroundColor: theme.searchBg }]}><Icon size={19} color="#3b82f6" /></View>
+                  <Text style={[styles.sideMenuLabel, { color: theme.textPrimary }]}>{item.label}</Text>
+                  <ChevronRight size={17} color={theme.textMuted} />
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
+
       {/* TOAST SHARING FEEDBACK ALERT */}
       {shareAlertVisible && (
         <View style={styles.toastContainer}>
@@ -1221,7 +1323,19 @@ const styles = StyleSheet.create({
   // Header styles
   socialHeader: { paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 44 },
   headerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   messengerIconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  menuOverlay: { flex: 1, flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.55)' },
+  menuDismissArea: { flex: 1 },
+  sideMenu: { width: '82%', maxWidth: 340, height: '100%', borderLeftWidth: 1, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 48, paddingHorizontal: 14 },
+  sideMenuHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 16, marginBottom: 10, borderBottomWidth: 1 },
+  sideMenuAvatar: { width: 48, height: 48, borderRadius: 24 },
+  sideMenuName: { fontSize: 15, fontWeight: '900' },
+  sideMenuEmail: { fontSize: 10.5, marginTop: 2 },
+  sideMenuClose: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  sideMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 58, paddingHorizontal: 8, borderRadius: 12 },
+  sideMenuIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  sideMenuLabel: { flex: 1, fontSize: 13, fontWeight: '800' },
   messengerBadge: { position: 'absolute', top: 8, right: 8, width: 9, height: 9, borderRadius: 4.5, backgroundColor: '#ef4444', borderWidth: 1.5, borderColor: '#fff' },
   socialTitle: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
   socialSubtitle: { fontSize: 12, fontWeight: '500', marginTop: 4, lineHeight: 16, marginLeft: 4 },
@@ -1835,6 +1949,23 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     paddingVertical: 0,
   },
+  friendSearchResults: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+  },
+  friendSearchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  friendSearchAvatar: { width: 42, height: 42, borderRadius: 21 },
+  friendSearchName: { fontSize: 13, fontWeight: '800', marginBottom: 3 },
+  friendSearchContact: { fontSize: 11, fontWeight: '500' },
+  emptyFriendSearch: { fontSize: 12, paddingVertical: 14, lineHeight: 18 },
 
   // Custom Sections
   sectionContainer: {
