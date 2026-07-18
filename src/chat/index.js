@@ -1,1 +1,1 @@
-export { ChatScreen } from './groupWorkspace';
+export { ChatScreen } from './chat';
