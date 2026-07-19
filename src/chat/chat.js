@@ -25,16 +25,7 @@ const { width, height } = Dimensions.get('window');
 
 const getUserAvatarByName = (name) => {
   if (!name) return 'https://i.pravatar.cc/150?img=11';
-  if (name === 'Thanh Hằng') return 'https://i.pravatar.cc/150?img=47';
-  if (name === 'Trần Nam') return 'https://i.pravatar.cc/150?img=12';
-  if (name === 'Quốc Bảo') return 'https://i.pravatar.cc/150?img=33';
-  if (name === 'Linh Chi') return 'https://i.pravatar.cc/150?img=26';
-  if (name === 'Minh Trang') return 'https://i.pravatar.cc/150?img=48';
-  if (name === 'Duy Mạnh') return 'https://i.pravatar.cc/150?img=15';
-  if (name === 'Mai Phương') return 'https://i.pravatar.cc/150?img=28';
-  if (name === 'Hoàng Anh') return 'https://i.pravatar.cc/150?img=18';
-  if (name === 'Tuấn Đạt') return 'https://i.pravatar.cc/150?img=14';
-  
+
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -44,20 +35,11 @@ const getUserAvatarByName = (name) => {
 };
 
 const getUserLevelByName = (name) => {
-  if (name === 'Thanh Hằng') return 'Cấp 12';
-  if (name === 'Quốc Bảo') return 'Cấp 15';
-  if (name === 'Khánh An') return 'Cấp 9';
-  if (name === 'Duy Mạnh') return 'Cấp 10';
-  if (name === 'Minh Trang') return 'Cấp 11';
-  if (name === 'Mai Phương') return 'Cấp 8';
-  if (name === 'Hoàng Anh') return 'Cấp 14';
-  if (name === 'Tuấn Đạt') return 'Cấp 7';
-  
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return `Cấp ${Math.abs(hash % 12) + 3}`;
+  return `C?p ${Math.abs(hash % 12) + 3}`;
 };
 
 const getFormattedMsgTime = (msgId) => {
@@ -128,43 +110,15 @@ const getTagColors = (tag, isDarkMode) => {
   };
 };
 
-const initialGroups = [
-  {
-    id: 1,
-    name: 'Hội Săn Mây Sa Pa 2026',
-    tag: 'Sapa / Phượt',
-    members: 342,
-    image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=300&q=80',
-    lastMessage: 'Minh Trang: Ngày mai có ai lên đỉnh đèo Ô Quy Hồ ngắm bình minh không?',
-    messages: [
-      { id: 1, user: 'Duy Mạnh', text: 'Dự báo mai mây dày lắm đó mn.' },
-      { id: 2, user: 'Minh Trang', text: 'Ngày mai có ai lên đỉnh đèo Ô Quy Hồ ngắm bình minh không?' }
-    ]
-  },
-  {
-    id: 2,
-    name: 'Kinh Nghiệm Phú Quốc Tự Túc',
-    tag: 'Ẩm thực / Khách sạn',
-    members: 1205,
-    image: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=300&q=80',
-    lastMessage: 'Hoàng Anh: Mọi người ăn ghẹ ở Hàm Ninh nhớ chọn quán ven bè ăn tươi hơn nhé.',
-    messages: [
-      { id: 1, user: 'Mai Phương', text: 'Ghẹ Hàm Ninh đang vào mùa ngon lắm ạ.' },
-      { id: 2, user: 'Hoàng Anh', text: 'Mọi người ăn ghẹ ở Hàm Ninh nhớ chọn quán ven bè ăn tươi hơn nhé.' }
-    ]
-  },
-  {
-    id: 3,
-    name: 'Đồng Hành Đà Nẵng - Hội An',
-    tag: 'Kết bạn / Ghép xe',
-    members: 184,
-    image: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?auto=format&fit=crop&w=300&q=80',
-    lastMessage: 'Tuấn Đạt: Nhóm mình còn trống 2 chỗ đi Bà Nà Hills sáng thứ 5, ai đi cùng không?',
-    messages: [
-      { id: 1, user: 'Tuấn Đạt', text: 'Nhóm mình còn trống 2 chỗ đi Bà Nà Hills sáng thứ 5, ai đi cùng không?' }
-    ]
-  }
-];
+const initialGroups = [];
+
+const SEEDED_GROUP_IDS = new Set([1, 2, 3]);
+
+const sanitizeGroups = (items) => (
+  Array.isArray(items)
+    ? items.filter((group) => group && !SEEDED_GROUP_IDS.has(Number(group.id)))
+    : []
+);
 
 export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, prevScreen }) {
   const [groups, setGroups] = useState(initialGroups);
@@ -177,7 +131,9 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     let active = true;
     loadAppData(ownerId, 'chat')
       .then(saved => {
-        if (active && Array.isArray(saved?.groups)) setGroups(saved.groups);
+        if (active) {
+          setGroups(sanitizeGroups(saved?.groups));
+        }
       })
       .catch(error => console.warn('Không thể tải nhóm chat:', error.message))
       .finally(() => active && setGroupsOwnerId(ownerId));

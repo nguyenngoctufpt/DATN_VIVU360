@@ -158,14 +158,14 @@ export default function App() {
 
   // Global User Info State (synchronized across all views)
   const [userInfo, setUserInfo] = useState({
-    name: 'Nguyễn Minh',
-    email: 'minh.nguyen@vivu360.vn',
+    name: 'Bạn',
+    email: '',
     avatar: 'https://i.pravatar.cc/150?img=68',
-    phone: '0987654321',
+    phone: '',
     bio: 'Thích tìm hiểu lịch sử, danh lam thắng cảnh. Thích trải nghiệm tham quan ảo AR 360 độ trên Vivu360! 🌐🎒',
-    level: 'Cấp 8',
-    points: 8250,
-    checkedIn: [1], // Checked-in places log (1 represents Vịnh Hạ Long)
+    level: 'Cấp 1',
+    points: 0,
+    checkedIn: [],
   });
 
   useEffect(() => {
@@ -279,6 +279,19 @@ export default function App() {
     });
   };
 
+  const handleLogout = () => {
+    signOut(auth)
+      .then(() => {
+        setIsLoggedIn(false);
+        setAuthRoute('login');
+        setActiveNav('social');
+        Alert.alert('Đăng xuất', 'Đã đăng xuất tài khoản thành công!');
+      })
+      .catch(() => {
+        Alert.alert('Lỗi', 'Không thể đăng xuất, vui lòng thử lại.');
+      });
+  };
+
   // Category list size calculator
   const displayedCategories = useMemo(() => {
     return expandedCategories ? allCategories : allCategories.slice(0, 8);
@@ -340,7 +353,7 @@ export default function App() {
           />
         );
       case 'social':
-        return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} />;
+        return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} onLogout={handleLogout} />;
       case 'chat':
         return <ChatScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} prevScreen={prevNav} />;
       case 'camera':
@@ -424,18 +437,7 @@ export default function App() {
             onViewTicketList={() => setActiveNav('ticketList')}
             onViewTiers={() => setActiveNav('membershipTiers')}
             onViewChallenges={() => setActiveNav('travelChallenges')}
-            onLogout={() => {
-              signOut(auth)
-                .then(() => {
-                  setIsLoggedIn(false);
-                  setAuthRoute('login');
-                  setActiveNav('social');
-                  Alert.alert('Đăng xuất', 'Đã đăng xuất tài khoản thành công!');
-                })
-                .catch((error) => {
-                  Alert.alert('Lỗi', 'Không thể đăng xuất, vui lòng thử lại.');
-                });
-            }}
+            onLogout={handleLogout}
           />
         );
       case 'ticketList':
@@ -499,7 +501,7 @@ export default function App() {
         );
       case 'home':
       default:
-        return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} />;
+        return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} onLogout={handleLogout} />;
     }
   };
 
