@@ -18,6 +18,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { loadAppData, saveAppData } from '../services/appDataService';
 import { searchFriends } from '../services/userService';
+import { addChatMembers, createChatGroup, getChatGroups, getChatMessages, removeChatMember, renameChatGroup, sendChatMessage } from '../services/chatService';
 import { fetchGoogleWeatherForecast } from '../services/googleWeatherService';
 import {
   X,
@@ -675,6 +676,28 @@ const normalizeGroup = (group, currentUser, ownerId) => {
 
 const buildDefaultGroups = (currentUser, ownerId) => sanitizeGroups(initialGroups).map((group) => normalizeGroup(group, currentUser, ownerId));
 
+const normalizeApiMessage = (message, currentUser, ownerId) => ({
+  id: message._id || message.id,
+  senderId: message.senderId,
+  user: message.sender?.name || (message.senderId === ownerId ? currentUser?.name : 'Thành viên Vivu360'),
+  avatar: message.sender?.avatar || '',
+  text: message.content || '',
+  createdAt: message.createdAt,
+});
+
+const normalizeApiGroup = (group, currentUser, ownerId) => normalizeGroup({
+  id: group._id || group.id,
+  name: group.name,
+  image: group.avatar || GROUP_IMAGES[0],
+  tag: 'Du lịch',
+  creatorId: group.ownerId,
+  leaderId: group.ownerId,
+  deputyIds: (group.admins || []).filter((id) => id !== group.ownerId),
+  membersList: group.memberProfiles || [],
+  lastMessage: group.lastMessage ? `${group.lastMessage.senderId === ownerId ? currentUser?.name || 'Bạn' : 'Thành viên'}: ${group.lastMessage.content}` : 'Nhóm chưa có tin nhắn',
+  messages: [],
+}, currentUser, ownerId);
+
 const getMemberRole = (group, memberId) => {
   if (!group || !memberId) return 'member';
   if (group.leaderId === memberId) return 'leader';
@@ -771,6 +794,8 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const [memberSearchResults, setMemberSearchResults] = useState([]);
   const [memberSearchError, setMemberSearchError] = useState('');
   const [isSearchingMembers, setIsSearchingMembers] = useState(false);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   const [planDaysInput, setPlanDaysInput] = useState('3');
   const [planStartDate, setPlanStartDate] = useState(getTodayIso());
@@ -798,29 +823,50 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
     let active = true;
 
-    loadAppData(ownerId, 'chat')
-      .then((saved) => {
+    setIsLoadingGroups(true);
+    Promise.all([getChatGroups(ownerId), loadAppData(ownerId, 'chat').catch(() => null)])
+      .then(([apiGroups, saved]) => {
         if (!active) return;
 
-        const sanitizedGroups = sanitizeGroups(saved?.groups);
-        if (sanitizedGroups.length) {
-          setGroups(sanitizedGroups.map((group) => normalizeGroup(group, currentUser, ownerId)));
-        } else {
-          setGroups(buildDefaultGroups(currentUser, ownerId));
-        }
+        const savedMap = new Map(sanitizeGroups(saved?.groups).map(group => [String(group.id), group]));
+        setGroups((apiGroups || []).map(apiGroup => {
+          const remote = normalizeApiGroup(apiGroup, currentUser, ownerId);
+          const local = savedMap.get(String(remote.id));
+          return local ? normalizeGroup({ ...local, ...remote, itinerary: local.itinerary, fund: local.fund }, currentUser, ownerId) : remote;
+        }));
       })
       .catch((error) => {
         console.warn('Không thể tải nhóm chat:', error.message);
-        if (active) setGroups(buildDefaultGroups(currentUser, ownerId));
+        if (active) Alert.alert('Không thể tải chat', 'Hãy kiểm tra Vivu360_API đang chạy và thử lại.');
       })
       .finally(() => {
-        if (active) setGroupsOwnerId(ownerId);
+        if (active) {
+          setGroupsOwnerId(ownerId);
+          setIsLoadingGroups(false);
+        }
       });
 
     return () => {
       active = false;
     };
   }, [ownerId, currentUser?.name, currentUser?.avatar, currentUser?.email]);
+
+  useEffect(() => {
+    if (!chatModalVisible || !selectedGroupId || !ownerId) return undefined;
+    let active = true;
+    const loadMessages = () => getChatMessages(selectedGroupId, ownerId)
+      .then(messages => {
+        if (!active) return;
+        setGroups(prevGroups => prevGroups.map(group => group.id !== selectedGroupId ? group : normalizeGroup({
+          ...group,
+          messages: messages.map(message => normalizeApiMessage(message, currentUser, ownerId)),
+        }, currentUser, ownerId)));
+      })
+      .catch(error => console.warn('Không thể tải tin nhắn:', error.message));
+    loadMessages();
+    const timer = setInterval(loadMessages, 3000);
+    return () => { active = false; clearInterval(timer); };
+  }, [chatModalVisible, selectedGroupId, ownerId]);
 
   useEffect(() => {
     if (!ownerId || groupsOwnerId !== ownerId) return undefined;
@@ -875,13 +921,6 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     if (!settingsVisible) return undefined;
 
     const query = memberSearchText.trim();
-    if (query.length < 2) {
-      setMemberSearchResults([]);
-      setMemberSearchError('');
-      setIsSearchingMembers(false);
-      return undefined;
-    }
-
     let active = true;
     setIsSearchingMembers(true);
     setMemberSearchError('');
@@ -929,7 +968,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     setGroups((prevGroups) => prevGroups.filter((group) => group.id !== groupId));
   };
 
-  const handleSubmitGroup = () => {
+  const handleSubmitGroup = async () => {
     if (!newGroupName.trim()) return;
 
     const creatorId = currentUserId;
@@ -945,39 +984,21 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     const startDate = getTodayIso();
     const endDate = shiftIsoDate(startDate, 2);
 
-    const newGroup = normalizeGroup(
-      {
-        id: Date.now(),
-        name: newGroupName.trim(),
+    try {
+      const avatar = GROUP_IMAGES[Math.floor(Math.random() * GROUP_IMAGES.length)];
+      const created = await createChatGroup({ name: newGroupName.trim(), avatar, ownerId });
+      const newGroup = normalizeGroup({
+        ...normalizeApiGroup({ ...created, memberProfiles: [creatorMember] }, currentUser, ownerId),
         tag: newGroupTag.trim() || 'Du lịch',
-        image: GROUP_IMAGES[Math.floor(Math.random() * GROUP_IMAGES.length)],
-        lastMessage: 'Hệ thống: Nhóm vừa được khởi tạo bởi bạn',
-        messages: [
-          {
-            id: Date.now(),
-            user: 'Hệ thống',
-            text: `Nhóm ${newGroupName.trim()} đã được tạo. Trưởng nhóm hiện tại là ${creatorMember.name}.`,
-          },
-        ],
-        membersList: [creatorMember],
-        creatorId,
-        leaderId: creatorId,
-        deputyIds: [],
-        itinerary: {
-          startDate,
-          endDate,
-          daysCount: 3,
-          destinationId: matchedDestination.id,
-        },
-      },
-      currentUser,
-      ownerId
-    );
-
-    setGroups((prevGroups) => [newGroup, ...prevGroups]);
-    setNewGroupName('');
-    setNewGroupTag('');
-    setGroupModalVisible(false);
+        itinerary: { startDate, endDate, daysCount: 3, destinationId: matchedDestination.id },
+      }, currentUser, ownerId);
+      setGroups((prevGroups) => [newGroup, ...prevGroups]);
+      setNewGroupName('');
+      setNewGroupTag('');
+      setGroupModalVisible(false);
+    } catch (error) {
+      Alert.alert('Không thể tạo nhóm', error.response?.data?.message || 'Vui lòng thử lại.');
+    }
   };
 
   const handleOpenChat = (group) => {
@@ -986,23 +1007,21 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     setChatModalVisible(true);
   };
 
-  const handleSendChatMessage = () => {
+  const handleSendChatMessage = async () => {
     if (!chatInput.trim() || !selectedGroup) return;
 
     const trimmedMessage = chatInput.trim();
-    const newMessage = {
-      id: Date.now(),
-      user: currentUser?.name || 'Bạn',
-      text: trimmedMessage,
-    };
-
-    updateGroupById(selectedGroup.id, (group) => ({
-      ...group,
-      lastMessage: `${newMessage.user}: ${trimmedMessage}`,
-      messages: [...group.messages, newMessage],
-    }));
-
-    setChatInput('');
+    setIsSendingMessage(true);
+    try {
+      const sent = await sendChatMessage(selectedGroup.id, ownerId, trimmedMessage);
+      const newMessage = normalizeApiMessage({ ...sent, sender: { name: currentUser?.name, avatar: currentUser?.avatar } }, currentUser, ownerId);
+      updateGroupById(selectedGroup.id, (group) => ({ ...group, lastMessage: `${newMessage.user}: ${trimmedMessage}`, messages: [...group.messages, newMessage] }));
+      setChatInput('');
+    } catch (error) {
+      Alert.alert('Gửi tin nhắn thất bại', error.response?.data?.message || 'Vui lòng thử lại.');
+    } finally {
+      setIsSendingMessage(false);
+    }
   };
 
   const handleOpenUserProfile = (username) => {
@@ -1010,18 +1029,18 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     setProfileModalVisible(true);
   };
 
-  const handleRenameGroup = () => {
+  const handleRenameGroup = async () => {
     if (!selectedGroup || !renameGroupName.trim()) return;
-
-    updateGroupById(selectedGroup.id, (group) => ({
-      ...group,
-      name: renameGroupName.trim(),
-    }));
-
-    Alert.alert('Đã cập nhật', 'Tên nhóm đã được thay đổi.');
+    try {
+      await renameChatGroup(selectedGroup.id, ownerId, renameGroupName.trim());
+      updateGroupById(selectedGroup.id, (group) => ({ ...group, name: renameGroupName.trim() }));
+      Alert.alert('Đã cập nhật', 'Tên nhóm đã được thay đổi.');
+    } catch (error) {
+      Alert.alert('Không thể đổi tên', error.response?.data?.message || 'Bạn không có quyền thực hiện thao tác này.');
+    }
   };
 
-  const handleAddMember = (rawMember) => {
+  const handleAddMember = async (rawMember) => {
     if (!selectedGroup) return;
 
     const member = createMember(rawMember);
@@ -1032,28 +1051,18 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
       return;
     }
 
-    updateGroupById(selectedGroup.id, (group) => ({
-      ...group,
-      membersList: [...group.membersList, member],
-      lastMessage: `Hệ thống: ${member.name} vừa được thêm vào nhóm`,
-      messages: [
-        ...group.messages,
-        {
-          id: Date.now(),
-          user: 'Hệ thống',
-          text: `${member.name} vừa được thêm vào nhóm.`,
-        },
-      ],
-    }));
-
-    setMemberSearchText('');
-    setMemberSearchResults([]);
+    try {
+      await addChatMembers(selectedGroup.id, ownerId, [member.id]);
+      updateGroupById(selectedGroup.id, (group) => ({ ...group, membersList: [...group.membersList, member], lastMessage: `Hệ thống: ${member.name} vừa được thêm vào nhóm` }));
+      setMemberSearchText('');
+      setMemberSearchResults([]);
+    } catch (error) {
+      Alert.alert('Không thể thêm thành viên', error.response?.data?.message || 'Vui lòng thử lại.');
+    }
   };
 
   const handleQuickAddMember = () => {
-    const rawName = memberSearchText.trim();
-    if (!rawName) return;
-    handleAddMember({ name: rawName });
+    Alert.alert('Chọn người dùng Vivu360', 'Hãy nhập email hoặc số điện thoại rồi chọn đúng tài khoản trong danh sách tìm kiếm.');
   };
 
   const handleTransferLeader = (memberId) => {
@@ -1092,7 +1101,13 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
         {
           text: 'Xóa',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
+            try {
+              await removeChatMember(selectedGroup.id, ownerId, member.id);
+            } catch (error) {
+              Alert.alert('Không thể xóa thành viên', error.response?.data?.message || 'Bạn không có quyền thực hiện thao tác này.');
+              return;
+            }
             updateGroupById(selectedGroup.id, (group) => {
               const remainingMembers = group.membersList.filter((item) => item.id !== member.id);
               const nextLeaderId = member.id === group.leaderId
@@ -1337,7 +1352,9 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
             </LinearGradient>
           </Pressable>
 
-          {groups.length > 0 ? groups.map((group) => (
+          {isLoadingGroups ? (
+            <ActivityIndicator color="#3b82f6" style={{ marginTop: 32 }} />
+          ) : groups.length > 0 ? groups.map((group) => (
             <Pressable
               key={group.id}
               style={[styles.groupCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
@@ -1503,7 +1520,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                       }
 
                       const isMe = message.user === currentUser?.name;
-                      const messageTime = getFormattedMsgTime(message.id);
+                      const messageTime = getFormattedMsgTime(message.createdAt || message.id);
 
                       return (
                         <View key={message.id} style={[styles.msgWrapper, isMe ? styles.msgWrapperMe : null]}>
@@ -1520,7 +1537,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                           ) : (
                             <View style={styles.otherMsgRow}>
                               <Pressable onPress={() => { setChatModalVisible(false); handleOpenUserProfile(message.user); }}>
-                                <Image source={{ uri: getUserAvatarByName(message.user) }} style={styles.otherMsgAvatar} />
+                                <Image source={{ uri: message.avatar || getUserAvatarByName(message.user) }} style={styles.otherMsgAvatar} />
                               </Pressable>
 
                               <View style={styles.otherMsgCol}>
@@ -1604,7 +1621,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                         </Pressable>
                       </View>
 
-                      <Pressable style={styles.sendMsgBtn} onPress={handleSendChatMessage}>
+                      <Pressable style={[styles.sendMsgBtn, isSendingMessage && { opacity: 0.55 }]} onPress={handleSendChatMessage} disabled={isSendingMessage}>
                         <LinearGradient colors={['#06b6d4', '#3b82f6']} style={styles.sendMsgGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                           <Send size={14} color="#fff" />
                         </LinearGradient>
@@ -2001,13 +2018,6 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                       placeholder="Nhập tên, email hoặc số điện thoại"
                       placeholderTextColor={theme.textMuted}
                     />
-                  </View>
-
-                  <View style={styles.inlineActionRow}>
-                    <Pressable style={[styles.secondaryActionBtn, { backgroundColor: theme.cardGlass, borderColor: theme.border }]} onPress={handleQuickAddMember}>
-                      <UserPlus size={15} color="#3b82f6" />
-                      <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Thêm nhanh theo tên</Text>
-                    </Pressable>
                   </View>
 
                   {isSearchingMembers ? (
