@@ -676,14 +676,21 @@ const normalizeGroup = (group, currentUser, ownerId) => {
 
 const buildDefaultGroups = (currentUser, ownerId) => sanitizeGroups(initialGroups).map((group) => normalizeGroup(group, currentUser, ownerId));
 
-const normalizeApiMessage = (message, currentUser, ownerId) => ({
-  id: message._id || message.id,
-  senderId: message.senderId,
-  user: message.sender?.name || (message.senderId === ownerId ? currentUser?.name : 'Thành viên Vivu360'),
-  avatar: message.sender?.avatar || '',
-  text: message.content || '',
-  createdAt: message.createdAt,
-});
+const normalizeApiMessage = (message, currentUser, ownerId, membersList = []) => {
+  const groupMember = membersList.find(member => String(member.id) === String(message.senderId));
+  const senderProfile = String(message.senderId) === String(ownerId)
+    ? { ...message.sender, ...groupMember, name: currentUser?.name || groupMember?.name || message.sender?.name, avatar: currentUser?.avatar || groupMember?.avatar || message.sender?.avatar }
+    : { ...message.sender, ...groupMember };
+
+  return {
+    id: message._id || message.id,
+    senderId: message.senderId,
+    user: senderProfile.name || 'Thành viên Vivu360',
+    avatar: senderProfile.avatar || '',
+    text: message.content || '',
+    createdAt: message.createdAt,
+  };
+};
 
 const normalizeApiGroup = (group, currentUser, ownerId) => normalizeGroup({
   id: group._id || group.id,
@@ -694,7 +701,9 @@ const normalizeApiGroup = (group, currentUser, ownerId) => normalizeGroup({
   leaderId: group.ownerId,
   deputyIds: (group.admins || []).filter((id) => id !== group.ownerId),
   membersList: group.memberProfiles || [],
-  lastMessage: group.lastMessage ? `${group.lastMessage.senderId === ownerId ? currentUser?.name || 'Bạn' : 'Thành viên'}: ${group.lastMessage.content}` : 'Nhóm chưa có tin nhắn',
+  lastMessage: group.lastMessage ? `${group.lastMessage.senderId === ownerId
+    ? currentUser?.name || 'Bạn'
+    : group.memberProfiles?.find(member => member.firebaseUid === group.lastMessage.senderId)?.name || 'Thành viên'}: ${group.lastMessage.content}` : 'Nhóm chưa có tin nhắn',
   messages: [],
 }, currentUser, ownerId);
 
@@ -784,6 +793,10 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) || null;
+  const selectedMemberIds = (selectedGroup?.membersList || [])
+    .map((member) => String(member.id))
+    .sort()
+    .join('|');
 
   const [chatInput, setChatInput] = useState('');
   const [targetUsername, setTargetUsername] = useState('');
@@ -859,7 +872,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
         if (!active) return;
         setGroups(prevGroups => prevGroups.map(group => group.id !== selectedGroupId ? group : normalizeGroup({
           ...group,
-          messages: messages.map(message => normalizeApiMessage(message, currentUser, ownerId)),
+          messages: messages.map(message => normalizeApiMessage(message, currentUser, ownerId, group.membersList)),
         }, currentUser, ownerId)));
       })
       .catch(error => console.warn('Không thể tải tin nhắn:', error.message));
@@ -953,7 +966,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
       active = false;
       clearTimeout(timer);
     };
-  }, [memberSearchText, settingsVisible, ownerId, selectedGroup?.membersList]);
+  }, [memberSearchText, settingsVisible, ownerId, selectedGroupId, selectedMemberIds]);
 
   const updateGroupById = (groupId, updater) => {
     setGroups((prevGroups) =>
@@ -1014,7 +1027,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     setIsSendingMessage(true);
     try {
       const sent = await sendChatMessage(selectedGroup.id, ownerId, trimmedMessage);
-      const newMessage = normalizeApiMessage({ ...sent, sender: { name: currentUser?.name, avatar: currentUser?.avatar } }, currentUser, ownerId);
+      const newMessage = normalizeApiMessage({ ...sent, sender: { name: currentUser?.name, avatar: currentUser?.avatar } }, currentUser, ownerId, selectedGroup.membersList);
       updateGroupById(selectedGroup.id, (group) => ({ ...group, lastMessage: `${newMessage.user}: ${trimmedMessage}`, messages: [...group.messages, newMessage] }));
       setChatInput('');
     } catch (error) {
@@ -1519,7 +1532,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                         );
                       }
 
-                      const isMe = message.user === currentUser?.name;
+                      const isMe = String(message.senderId) === String(ownerId);
                       const messageTime = getFormattedMsgTime(message.createdAt || message.id);
 
                       return (
