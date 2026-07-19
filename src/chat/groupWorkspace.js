@@ -205,55 +205,18 @@ const TRAVEL_DESTINATIONS = [
   },
 ];
 
-const initialGroups = [
-  {
-    id: 1,
-    name: 'Hội Săn Mây Sa Pa 2026',
-    tag: 'Sa Pa / Phượt',
-    image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=300&q=80',
-    lastMessage: 'Minh Trang: Ngày mai có ai lên Ô Quy Hồ ngắm bình minh không?',
-    messages: [
-      { id: 1, user: 'Duy Mạnh', text: 'Dự báo mai mây dày đẹp lắm đó mọi người.' },
-      { id: 2, user: 'Minh Trang', text: 'Ngày mai có ai lên Ô Quy Hồ ngắm bình minh không?' },
-    ],
-    sampleMembers: ['Nguyễn Minh', 'Minh Trang', 'Duy Mạnh', 'Khánh An'],
-  },
-  {
-    id: 2,
-    name: 'Kinh Nghiệm Phú Quốc Tự Túc',
-    tag: 'Ẩm thực / Khách sạn',
-    image: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=300&q=80',
-    lastMessage: 'Hoàng Anh: Mọi người ăn ghẹ Hàm Ninh nhớ chọn quán sát bờ cho tươi nhé.',
-    messages: [
-      { id: 1, user: 'Mai Phương', text: 'Ghẹ Hàm Ninh mùa này ngon lắm mọi người ạ.' },
-      { id: 2, user: 'Hoàng Anh', text: 'Mọi người ăn ghẹ Hàm Ninh nhớ chọn quán sát bờ cho tươi nhé.' },
-    ],
-    sampleMembers: ['Nguyễn Minh', 'Hoàng Anh', 'Mai Phương', 'Quốc Bảo'],
-  },
-  {
-    id: 3,
-    name: 'Đồng Hành Đà Nẵng - Hội An',
-    tag: 'Kết bạn / Ghép xe',
-    image: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?auto=format&fit=crop&w=300&q=80',
-    lastMessage: 'Tuấn Đạt: Nhóm mình còn trống 2 chỗ đi Bà Nà Hills sáng thứ 5.',
-    messages: [
-      { id: 1, user: 'Tuấn Đạt', text: 'Nhóm mình còn trống 2 chỗ đi Bà Nà Hills sáng thứ 5.' },
-    ],
-    sampleMembers: ['Nguyễn Minh', 'Tuấn Đạt', 'Linh Chi', 'Thanh Hằng'],
-  },
-];
+const initialGroups = [];
+
+const SEEDED_GROUP_IDS = new Set([1, 2, 3]);
+
+const sanitizeGroups = (items) => (
+  Array.isArray(items)
+    ? items.filter((group) => group && !SEEDED_GROUP_IDS.has(Number(group.id)))
+    : []
+);
 
 const getUserAvatarByName = (name) => {
   if (!name) return 'https://i.pravatar.cc/150?img=11';
-  if (name === 'Thanh Hằng') return 'https://i.pravatar.cc/150?img=47';
-  if (name === 'Trần Nam') return 'https://i.pravatar.cc/150?img=12';
-  if (name === 'Quốc Bảo') return 'https://i.pravatar.cc/150?img=33';
-  if (name === 'Linh Chi') return 'https://i.pravatar.cc/150?img=26';
-  if (name === 'Minh Trang') return 'https://i.pravatar.cc/150?img=48';
-  if (name === 'Duy Mạnh') return 'https://i.pravatar.cc/150?img=15';
-  if (name === 'Mai Phương') return 'https://i.pravatar.cc/150?img=28';
-  if (name === 'Hoàng Anh') return 'https://i.pravatar.cc/150?img=18';
-  if (name === 'Tuấn Đạt') return 'https://i.pravatar.cc/150?img=14';
 
   let hash = 0;
   for (let i = 0; i < name.length; i += 1) {
@@ -265,15 +228,6 @@ const getUserAvatarByName = (name) => {
 };
 
 const getUserLevelByName = (name) => {
-  if (name === 'Thanh Hằng') return 'Cấp 12';
-  if (name === 'Quốc Bảo') return 'Cấp 15';
-  if (name === 'Khánh An') return 'Cấp 9';
-  if (name === 'Duy Mạnh') return 'Cấp 10';
-  if (name === 'Minh Trang') return 'Cấp 11';
-  if (name === 'Mai Phương') return 'Cấp 8';
-  if (name === 'Hoàng Anh') return 'Cấp 14';
-  if (name === 'Tuấn Đạt') return 'Cấp 7';
-
   let hash = 0;
   for (let i = 0; i < name.length; i += 1) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -684,9 +638,7 @@ const normalizeGroup = (group, currentUser, ownerId) => {
 
   let membersList = Array.isArray(group?.membersList) && group.membersList.length
     ? group.membersList.map(createMember)
-    : Array.isArray(group?.sampleMembers) && group.sampleMembers.length
-      ? group.sampleMembers.map((member) => (typeof member === 'string' ? createMember({ name: member }) : createMember(member)))
-      : [currentMember];
+    : [currentMember];
 
   membersList = dedupeMembers([currentMember, ...membersList]);
 
@@ -721,7 +673,7 @@ const normalizeGroup = (group, currentUser, ownerId) => {
   };
 };
 
-const buildDefaultGroups = (currentUser, ownerId) => initialGroups.map((group) => normalizeGroup(group, currentUser, ownerId));
+const buildDefaultGroups = (currentUser, ownerId) => sanitizeGroups(initialGroups).map((group) => normalizeGroup(group, currentUser, ownerId));
 
 const getMemberRole = (group, memberId) => {
   if (!group || !memberId) return 'member';
@@ -850,8 +802,9 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
       .then((saved) => {
         if (!active) return;
 
-        if (Array.isArray(saved?.groups) && saved.groups.length) {
-          setGroups(saved.groups.map((group) => normalizeGroup(group, currentUser, ownerId)));
+        const sanitizedGroups = sanitizeGroups(saved?.groups);
+        if (sanitizedGroups.length) {
+          setGroups(sanitizedGroups.map((group) => normalizeGroup(group, currentUser, ownerId)));
         } else {
           setGroups(buildDefaultGroups(currentUser, ownerId));
         }
@@ -1384,7 +1337,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
             </LinearGradient>
           </Pressable>
 
-          {groups.map((group) => (
+          {groups.length > 0 ? groups.map((group) => (
             <Pressable
               key={group.id}
               style={[styles.groupCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
@@ -1393,15 +1346,12 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
               <Image source={{ uri: group.image }} style={styles.groupCoverImage} />
               <View style={styles.groupCardInfo}>
                 <View style={styles.groupTitleRow}>
-                  <Text numberOfLines={1} style={[styles.groupCardName, { color: theme.textPrimary }]}>
-                    {group.name}
-                  </Text>
+                  <Text numberOfLines={1} style={[styles.groupCardName, { color: theme.textPrimary }]}>{group.name}</Text>
                   <View style={[styles.groupMembersCount, { backgroundColor: theme.statusBg, borderColor: theme.border, borderWidth: 0.5 }]}>
                     <Users size={11} color="#3b82f6" />
-                    <Text style={[styles.groupMembersText, { color: '#3b82f6' }]}>{group.members} TV</Text>
+                    <Text style={[styles.groupMembersText, { color: "#3b82f6" }]}>{group.members} TV</Text>
                   </View>
                 </View>
-
                 <View style={styles.groupTagsContainer}>
                   {String(group.tag || '')
                     .split(' / ')
@@ -1415,13 +1365,17 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                       );
                     })}
                 </View>
-
-                <Text numberOfLines={1} style={[styles.groupCardLastMsg, { color: theme.textSecondary }]}>
-                  {group.lastMessage}
-                </Text>
+                <Text numberOfLines={1} style={[styles.groupCardLastMsg, { color: theme.textSecondary }]}>{group.lastMessage}</Text>
               </View>
             </Pressable>
-          ))}
+          )) : (
+            <View style={[styles.groupCard, { backgroundColor: theme.cardGlass, borderColor: theme.border, alignItems: "center", paddingVertical: 28, paddingHorizontal: 18 }]}>
+              <Text style={[styles.groupCardName, { color: theme.textPrimary, textAlign: "center" }]}>Chưa có nhóm chat nào</Text>
+              <Text style={[styles.groupCardLastMsg, { color: theme.textSecondary, textAlign: "center", marginTop: 8 }]}>
+                Tạo nhóm đầu tiên để bắt đầu trò chuyện, lập lịch trình và quản lý quỹ cùng nhau.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 

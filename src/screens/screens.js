@@ -917,7 +917,7 @@ export function ExploreScreen({
   // Booking Form State
   const [bookingDate, setBookingDate] = useState('2026-06-20');
   const [quantity, setQuantity] = useState(1);
-  const [contactName, setContactName] = useState('Nguyễn Minh');
+  const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('0987654321');
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);

@@ -28,6 +28,7 @@ import {
   Newspaper,
   Search,
   Menu,
+  BellRing,
   Compass,
   Map,
   Ticket,
@@ -94,35 +95,17 @@ const { width, height } = Dimensions.get('window');
 
 const getUserAvatarByName = (name) => {
   if (!name) return 'https://i.pravatar.cc/150?img=11';
-  if (name === 'Thanh Hằng') return 'https://i.pravatar.cc/150?img=47';
-  if (name === 'Trần Nam') return 'https://i.pravatar.cc/150?img=12';
-  if (name === 'Quốc Bảo') return 'https://i.pravatar.cc/150?img=33';
-  if (name === 'Linh Chi') return 'https://i.pravatar.cc/150?img=26';
-  if (name === 'Minh Trang') return 'https://i.pravatar.cc/150?img=48';
-  if (name === 'Duy Mạnh') return 'https://i.pravatar.cc/150?img=15';
-  if (name === 'Mai Phương') return 'https://i.pravatar.cc/150?img=28';
-  if (name === 'Hoàng Anh') return 'https://i.pravatar.cc/150?img=18';
-  if (name === 'Tuấn Đạt') return 'https://i.pravatar.cc/150?img=14';
-  
-  // Hash name to get a consistent image index between 1 and 70
+
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
+
   const imgIndex = Math.abs(hash % 70) + 1;
   return `https://i.pravatar.cc/150?img=${imgIndex}`;
 };
 
 const getUserLevelByName = (name) => {
-  if (name === 'Thanh Hằng') return 'Cấp 12';
-  if (name === 'Quốc Bảo') return 'Cấp 15';
-  if (name === 'Khánh An') return 'Cấp 9';
-  if (name === 'Duy Mạnh') return 'Cấp 10';
-  if (name === 'Minh Trang') return 'Cấp 11';
-  if (name === 'Mai Phương') return 'Cấp 8';
-  if (name === 'Hoàng Anh') return 'Cấp 14';
-  if (name === 'Tuấn Đạt') return 'Cấp 7';
-  
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -133,11 +116,9 @@ const getUserLevelByName = (name) => {
 const isSourceVerified = (name) => {
   if (!name) return false;
   const verifiedNames = [
-    'Ban truyền thông Vivu360', 
-    'Tạp chí Phượt Việt', 
-    'Góc Ẩm Thực Việt',
-    'Thanh Hằng',
-    'Quốc Bảo'
+    'Ban truyền thông Vivu360',
+    'Tạp chí Phượt Việt',
+    'Góc Ẩm Thực Việt'
   ];
   return verifiedNames.includes(name.trim());
 };
@@ -246,167 +227,35 @@ const popularCities = [
   }
 ];
 
-const travelFriends = [
-  { id: 1, name: 'Thanh Hằng', avatar: 'https://i.pravatar.cc/150?img=47', online: true },
-  { id: 2, name: 'Trần Nam', avatar: 'https://i.pravatar.cc/150?img=12', online: true },
-  { id: 3, name: 'Quốc Bảo', avatar: 'https://i.pravatar.cc/150?img=33', online: true },
-  { id: 4, name: 'Linh Chi', avatar: 'https://i.pravatar.cc/150?img=26', online: false },
-  { id: 5, name: 'Minh Trang', avatar: 'https://i.pravatar.cc/150?img=48', online: true },
-  { id: 6, name: 'Duy Mạnh', avatar: 'https://i.pravatar.cc/150?img=15', online: false },
-  { id: 7, name: 'Mai Phương', avatar: 'https://i.pravatar.cc/150?img=28', online: true },
-];
+const travelFriends = [];
 
-const initialPosts = [
-  {
-    id: 1,
-    title: 'Hành trình 3 ngày 2 đêm săn hoàng hôn và Carnival rực rỡ tại Vịnh Hạ Long',
-    category: 'Khám phá',
-    source: 'Thanh Hằng',
-    time: '15 phút trước',
-    location: 'Vịnh Hạ Long, Quảng Ninh',
-    duration: '3 ngày 2 đêm',
-    companions: [
-      'https://i.pravatar.cc/150?img=47',
-      'https://i.pravatar.cc/150?img=12',
-      'https://i.pravatar.cc/150?img=33'
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1555921015-5532091f6026?auto=format&fit=crop&w=400&q=80'
-    ],
-    itinerary: [
-      { day: 'Ngày 1', text: 'Nhận phòng khách sạn nghỉ ngơi, chiều đi du thuyền khám phá Hòn Trống Mái, Hang Sửng Sốt.' },
-      { day: 'Ngày 2', text: 'Chèo kayak quanh Hang Luồn, chiều tối hoà mình vào lễ hội diễu hành Hạ Long Carnival sầm uất.' },
-      { day: 'Ngày 3', text: 'Check-in bảo tàng Quảng Ninh cực chất và thưởng thức chả mực nóng nổi trước khi về.' }
-    ],
-    content: 'Chúng tôi vừa hoàn thành chuyến đi tuyệt vời tại Vịnh Hạ Long. Mùa hè này thời tiết vô cùng lý tưởng để chèo kayak và ngắm nhìn những dãy núi đá vôi hùng vĩ. Đêm hội Carnival vô cùng sôi động với dàn công nghệ 3D Mapping hoành tráng.',
-    image: 'https://images.unsplash.com/photo-1524230507669-e297d477b24d?auto=format&fit=crop&w=600&q=80',
-    likes: 124,
-    commentsCount: 2,
-    likedByUser: false,
-    comments: [
-      { id: 1, user: 'Trần Nam', text: 'Quá hoành tráng! Tôi vừa đặt vé và phòng khách sạn trên app để đi vào cuối tuần này.' },
-      { id: 2, user: 'Quốc Bảo', text: 'Đợt này đi Hạ Long xem bản đồ hướng dẫn 3D trên app rất tiện lợi, đỡ bị lạc đường.' }
-    ],
-    user: { name: 'Thanh Hằng', avatar: 'https://i.pravatar.cc/150?img=47', level: 'Cấp 12', points: 12400 }
-  },
-  {
-    id: 2,
-    title: 'Chinh phục đỉnh Fansipan mùa săn mây trắng xoá trôi bồng bềnh',
-    category: 'Cẩm nang',
-    source: 'Quốc Bảo',
-    time: '2 giờ trước',
-    location: 'Đỉnh Fansipan, Sa Pa',
-    duration: '2 ngày 1 đêm',
-    companions: [
-      'https://i.pravatar.cc/150?img=26',
-      'https://i.pravatar.cc/150?img=33',
-      'https://i.pravatar.cc/150?img=48'
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1486916856992-e4db22c8df33?auto=format&fit=crop&w=400&q=80'
-    ],
-    itinerary: [
-      { day: 'Ngày 1', text: 'Di chuyển lên thị trấn Sa Pa xe giường nằm, tham quan bản Cát Cát mộc mạc và ăn đồ nướng.' },
-      { day: 'Ngày 2', text: 'Dậy sớm đi cáp treo lên Fansipan đón bình minh và săn biển mây cuộn sóng, ngắm nhìn nóc nhà Đông Dương.' }
-    ],
-    content: 'Chuyến săn mây thành công ngoài mong đợi! Biển mây Sapa dày đặc bao phủ toàn bộ thung lũng tạo cảm giác như đứng giữa thiên đường. Nhiệt độ trên đỉnh Fansipan buổi sáng khá lạnh (khoảng 8 độ C), các bạn nhớ mang theo áo phao giữ ấm dày nhé.',
-    image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=600&q=80',
-    likes: 258,
-    commentsCount: 2,
-    likedByUser: true,
-    comments: [
-      { id: 1, user: 'Linh Chi', text: 'Sapa mùa này đúng là thiên đường săn mây luôn đó cả nhà, mê mệt!' },
-      { id: 2, user: 'Minh Trang', text: 'Ảnh chụp xuất sắc quá, mình cũng muốn lên đây cắm trại ngắm bình minh quá.' }
-    ],
-    user: { name: 'Quốc Bảo', avatar: 'https://i.pravatar.cc/150?img=33', level: 'Cấp 15', points: 15200 }
-  },
-  {
-    id: 3,
-    title: 'Khám phá thiên đường Đảo Ngọc: Top 5 đặc sản hải sản tại Chợ Đêm',
-    category: 'Ẩm thực',
-    source: 'Khánh An',
-    time: '5 giờ trước',
-    location: 'Bãi Sao, Phú Quốc',
-    duration: '3 ngày 2 đêm',
-    companions: [
-      'https://i.pravatar.cc/150?img=22',
-      'https://i.pravatar.cc/150?img=15',
-      'https://i.pravatar.cc/150?img=28'
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=400&q=80'
-    ],
-    itinerary: [
-      { day: 'Ngày 1', text: 'Check-in khách sạn sát biển, đi dạo hoàng hôn Bãi Trường và ăn tối Chợ đêm Dương Đông.' },
-      { day: 'Ngày 2', text: 'Đi tour 4 đảo cáp treo Hòn Thơm, lặn ngắm san hô biển Nam Đảo hoang sơ.' },
-      { day: 'Ngày 3', text: 'Tắm biển nghỉ ngơi thư giãn tại resort trước khi ra sân bay về lại Hà Nội.' }
-    ],
-    content: 'Gỏi cá trích cuốn bánh tráng chấm sốt đậu phộng bùi bùi, ghẹ Hàm Ninh ngọt lịm chắc thịt hay bún quậy Kiến Xây nóng hổi cay nồng là những món ăn ngon nức tiếng tại Phú Quốc. Hãy ghé chợ đêm để được thưởng thức hải sản tươi rói chế biến tại chỗ nhé.',
-    image: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=600&q=80',
-    likes: 95,
-    commentsCount: 0,
-    likedByUser: false,
-    comments: [],
-    user: { name: 'Khánh An', avatar: 'https://i.pravatar.cc/150?img=22', level: 'Cấp 9', points: 9150 }
-  }
-];
+const initialPosts = [];
 
-const initialGroups = [
-  {
-    id: 1,
-    name: 'Hội Săn Mây Sa Pa 2026',
-    tag: 'Sapa / Phượt',
-    members: 342,
-    image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=300&q=80',
-    lastMessage: 'Minh Trang: Ngày mai có ai lên đỉnh đèo Ô Quy Hồ ngắm bình minh không?',
-    messages: [
-      { id: 1, user: 'Duy Mạnh', text: 'Dự báo mai mây dày lắm đó mn.' },
-      { id: 2, user: 'Minh Trang', text: 'Ngày mai có ai lên đỉnh đèo Ô Quy Hồ ngắm bình minh không?' }
-    ]
-  },
-  {
-    id: 2,
-    name: 'Kinh Nghiệm Phú Quốc Tự Túc',
-    tag: 'Ẩm thực / Khách sạn',
-    members: 1205,
-    image: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=300&q=80',
-    lastMessage: 'Hoàng Anh: Mọi người ăn ghẹ ở Hàm Ninh nhớ chọn quán ven bè ăn tươi hơn nhé.',
-    messages: [
-      { id: 1, user: 'Mai Phương', text: 'Ghẹ Hàm Ninh đang vào mùa ngon lắm ạ.' },
-      { id: 2, user: 'Hoàng Anh', text: 'Mọi người ăn ghẹ ở Hàm Ninh nhớ chọn quán ven bè ăn tươi hơn nhé.' }
-    ]
-  },
-  {
-    id: 3,
-    name: 'Đồng Hành Đà Nẵng - Hội An',
-    tag: 'Kết bạn / Ghép xe',
-    members: 184,
-    image: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?auto=format&fit=crop&w=300&q=80',
-    lastMessage: 'Tuấn Đạt: Nhóm mình còn trống 2 chỗ đi Bà Nà Hills sáng thứ 5, ai đi cùng không?',
-    messages: [
-      { id: 1, user: 'Tuấn Đạt', text: 'Nhóm mình còn trống 2 chỗ đi Bà Nà Hills sáng thứ 5, ai đi cùng không?' }
-    ]
-  }
-];
+const initialGroups = [];
 
-export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab }) {
+const SEEDED_POST_IDS = new Set([1, 2, 3]);
+
+const sanitizePosts = (items) => (
+  Array.isArray(items)
+    ? items.filter((post) => post && !SEEDED_POST_IDS.has(Number(post.id)))
+    : []
+);
+
+export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, onLogout }) {
   const [posts, setPosts] = useState(initialPosts);
   const [postsOwnerId, setPostsOwnerId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
   const [menuVisible, setMenuVisible] = useState(false);
+  const [notificationVisible, setNotificationVisible] = useState(false);
 
   useEffect(() => {
     if (!ownerId) return;
     let active = true;
     loadAppData(ownerId, 'social')
       .then(saved => {
-        if (active && Array.isArray(saved?.posts)) setPosts(saved.posts);
+        if (active) {
+          setPosts(sanitizePosts(saved?.posts));
+        }
       })
       .catch(error => console.warn('Không thể tải bài viết:', error.message))
       .finally(() => active && setPostsOwnerId(ownerId));
@@ -422,13 +271,9 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
     return () => clearTimeout(timer);
   }, [ownerId, postsOwnerId, posts]);
 
-  const mockStories = useMemo(() => [
-    { id: 1, name: 'Tin của bạn', image: currentUser.avatar, isCreate: true },
-    { id: 2, name: 'Thanh Hằng', image: 'https://images.unsplash.com/photo-1524230507669-e297d477b24d?auto=format&fit=crop&w=300&q=80', avatar: 'https://i.pravatar.cc/150?img=47' },
-    { id: 3, name: 'Quốc Bảo', image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=300&q=80', avatar: 'https://i.pravatar.cc/150?img=33' },
-    { id: 4, name: 'Linh Chi', image: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?auto=format&fit=crop&w=300&q=80', avatar: 'https://i.pravatar.cc/150?img=26' },
-    { id: 5, name: 'Minh Trang', image: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=300&q=80', avatar: 'https://i.pravatar.cc/150?img=48' },
-  ], [currentUser]);
+  const mockStories = useMemo(() => [], []);
+
+  const notifications = useMemo(() => [], []);
 
   // View states within social tab: 'feed' | 'createPost'
   const [activeView, setActiveView] = useState('feed');
@@ -667,9 +512,9 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             </Pressable>
             <Pressable 
               style={({ pressed }) => [styles.messengerIconBtn, { backgroundColor: theme.searchBg }, pressed && { opacity: 0.7 }]}
-              onPress={() => onNavigateToTab && onNavigateToTab('chat')}
+              onPress={() => setNotificationVisible(true)}
             >
-              <MessageCircle size={22} color={theme.textPrimary} />
+              <BellRing size={22} color={theme.textPrimary} />
               <View style={styles.messengerBadge} />
             </Pressable>
           </View>
@@ -782,7 +627,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             <Pressable style={styles.addFriendCircle} onPress={() => Alert.alert('Tính năng', 'Tìm bạn đồng hành qua mã QR quét vị trí!')}>
               <Plus size={20} color={theme.textSecondary} />
             </Pressable>
-            {travelFriends.map((friend) => (
+            {travelFriends.length > 0 ? travelFriends.map((friend) => (
               <Pressable key={friend.id} style={styles.friendAvatarCheck} onPress={() => setSearchText(friend.name)}>
                 <View style={styles.friendAvatarWrap}>
                   <Image source={{ uri: friend.avatar }} style={styles.friendAvatarCircle} />
@@ -790,7 +635,13 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                 </View>
                 <Text style={[styles.friendNameMin, { color: theme.textPrimary }]} numberOfLines={1}>{friend.name.split(' ')[1] || friend.name}</Text>
               </Pressable>
-            ))}
+            )) : (
+              <View style={{ justifyContent: "center", paddingHorizontal: 12, maxWidth: 260 }}>
+                <Text style={{ color: theme.textSecondary, fontSize: 11.5, fontWeight: "600", lineHeight: 17 }}>
+                  Chưa có bạn đồng hành nào được đồng bộ. Hãy tìm bạn bằng email hoặc số điện thoại.
+                </Text>
+              </View>
+            )}
           </ScrollView>
         </View>
 
@@ -832,10 +683,13 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             {(() => {
               const listToRender = displayListPosts;
               if (listToRender.length === 0) {
+                const emptyMessage = posts.length === 0 && !searchText.trim() && selectedCategory === 'Tất cả'
+                  ? 'Chưa có bài đăng nào. Hãy tạo bài đăng đầu tiên của bạn.'
+                  : 'Không tìm thấy chuyến đi tương ứng.';
                 return (
-                  <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                    <Text style={{ color: theme.textSecondary, fontWeight: '700', fontSize: 13 }}>
-                      Không tìm thấy chuyến đi tương ứng.
+                  <View style={{ alignItems: "center", paddingVertical: 60, paddingHorizontal: 24 }}>
+                    <Text style={{ color: theme.textSecondary, fontWeight: "700", fontSize: 13, textAlign: "center", lineHeight: 20 }}>
+                      {emptyMessage}
                     </Text>
                   </View>
                 );
@@ -884,7 +738,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       {/* Companion avatars list */}
                       <View style={styles.avatarGroupContainer}>
-                        {(post.companions || ['https://i.pravatar.cc/150?img=47', 'https://i.pravatar.cc/150?img=12']).map((cAvatar, idx) => (
+                        {(post.companions || []).map((cAvatar, idx) => (
                           <Image key={idx} source={{ uri: cAvatar }} style={[styles.tripCompanionAvatar, { marginLeft: idx > 0 ? -12 : 0 }]} />
                         ))}
                       </View>
@@ -982,7 +836,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                     <Text style={{ fontSize: 10.5, color: theme.textMuted }}>{selectedPost.time} • Tác giả ký sự</Text>
                   </View>
                   <View style={styles.tripDetailCompanionGroup}>
-                    {(selectedPost.companions || ['https://i.pravatar.cc/150?img=47', 'https://i.pravatar.cc/150?img=12']).map((cAv, idx) => (
+                    {(selectedPost.companions || []).map((cAv, idx) => (
                       <Image key={idx} source={{ uri: cAv }} style={[styles.detailCompanionAvatarCircle, { marginLeft: idx > 0 ? -8 : 0 }]} />
                     ))}
                   </View>
@@ -998,11 +852,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                 {/* Photo Carousel (Scroll deck of secondary images like screen 3 in mockup) */}
                 <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textSecondary, marginLeft: 16, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Bộ ảnh hành trình</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10, marginBottom: 20 }}>
-                  {(selectedPost.images || [
-                    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=300&q=80',
-                    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=300&q=80',
-                    'https://images.unsplash.com/photo-1555921015-5532091f6026?auto=format&fit=crop&w=300&q=80'
-                  ]).map((imgUrl, index) => (
+                  {((selectedPost.images && selectedPost.images.length ? selectedPost.images : [selectedPost.image].filter(Boolean))).map((imgUrl, index) => (
                     <Image key={index} source={{ uri: imgUrl }} style={styles.itineraryCarouselImage} />
                   ))}
                 </ScrollView>
@@ -1010,11 +860,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                 {/* Day-by-Day Itinerary (like screen 3 list in mockup) */}
                 <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textSecondary, marginLeft: 16, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Lịch trình chi tiết</Text>
                 <View style={{ paddingHorizontal: 16, gap: 12, marginBottom: 24 }}>
-                  {(selectedPost.itinerary || [
-                    { day: 'Ngày 1', text: 'Nhận phòng, di chuyển ra bến tàu du lịch tham quan phong cảnh ảo di sản.' },
-                    { day: 'Ngày 2', text: 'Trải nghiệm quét điểm đến bằng AR 360°, thưởng thức ẩm thực đặc sắc.' },
-                    { day: 'Ngày 3', text: 'Chụp ảnh lưu niệm tại quảng trường địa phương và làm thủ tục check-out.' }
-                  ]).map((it, idx) => (
+                  {selectedPost.itinerary?.length ? selectedPost.itinerary.map((it, idx) => (
                     <View key={idx} style={[styles.itineraryDayCard, { backgroundColor: theme.searchBg, borderColor: theme.border }]}>
                       <View style={styles.itineraryDayHeader}>
                         <LinearGradient
@@ -1026,7 +872,13 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                       </View>
                       <Text style={[styles.itineraryDayText, { color: theme.textPrimary }]}>{it.text}</Text>
                     </View>
-                  ))}
+                  )) : (
+                    <View style={[styles.itineraryDayCard, { backgroundColor: theme.searchBg, borderColor: theme.border }]}>
+                      <Text style={[styles.itineraryDayText, { color: theme.textSecondary }]}>
+                        B?i vi?t n?y ch?a c? l?ch tr?nh chi ti?t.
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Comments section title */}
@@ -1143,6 +995,86 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                 </Pressable>
               );
             })}
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.sideMenuItem,
+                {
+                  marginTop: 12,
+                  borderWidth: 1,
+                  borderColor: 'rgba(239, 68, 68, 0.24)',
+                  backgroundColor: pressed ? 'rgba(239, 68, 68, 0.08)' : 'transparent'
+                }
+              ]}
+              onPress={() => {
+                setMenuVisible(false);
+                Alert.alert(
+                  'Đăng xuất tài khoản',
+                  'Bạn có muốn đăng xuất tài khoản không?',
+                  [
+                    { text: 'Không', style: 'cancel' },
+                    {
+                      text: 'Có',
+                      style: 'destructive',
+                      onPress: () => onLogout && onLogout(),
+                    },
+                  ]
+                );
+              }}
+            >
+              <View style={[styles.sideMenuIcon, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}><X size={19} color="#ef4444" /></View>
+              <Text style={[styles.sideMenuLabel, { color: '#ef4444' }]}>Đăng xuất tài khoản</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={notificationVisible} transparent animationType="fade" onRequestClose={() => setNotificationVisible(false)}>
+        <View style={styles.menuOverlay}>
+          <Pressable style={styles.menuDismissArea} onPress={() => setNotificationVisible(false)} />
+          <View style={[styles.sideMenu, { backgroundColor: theme.card, borderLeftColor: theme.border }]}>
+            <View style={[styles.sideMenuHeader, { borderBottomColor: theme.border }]}>
+              <View style={[styles.sideMenuIcon, { backgroundColor: theme.searchBg }]}><BellRing size={19} color="#3b82f6" /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sideMenuName, { color: theme.textPrimary }]}>Thông báo</Text>
+                <Text style={[styles.sideMenuEmail, { color: theme.textSecondary }]} numberOfLines={2}>
+                  Chỉ hiển thị thông báo thật từ hoạt động tài khoản của bạn
+                </Text>
+              </View>
+              <Pressable onPress={() => setNotificationVisible(false)} style={styles.sideMenuClose}>
+                <X size={19} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 8 }}>
+              {notifications.length > 0 ? notifications.map(item => {
+                const Icon = item.Icon;
+                return (
+                  <Pressable
+                    key={item.id}
+                    style={({ pressed }) => [styles.notificationItem, { borderBottomColor: theme.border }, pressed && { backgroundColor: theme.searchBg }]}
+                    onPress={() => {
+                      setNotificationVisible(false);
+                      item.onPress && item.onPress();
+                    }}
+                  >
+                    <View style={[styles.notificationIconWrap, { backgroundColor: `${item.color}1A` }]}><Icon size={18} color={item.color} /></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>{item.title}</Text>
+                      <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>{item.message}</Text>
+                      <Text style={[styles.notificationTime, { color: theme.textMuted }]}>{item.time}</Text>
+                    </View>
+                  </Pressable>
+                );
+              }) : (
+                <View style={{ paddingHorizontal: 18, paddingVertical: 28 }}>
+                  <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>Chưa có thông báo nào</Text>
+                  <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>
+                    Khi có lời mời kết bạn, người theo dõi hoặc tin nhắn thật, chúng sẽ hiển thị ở đây.
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1336,6 +1268,11 @@ const styles = StyleSheet.create({
   sideMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 58, paddingHorizontal: 8, borderRadius: 12 },
   sideMenuIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   sideMenuLabel: { flex: 1, fontSize: 13, fontWeight: '800' },
+  notificationItem: { flexDirection: 'row', gap: 12, paddingVertical: 14, borderBottomWidth: 1 },
+  notificationIconWrap: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  notificationTitle: { fontSize: 12.5, fontWeight: '800' },
+  notificationMessage: { fontSize: 11, lineHeight: 16, marginTop: 4, fontWeight: '500' },
+  notificationTime: { fontSize: 10, marginTop: 6, fontWeight: '600' },
   messengerBadge: { position: 'absolute', top: 8, right: 8, width: 9, height: 9, borderRadius: 4.5, backgroundColor: '#ef4444', borderWidth: 1.5, borderColor: '#fff' },
   socialTitle: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
   socialSubtitle: { fontSize: 12, fontWeight: '500', marginTop: 4, lineHeight: 16, marginLeft: 4 },

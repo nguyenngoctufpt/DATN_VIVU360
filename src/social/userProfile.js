@@ -19,136 +19,69 @@ const { width, height } = Dimensions.get('window');
 const isSourceVerified = (name) => {
   if (!name) return false;
   const verifiedNames = [
-    'Ban truyền thông Vivu360', 
-    'Tạp chí Phượt Việt', 
-    'Góc Ẩm Thực Việt',
-    'Thanh Hằng',
-    'Quốc Bảo'
+    'Ban truyền thông Vivu360',
+    'Tạp chí Phượt Việt',
+    'Góc Ẩm Thực Việt'
   ];
   return verifiedNames.includes(name.trim());
 };
 
-// Mock User Profiles Database
-const userProfilesData = {
-  'Thanh Hằng': {
-    name: 'Thanh Hằng',
-    avatar: 'https://i.pravatar.cc/150?img=47',
-    cover: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=500&q=80',
-    bio: 'Đam mê chụp ảnh phong cảnh du lịch tự nhiên. Đã đi qua 20 tỉnh thành Việt Nam. Rất vui được kết bạn! 📸✈️',
-    level: 'Cấp 12 - Chuyên Gia Du Lịch',
-    levelColor: '#facc15',
-    trips: 18,
-    followers: '1.4k',
-    following: 342,
-    photos: [
-      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=200&q=80',
-      'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=200&q=80',
-      'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=200&q=80',
-      'https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?auto=format&fit=crop&w=200&q=80',
-    ]
-  },
-  'Quốc Bảo': {
-    name: 'Quốc Bảo',
-    avatar: 'https://i.pravatar.cc/150?img=33',
-    cover: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=500&q=80',
-    bio: 'Phượt thủ leo núi chuyên nghiệp, săn mây là hơi thở. Bạn nào muốn trekking Sa Pa, Hà Giang cứ nhắn mình nha! 🧗‍♂️🏔️',
-    level: 'Cấp 15 - Kỷ Lục Gia Trekking',
-    levelColor: '#a855f7',
-    trips: 34,
-    followers: '3.2k',
-    following: 580,
-    photos: [
-      'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=200&q=80',
-      'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=200&q=80',
-      'https://images.unsplash.com/photo-1518684079-3c830dcef090?auto=format&fit=crop&w=200&q=80',
-    ]
-  },
-  'Khánh An': {
-    name: 'Khánh An',
-    avatar: 'https://i.pravatar.cc/150?img=22',
-    cover: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=500&q=80',
-    bio: 'Thích nằm dài bên bờ biển uống nước dừa hơn là đi bộ. Nghỉ dưỡng là chân lý! Đảo ngọc Phú Quốc là ngôi nhà thứ 2. 🏖️🌴',
-    level: 'Cấp 8 - Đại Sứ Nghỉ Dưỡng',
-    levelColor: '#10b981',
-    trips: 12,
-    followers: '920',
-    following: 154,
-    photos: [
-      'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=200&q=80',
-      'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=200&q=80',
-    ]
-  },
-  'Nguyễn Minh': {
-    name: 'Nguyễn Minh',
-    avatar: 'https://i.pravatar.cc/150?img=68',
-    cover: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=500&q=80',
-    bio: 'Thích tìm hiểu lịch sử, danh lam thắng cảnh. Thích trải nghiệm tham quan ảo AR 360 độ trên Vivu360! 🌐🎒',
-    level: 'Cấp 8 - Nhà Thám Hiểm AR',
-    levelColor: '#60a5fa',
-    trips: 12,
-    followers: '820',
-    following: 310,
-    photos: [
-      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=200&q=80',
-      'https://images.unsplash.com/photo-1518684079-3c830dcef090?auto=format&fit=crop&w=200&q=80',
-    ]
+const getUserAvatarByName = (name) => {
+  if (!name) return 'https://i.pravatar.cc/150?img=11';
+
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
+
+  const imgIndex = Math.abs(hash % 70) + 1;
+  return `https://i.pravatar.cc/150?img=${imgIndex}`;
+};
+
+const buildGenericProfile = ({ username, currentUser, isMe }) => {
+  const displayName = username || 'Thành viên Vivu360';
+  const defaultCover = 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=500&q=80';
+
+  if (isMe && currentUser) {
+    return {
+      name: currentUser.name || displayName,
+      avatar: currentUser.avatar || getUserAvatarByName(currentUser.name || currentUser.email || displayName),
+      cover: defaultCover,
+      bio: currentUser.bio || 'Chưa cập nhật giới thiệu cá nhân.',
+      level: currentUser.level || 'Cấp 1',
+      levelColor: '#60a5fa',
+      trips: Array.isArray(currentUser.checkedIn) ? currentUser.checkedIn.length : 0,
+      followers: '0',
+      following: 0,
+      photos: [],
+    };
+  }
+
+  return {
+    name: displayName,
+    avatar: getUserAvatarByName(displayName),
+    cover: defaultCover,
+    bio: 'Thành viên Vivu360. Hồ sơ sẽ hiển thị đầy đủ hơn khi người dùng cập nhật thông tin.',
+    level: 'Cấp 1',
+    levelColor: '#9ca3af',
+    trips: 0,
+    followers: '0',
+    following: 0,
+    photos: [],
+  };
 };
 
 export function UserProfileModal({ username, visible, onClose, isDarkMode, theme, currentUser }) {
   const [isFollowing, setIsFollowing] = useState(false);
 
   const rank = useMemo(() => {
-    if (currentUser && (username === 'Nguyễn Minh' || username === currentUser.name)) {
-      return getRankDetails(currentUser.points || 8250);
-    }
-    const otherProfile = userProfilesData[username];
-    if (otherProfile) {
-      if (otherProfile.name === 'Thanh Hằng') {
-        return getRankDetails(12400); // Platinum
-      } else if (otherProfile.name === 'Quốc Bảo') {
-        return getRankDetails(15200); // Platinum
-      } else if (otherProfile.name === 'Khánh An') {
-        return getRankDetails(9150); // Gold
-      }
-    }
-    return getRankDetails(100); // Bronze
+    const isMe = !!(currentUser && username === currentUser.name);
+    return getRankDetails(isMe ? (currentUser.points || 0) : 100);
   }, [username, currentUser]);
 
   const profile = useMemo(() => {
-    const defaultMeName = 'Nguyễn Minh';
-    const isMe = username === defaultMeName || (currentUser && username === currentUser.name);
-
-    if (isMe && currentUser) {
-      return {
-        name: currentUser.name,
-        avatar: currentUser.avatar,
-        cover: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=500&q=80',
-        bio: currentUser.bio || 'Thích tìm hiểu lịch sử, danh lam thắng cảnh. Thích trải nghiệm tham quan ảo AR 360 độ trên Vivu360! 🌐🎒',
-        level: `${currentUser.level || 'Cấp 8'} - Nhà Thám Hiểm AR`,
-        levelColor: '#60a5fa',
-        trips: 12,
-        followers: '820',
-        following: 310,
-        photos: [
-          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=200&q=80',
-          'https://images.unsplash.com/photo-1518684079-3c830dcef090?auto=format&fit=crop&w=200&q=80',
-        ]
-      };
-    }
-
-    return userProfilesData[username] || {
-      name: username,
-      avatar: 'https://i.pravatar.cc/150?img=11',
-      cover: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=500&q=80',
-      bio: 'Thành viên mới gia nhập Vivu360. Đang lên kế hoạch cho những chuyến đi tiếp theo!',
-      level: 'Cấp 1 - Thành Viên Mới',
-      levelColor: '#9ca3af',
-      trips: 1,
-      followers: '12',
-      following: 5,
-      photos: []
-    };
+    const isMe = !!(currentUser && username === currentUser.name);
+    return buildGenericProfile({ username, currentUser, isMe });
   }, [username, currentUser]);
 
   return (
