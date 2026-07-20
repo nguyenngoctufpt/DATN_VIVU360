@@ -3,7 +3,8 @@ import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal,
 import { LinearGradient } from 'expo-linear-gradient';
 import { searchFriends } from '../services/userService';
 import { getFriendships, sendFriendRequest, acceptFriendRequest, rejectFriendRequest } from '../services/friendshipService';
-import { getFeed, createPost, togglePostLike } from '../services/postService';
+import { getFeed, createPost, togglePostLike, addPostComment } from '../services/postService';
+import { getSocialNotifications, markSocialNotificationsRead } from '../services/socialNotificationService';
 import {
   Heart,
   MessageSquare,
@@ -228,8 +229,6 @@ const popularCities = [
   }
 ];
 
-const travelFriends = [];
-
 const initialPosts = [];
 
 const initialGroups = [];
@@ -240,29 +239,33 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   const [menuVisible, setMenuVisible] = useState(false);
   const [notificationVisible, setNotificationVisible] = useState(false);
   const [friendships, setFriendships] = useState([]);
+  const [socialNotifications, setSocialNotifications] = useState([]);
   const [friendActionId, setFriendActionId] = useState(null);
 
   const normalizeFeed = feed => feed.map(post => ({
     ...post, id: post._id, image: post.images?.[0] || '', likes: post.likesCount || 0,
     likedByUser: Boolean(post.likedByMe), time: new Date(post.createdAt).toLocaleString('vi-VN'),
-    title: post.category || 'Hành trình mới', user: post.author || {}, comments: [],
+    title: post.category || 'Hành trình mới', user: post.author || {},
+    comments: (post.comments || []).map(comment => ({ id: comment._id, user: comment.author?.name || 'Thành viên Vivu360', avatar: comment.author?.avatar, text: comment.text, createdAt: comment.createdAt })),
   }));
 
   const refreshSocialData = async () => {
     if (!ownerId) return;
-    const [feed, relations] = await Promise.all([getFeed(ownerId), getFriendships(ownerId)]);
+    const [feed, relations, notifications] = await Promise.all([getFeed(ownerId), getFriendships(ownerId), getSocialNotifications(ownerId)]);
     setPosts(normalizeFeed(feed));
     setFriendships(Array.isArray(relations) ? relations : []);
+    setSocialNotifications(Array.isArray(notifications) ? notifications : []);
   };
 
   useEffect(() => {
     if (!ownerId) return;
     let active = true;
-    Promise.all([getFeed(ownerId), getFriendships(ownerId)])
-      .then(([feed, relations]) => {
+    Promise.all([getFeed(ownerId), getFriendships(ownerId), getSocialNotifications(ownerId)])
+      .then(([feed, relations, notifications]) => {
         if (active) {
           setPosts(normalizeFeed(feed));
           setFriendships(Array.isArray(relations) ? relations : []);
+          setSocialNotifications(Array.isArray(notifications) ? notifications : []);
         }
       })
       .catch(error => console.warn('Không thể tải bảng tin:', error.message));
@@ -275,6 +278,16 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
     () => friendships.filter(item => item.status === 'pending' && item.direction === 'incoming'),
     [friendships]
   );
+  const acceptedFriends = useMemo(
+    () => friendships.filter(item => item.status === 'accepted' && item.friend).map(item => item.friend),
+    [friendships]
+  );
+
+  useEffect(() => {
+    if (!ownerId) return undefined;
+    const timer = setInterval(() => refreshSocialData().catch(error => console.warn('Không thể tự làm mới bảng tin:', error.message)), 15000);
+    return () => clearInterval(timer);
+  }, [ownerId]);
 
   // View states within social tab: 'feed' | 'createPost'
   const [activeView, setActiveView] = useState('feed');
@@ -443,36 +456,18 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   };
 
   // Submit dynamic comment
-  const handleSendComment = () => {
+  const handleSendComment = async () => {
     if (!commentInput.trim() || !selectedPost) return;
-
-    const newComment = {
-      id: Date.now(),
-      user: currentUser.name,
-      text: commentInput
-    };
-
-    setPosts(prevPosts =>
-      prevPosts.map(p => {
-        if (p.id === selectedPost.id) {
-          const updatedComments = [...(p.comments || []), newComment];
-          return {
-            ...p,
-            comments: updatedComments,
-            commentsCount: updatedComments.length
-          };
-        }
-        return p;
-      })
-    );
-
-    setSelectedPost(prev => ({
-      ...prev,
-      comments: [...(prev.comments || []), newComment],
-      commentsCount: (prev.comments || []).length + 1
-    }));
-
-    setCommentInput('');
+    const text = commentInput.trim();
+    try {
+      const saved = await addPostComment(ownerId, selectedPost.id, text);
+      const newComment = { id: saved._id, user: saved.author?.name || currentUser.name, avatar: saved.author?.avatar, text: saved.text, createdAt: saved.createdAt };
+      setPosts(items => items.map(post => post.id === selectedPost.id ? { ...post, comments: [...(post.comments || []), newComment], commentsCount: (post.comments || []).length + 1 } : post));
+      setSelectedPost(post => ({ ...post, comments: [...(post.comments || []), newComment], commentsCount: (post.comments || []).length + 1 }));
+      setCommentInput('');
+    } catch (error) {
+      Alert.alert('Bình luận', 'Không thể gửi bình luận. Vui lòng thử lại.');
+    }
   };
 
   // Native Post Sharing handler
@@ -509,11 +504,14 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
               style={({ pressed }) => [styles.messengerIconBtn, { backgroundColor: theme.searchBg }, pressed && { opacity: 0.7 }]}
               onPress={() => {
                 setNotificationVisible(true);
-                refreshSocialData().catch(error => console.warn('Không thể làm mới thông báo:', error.message));
+                refreshSocialData()
+                  .then(() => markSocialNotificationsRead(ownerId))
+                  .then(() => setSocialNotifications(items => items.map(item => ({ ...item, read: true }))))
+                  .catch(error => console.warn('Không thể làm mới thông báo:', error.message));
               }}
             >
               <BellRing size={22} color={theme.textPrimary} />
-              {incomingRequests.length > 0 && <View style={styles.messengerBadge} />}
+              {(incomingRequests.length > 0 || socialNotifications.some(item => !item.read)) && <View style={styles.messengerBadge} />}
             </Pressable>
           </View>
         </View>
@@ -634,11 +632,10 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             <Pressable style={styles.addFriendCircle} onPress={() => Alert.alert('Tính năng', 'Tìm bạn đồng hành qua mã QR quét vị trí!')}>
               <Plus size={20} color={theme.textSecondary} />
             </Pressable>
-            {travelFriends.length > 0 ? travelFriends.map((friend) => (
-              <Pressable key={friend.id} style={styles.friendAvatarCheck} onPress={() => setSearchText(friend.name)}>
+            {acceptedFriends.length > 0 ? acceptedFriends.map((friend) => (
+              <Pressable key={friend.firebaseUid} style={styles.friendAvatarCheck} onPress={() => handleOpenUserProfile(friend.name)}>
                 <View style={styles.friendAvatarWrap}>
-                  <Image source={{ uri: friend.avatar }} style={styles.friendAvatarCircle} />
-                  {friend.online && <View style={styles.friendOnlineDot} />}
+                  <Image source={{ uri: friend.avatar || getUserAvatarByName(friend.name) }} style={styles.friendAvatarCircle} />
                 </View>
                 <Text style={[styles.friendNameMin, { color: theme.textPrimary }]} numberOfLines={1}>{friend.name.split(' ')[1] || friend.name}</Text>
               </Pressable>
@@ -864,30 +861,6 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                   ))}
                 </ScrollView>
 
-                {/* Day-by-Day Itinerary (like screen 3 list in mockup) */}
-                <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textSecondary, marginLeft: 16, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Lịch trình chi tiết</Text>
-                <View style={{ paddingHorizontal: 16, gap: 12, marginBottom: 24 }}>
-                  {selectedPost.itinerary?.length ? selectedPost.itinerary.map((it, idx) => (
-                    <View key={idx} style={[styles.itineraryDayCard, { backgroundColor: theme.searchBg, borderColor: theme.border }]}>
-                      <View style={styles.itineraryDayHeader}>
-                        <LinearGradient
-                          colors={['#3b82f6', '#60a5fa']}
-                          style={styles.itineraryDayBadge}
-                        >
-                          <Text style={styles.itineraryDayBadgeText}>{it.day}</Text>
-                        </LinearGradient>
-                      </View>
-                      <Text style={[styles.itineraryDayText, { color: theme.textPrimary }]}>{it.text}</Text>
-                    </View>
-                  )) : (
-                    <View style={[styles.itineraryDayCard, { backgroundColor: theme.searchBg, borderColor: theme.border }]}>
-                      <Text style={[styles.itineraryDayText, { color: theme.textSecondary }]}>
-                        B?i vi?t n?y ch?a c? l?ch tr?nh chi ti?t.
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
                 {/* Comments section title */}
                 <View style={{ height: 1, backgroundColor: theme.border, marginHorizontal: 16, marginBottom: 16 }} />
                 <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textSecondary, marginLeft: 16, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Ý kiến bạn đọc ({selectedPost.comments ? selectedPost.comments.length : 0})</Text>
@@ -1054,7 +1027,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 8 }}>
-              {incomingRequests.length > 0 ? incomingRequests.map(item => {
+              {incomingRequests.map(item => {
                 return (
                   <View
                     key={item._id}
@@ -1075,11 +1048,32 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                     </View>
                   </View>
                 );
-              }) : (
+              })}
+              {socialNotifications.map(item => {
+                const isLike = item.type === 'post_like';
+                return (
+                  <Pressable key={item._id} style={({ pressed }) => [styles.notificationItem, { borderBottomColor: theme.border }, pressed && { backgroundColor: theme.searchBg }]}
+                    onPress={() => {
+                      const post = posts.find(postItem => postItem.id === item.postId);
+                      if (post) { setNotificationVisible(false); handleOpenComments(post); }
+                    }}>
+                    <Image source={{ uri: item.actor?.avatar || getUserAvatarByName(item.actor?.name) }} style={styles.friendSearchAvatar} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>{item.actor?.name || 'Một thành viên'}</Text>
+                      <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>
+                        {isLike ? 'đã thích bài viết của bạn.' : `đã bình luận: “${item.message}”`}
+                      </Text>
+                      <Text style={[styles.notificationTime, { color: theme.textMuted }]}>{new Date(item.createdAt).toLocaleString('vi-VN')}</Text>
+                    </View>
+                    {isLike ? <Heart size={18} color="#ef4444" fill="#ef4444" /> : <MessageSquare size={18} color="#3b82f6" />}
+                  </Pressable>
+                );
+              })}
+              {incomingRequests.length === 0 && socialNotifications.length === 0 && (
                 <View style={{ paddingHorizontal: 18, paddingVertical: 28 }}>
                   <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>Chưa có thông báo nào</Text>
                   <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>
-                    Khi có lời mời kết bạn, người theo dõi hoặc tin nhắn thật, chúng sẽ hiển thị ở đây.
+                    Khi có lời mời kết bạn, lượt thích hoặc bình luận mới, chúng sẽ hiển thị ở đây.
                   </Text>
                 </View>
               )}
@@ -2225,31 +2219,6 @@ const styles = StyleSheet.create({
     width: 140,
     height: 95,
     borderRadius: 12,
-  },
-  itineraryDayCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 12,
-  },
-  itineraryDayHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  itineraryDayBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  itineraryDayBadgeText: {
-    color: '#fff',
-    fontSize: 9.5,
-    fontWeight: '900',
-  },
-  itineraryDayText: {
-    fontSize: 12.5,
-    lineHeight: 18,
-    fontWeight: '600',
   },
   tripCategoryFloatBadge: {
     position: 'absolute',

@@ -16,3 +16,8 @@ export async function togglePostLike(userId, postId) {
   const response = await api.post(`/posts/${postId}/like`, {}, auth(userId));
   return response.data.data;
 }
+
+export async function addPostComment(userId, postId, text) {
+  const response = await api.post(`/posts/${postId}/comments`, { text }, auth(userId));
+  return response.data.data;
+}
