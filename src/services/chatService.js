@@ -5,8 +5,15 @@ export async function getChatGroups(memberId) {
   return response.data.data;
 }
 
-export async function createChatGroup({ name, avatar, ownerId, memberIds = [] }) {
-  const response = await api.post('/chat/groups', { name, avatar, ownerId, memberIds });
+export async function getChatGroup(groupId, requesterId) {
+  const response = await api.get(`/chat/groups/${encodeURIComponent(groupId)}`, {
+    params: { requesterId },
+  });
+  return response.data.data;
+}
+
+export async function createChatGroup({ name, avatar, ownerId, memberIds = [], itinerary, fund }) {
+  const response = await api.post('/chat/groups', { name, avatar, ownerId, memberIds, itinerary, fund });
   return response.data.data;
 }
 
@@ -17,11 +24,26 @@ export async function getChatMessages(groupId, requesterId) {
   return response.data.data;
 }
 
+export async function getGroupNotifications(groupId, requesterId) {
+  const response = await api.get(`/notifications/groups/${encodeURIComponent(groupId)}`, {
+    params: { requesterId, limit: 100 },
+  });
+  return response.data.data;
+}
+
 export async function sendChatMessage(groupId, senderId, content) {
   const response = await api.post(`/chat/groups/${encodeURIComponent(groupId)}/messages`, {
     senderId,
     content,
     type: 'text',
+  });
+  return response.data.data;
+}
+
+export async function updateChatGroupWorkspace(groupId, requesterId, updates) {
+  const response = await api.patch(`/chat/groups/${encodeURIComponent(groupId)}/workspace`, {
+    requesterId,
+    ...updates,
   });
   return response.data.data;
 }

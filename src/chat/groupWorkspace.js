@@ -18,8 +18,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { loadAppData, saveAppData } from '../services/appDataService';
 import { searchFriends } from '../services/userService';
-import { addChatMembers, createChatGroup, getChatGroups, getChatMessages, removeChatMember, renameChatGroup, sendChatMessage } from '../services/chatService';
+import { addChatMembers, createChatGroup, getChatGroups, getChatMessages, getGroupNotifications, removeChatMember, renameChatGroup, sendChatMessage, updateChatGroupWorkspace } from '../services/chatService';
 import { fetchGoogleWeatherForecast } from '../services/googleWeatherService';
+import { isSystemChatEntry, looksLikeSystemAnnouncement, normalizeGroupPreviewText, normalizeSystemAnnouncementText } from '../utils/chatText';
 import {
   X,
   Plus,
@@ -631,7 +632,7 @@ const normalizeItinerary = (itinerary, fallbackDestinationId) => {
 const normalizeGroup = (group, currentUser, ownerId) => {
   const currentMember = createMember({
     id: getCurrentUserMemberId(currentUser, ownerId),
-    name: currentUser?.name || 'Bạn',
+    name: currentUser?.name || 'B\u1ea1n',
     avatar: currentUser?.avatar,
     email: currentUser?.email,
     phone: currentUser?.phone,
@@ -659,11 +660,11 @@ const normalizeGroup = (group, currentUser, ownerId) => {
 
   return {
     id: group?.id || Date.now(),
-    name: group?.name || 'Nhóm du lịch mới',
-    tag: group?.tag || 'Du lịch',
+    name: group?.name || 'Nh\u00f3m du l\u1ecbch m\u1edbi',
+    tag: group?.tag || 'Du l\u1ecbch',
     image: group?.image || GROUP_IMAGES[0],
-    lastMessage: group?.lastMessage || 'Hệ thống: Nhóm vừa được tạo.',
-    messages: Array.isArray(group?.messages) ? group.messages : [],
+    lastMessage: normalizeGroupPreviewText(group?.lastMessage) || 'H\u1ec7 th\u1ed1ng: Nh\u00f3m v\u1eeba \u0111\u01b0\u1ee3c t\u1ea1o.',
+    messages: Array.isArray(group?.messages) ? group.messages.map((message) => normalizeLocalMessageEntry(message, membersList, currentUser, ownerId)) : [],
     membersList,
     members: membersList.length,
     creatorId,
@@ -676,19 +677,124 @@ const normalizeGroup = (group, currentUser, ownerId) => {
 
 const buildDefaultGroups = (currentUser, ownerId) => sanitizeGroups(initialGroups).map((group) => normalizeGroup(group, currentUser, ownerId));
 
+const findMemberProfile = (membersList, memberId) => (membersList || []).find((member) => String(member.id || member.firebaseUid) === String(memberId)) || null;
+
+const buildGroupPreview = (group, currentUser, ownerId) => {
+  const activity = group.lastActivity || group.lastNotification || group.lastMessage;
+  if (!activity) return 'Nh\u00f3m ch\u01b0a c\u00f3 ho\u1ea1t \u0111\u1ed9ng';
+  if (typeof activity === 'string') return normalizeGroupPreviewText(activity);
+
+  const rawActivityText = activity.message || activity.content || activity.text || '';
+  if (activity.kind === 'notification' || activity.message || activity.type === 'system' || looksLikeSystemAnnouncement(rawActivityText)) {
+    return normalizeSystemAnnouncementText(
+      rawActivityText || 'H\u1ec7 th\u1ed1ng v\u1eeba c\u1eadp nh\u1eadt',
+      activity.actor?.name || activity.sender?.name
+    );
+  }
+
+  const senderName = activity.senderId === ownerId
+    ? currentUser?.name || 'B\u1ea1n'
+    : group.memberProfiles?.find((member) => String(member.firebaseUid || member.id) === String(activity.senderId))?.name || 'Th\u00e0nh vi\u00ean';
+
+  return `${senderName}: ${activity.content || ''}`.trim();
+};
+
+const getChatEntrySortValue = (entry) => {
+  const value = entry?.createdAt || entry?.id || 0;
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? Number(value) || 0 : parsed;
+};
+
+const mergeChatEntries = (...collections) => {
+  const entryMap = new Map();
+
+  collections.flat().filter(Boolean).forEach((entry) => {
+    const isSystemEntry = isSystemChatEntry(entry);
+    const normalizedSystemText = isSystemEntry
+      ? normalizeSystemAnnouncementText(entry?.text || entry?.content || entry?.message || '', entry?.actorName || 'Th\u00e0nh vi\u00ean')
+      : '';
+    const sortBucket = Math.floor(getChatEntrySortValue(entry) / 1000);
+    const fallbackKey = isSystemEntry
+      ? `system-${entry?.senderId || entry?.user || 'system'}-${normalizedSystemText}-${sortBucket}`
+      : `${entry?.type || 'entry'}-${entry?.senderId || entry?.user || 'system'}-${entry?.createdAt || entry?.text || Date.now()}`;
+    const key = String(isSystemEntry ? fallbackKey : (entry?.id || fallbackKey));
+    const previousEntry = entryMap.get(key) || {};
+    entryMap.set(key, {
+      ...previousEntry,
+      ...entry,
+      text: isSystemEntry ? normalizedSystemText : (entry?.text || ''),
+    });
+  });
+
+  return Array.from(entryMap.values()).sort((left, right) => getChatEntrySortValue(left) - getChatEntrySortValue(right));
+};
+
+const normalizeLocalMessageEntry = (message, membersList, currentUser, ownerId) => {
+  const senderId = message?.senderId || message?.actorId || null;
+  const groupMember = findMemberProfile(membersList, senderId);
+  const senderProfile = String(senderId) === String(ownerId)
+    ? { ...message?.sender, ...groupMember, name: currentUser?.name || groupMember?.name || message?.user || message?.sender?.name, avatar: currentUser?.avatar || groupMember?.avatar || message?.avatar || message?.sender?.avatar }
+    : { ...message?.sender, ...groupMember, name: groupMember?.name || message?.user || message?.sender?.name, avatar: groupMember?.avatar || message?.avatar || message?.sender?.avatar };
+  const rawText = String(message?.text || message?.content || message?.message || '').trim();
+  const systemEntry = Boolean(
+    message?.type === 'notification' ||
+    message?.type === 'system' ||
+    isSystemChatEntry(message) ||
+    looksLikeSystemAnnouncement(rawText)
+  );
+
+  return {
+    id: message?.id || message?._id || `${message?.type || 'entry'}-${senderId || senderProfile.name || 'system'}-${message?.createdAt || rawText || Date.now()}` ,
+    type: systemEntry ? (message?.type === 'notification' ? 'notification' : 'system') : (message?.type || 'text'),
+    senderId,
+    user: systemEntry ? 'H\u1ec7 th\u1ed1ng' : senderProfile.name || message?.user || 'Th\u00e0nh vi\u00ean Vivu360',
+    actorName: senderProfile.name || 'Th\u00e0nh vi\u00ean',
+    avatar: systemEntry ? '' : senderProfile.avatar || message?.avatar || '',
+    text: systemEntry
+      ? normalizeSystemAnnouncementText(rawText, senderProfile.name || 'Th\u00e0nh vi\u00ean')
+      : rawText,
+    createdAt: message?.createdAt || message?.id || Date.now(),
+  };
+};
+
 const normalizeApiMessage = (message, currentUser, ownerId, membersList = []) => {
-  const groupMember = membersList.find(member => String(member.id) === String(message.senderId));
+  const groupMember = findMemberProfile(membersList, message.senderId);
   const senderProfile = String(message.senderId) === String(ownerId)
     ? { ...message.sender, ...groupMember, name: currentUser?.name || groupMember?.name || message.sender?.name, avatar: currentUser?.avatar || groupMember?.avatar || message.sender?.avatar }
     : { ...message.sender, ...groupMember };
+  const rawText = String(message.content || '').trim();
+  const isSystemMessage = message.type === 'system' || looksLikeSystemAnnouncement(rawText);
 
   return {
     id: message._id || message.id,
+    type: isSystemMessage ? 'system' : (message.type || 'text'),
     senderId: message.senderId,
-    user: senderProfile.name || 'Thành viên Vivu360',
-    avatar: senderProfile.avatar || '',
-    text: message.content || '',
+    user: isSystemMessage ? 'H\u1ec7 th\u1ed1ng' : senderProfile.name || 'Th\u00e0nh vi\u00ean Vivu360',
+    actorName: senderProfile.name || 'Th\u00e0nh vi\u00ean',
+    avatar: isSystemMessage ? '' : senderProfile.avatar || '',
+    text: isSystemMessage
+      ? normalizeSystemAnnouncementText(rawText, senderProfile.name || 'Th\u00e0nh vi\u00ean')
+      : rawText,
     createdAt: message.createdAt,
+  };
+};
+
+const normalizeApiNotification = (notification, currentUser, ownerId, membersList = []) => {
+  const groupMember = findMemberProfile(membersList, notification.actorId);
+  const actorProfile = String(notification.actorId) === String(ownerId)
+    ? { ...notification.actor, ...groupMember, name: currentUser?.name || groupMember?.name || notification.actor?.name }
+    : { ...notification.actor, ...groupMember };
+
+  return {
+    id: notification._id || notification.id || `notification-${notification.createdAt}` ,
+    type: 'notification',
+    senderId: notification.actorId,
+    user: 'H\u1ec7 th\u1ed1ng',
+    actorName: actorProfile.name || 'Th\u00e0nh vi\u00ean',
+    avatar: '',
+    text: normalizeSystemAnnouncementText(notification.message || '', actorProfile.name || 'Th\u00e0nh vi\u00ean'),
+    createdAt: notification.createdAt,
+    notificationType: notification.type || 'group_update',
   };
 };
 
@@ -696,15 +802,15 @@ const normalizeApiGroup = (group, currentUser, ownerId) => normalizeGroup({
   id: group._id || group.id,
   name: group.name,
   image: group.avatar || GROUP_IMAGES[0],
-  tag: 'Du lịch',
+  tag: 'Du l\u1ecbch',
   creatorId: group.ownerId,
   leaderId: group.ownerId,
   deputyIds: (group.admins || []).filter((id) => id !== group.ownerId),
   membersList: group.memberProfiles || [],
-  lastMessage: group.lastMessage ? `${group.lastMessage.senderId === ownerId
-    ? currentUser?.name || 'Bạn'
-    : group.memberProfiles?.find(member => member.firebaseUid === group.lastMessage.senderId)?.name || 'Thành viên'}: ${group.lastMessage.content}` : 'Nhóm chưa có tin nhắn',
+  lastMessage: buildGroupPreview(group, currentUser, ownerId),
   messages: [],
+  itinerary: group.itinerary,
+  fund: group.fund,
 }, currentUser, ownerId);
 
 const getMemberRole = (group, memberId) => {
@@ -845,7 +951,18 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
         setGroups((apiGroups || []).map(apiGroup => {
           const remote = normalizeApiGroup(apiGroup, currentUser, ownerId);
           const local = savedMap.get(String(remote.id));
-          return local ? normalizeGroup({ ...local, ...remote, itinerary: local.itinerary, fund: local.fund }, currentUser, ownerId) : remote;
+          return local
+            ? normalizeGroup(
+              {
+                ...local,
+                ...remote,
+                itinerary: remote.itinerary ?? local.itinerary,
+                fund: remote.fund ?? local.fund,
+              },
+              currentUser,
+              ownerId
+            )
+            : remote;
         }));
       })
       .catch((error) => {
@@ -867,19 +984,42 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   useEffect(() => {
     if (!chatModalVisible || !selectedGroupId || !ownerId) return undefined;
     let active = true;
-    const loadMessages = () => getChatMessages(selectedGroupId, ownerId)
-      .then(messages => {
-        if (!active) return;
-        setGroups(prevGroups => prevGroups.map(group => group.id !== selectedGroupId ? group : normalizeGroup({
-          ...group,
-          messages: messages.map(message => normalizeApiMessage(message, currentUser, ownerId, group.membersList)),
-        }, currentUser, ownerId)));
-      })
-      .catch(error => console.warn('Không thể tải tin nhắn:', error.message));
+    const loadMessages = () =>
+      Promise.all([
+        getChatMessages(selectedGroupId, ownerId),
+        getGroupNotifications(selectedGroupId, ownerId).catch(() => []),
+      ])
+        .then(([messages, notifications]) => {
+          if (!active) return;
+          setGroups((prevGroups) =>
+            prevGroups.map((group) => {
+              if (group.id !== selectedGroupId) return group;
+
+              const mergedEntries = mergeChatEntries(
+                messages.map((message) => normalizeApiMessage(message, currentUser, ownerId, group.membersList)),
+                notifications.map((notification) => normalizeApiNotification(notification, currentUser, ownerId, group.membersList))
+              );
+              const latestEntry = mergedEntries[mergedEntries.length - 1] || null;
+
+              return normalizeGroup(
+                {
+                  ...group,
+                  lastMessage: latestEntry
+                    ? (isSystemChatEntry(latestEntry) ? latestEntry.text : `${latestEntry.user}: ${latestEntry.text}`)
+                    : group.lastMessage,
+                  messages: mergedEntries,
+                },
+                currentUser,
+                ownerId
+              );
+            })
+          );
+        })
+        .catch((error) => console.warn('Kh\u00f4ng th\u1ec3 t\u1ea3i d\u1eef li\u1ec7u chat nh\u00f3m:', error.message));
     loadMessages();
     const timer = setInterval(loadMessages, 3000);
     return () => { active = false; clearInterval(timer); };
-  }, [chatModalVisible, selectedGroupId, ownerId]);
+  }, [chatModalVisible, selectedGroupId, ownerId, currentUser?.name, currentUser?.avatar, selectedMemberIds]);
 
   useEffect(() => {
     if (!ownerId || groupsOwnerId !== ownerId) return undefined;
@@ -979,6 +1119,26 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
   const removeGroupById = (groupId) => {
     setGroups((prevGroups) => prevGroups.filter((group) => group.id !== groupId));
+  };
+
+  const applyWorkspaceUpdate = (groupId, nextGroupState, notification) => {
+    updateGroupById(groupId, (group) => {
+      const notificationEntry = notification
+        ? normalizeApiNotification(notification, currentUser, ownerId, group.membersList)
+        : null;
+      const mergedEntries = mergeChatEntries(group.messages, notificationEntry ? [notificationEntry] : []);
+      const latestEntry = mergedEntries[mergedEntries.length - 1] || null;
+
+      return {
+        ...group,
+        itinerary: nextGroupState?.itinerary ?? group.itinerary,
+        fund: nextGroupState?.fund ?? group.fund,
+        lastMessage: latestEntry
+          ? (isSystemChatEntry(latestEntry) ? latestEntry.text : `${latestEntry.user}: ${latestEntry.text}`)
+          : group.lastMessage,
+        messages: mergedEntries,
+      };
+    });
   };
 
   const handleSubmitGroup = async () => {
@@ -1200,22 +1360,26 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     );
   };
 
-  const handleSaveFundGoal = () => {
+  const handleSaveFundGoal = async () => {
     if (!selectedGroup) return;
 
     const goal = parseMoneyInput(fundGoalInput);
-    updateGroupById(selectedGroup.id, (group) => ({
-      ...group,
-      fund: {
-        ...group.fund,
-        goal,
-      },
-    }));
 
-    Alert.alert('Đã lưu', 'Mục tiêu quỹ chuyến đi đã được cập nhật.');
+    try {
+      const { group: updatedGroup, notification } = await updateChatGroupWorkspace(selectedGroup.id, ownerId, {
+        fundGoal: goal,
+        announcement: `${currentUserMember.name} \u0111\u00e3 c\u1eadp nh\u1eadt m\u1ee5c ti\u00eau qu\u1ef9 th\u00e0nh ${formatMoney(goal)}.`,
+      });
+
+      applyWorkspaceUpdate(selectedGroup.id, updatedGroup, notification);
+      setFundGoalInput(String(goal));
+      Alert.alert('\u0110\u00e3 l\u01b0u', 'M\u1ee5c ti\u00eau qu\u1ef9 chuy\u1ebfn \u0111i \u0111\u00e3 \u0111\u01b0\u1ee3c c\u1eadp nh\u1eadt.');
+    } catch (error) {
+      Alert.alert('Kh\u00f4ng th\u1ec3 c\u1eadp nh\u1eadt qu\u1ef9', error.response?.data?.message || 'Vui l\u00f2ng th\u1eed l\u1ea1i.');
+    }
   };
 
-  const handleAddContribution = () => {
+  const handleAddContribution = async () => {
     if (!selectedGroup) return;
 
     const amount = parseMoneyInput(fundContributionInput);
@@ -1227,45 +1391,50 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
       memberId: contributor.id,
       memberName: contributor.name,
       amount,
-      note: fundContributionNote.trim() || 'Đóng góp quỹ',
-      createdAt: Date.now(),
+      note: fundContributionNote.trim() || '\u0110\u00f3ng g\u00f3p qu\u1ef9',
+      createdAt: new Date().toISOString(),
     };
 
-    updateGroupById(selectedGroup.id, (group) => ({
-      ...group,
-      fund: {
-        ...group.fund,
-        contributions: [contribution, ...group.fund.contributions],
-      },
-    }));
+    try {
+      const { group: updatedGroup, notification } = await updateChatGroupWorkspace(selectedGroup.id, ownerId, {
+        contribution,
+        announcement: `${contributor.name} \u0111\u00e3 \u0111\u00f3ng g\u00f3p ${formatMoney(amount)} v\u00e0o qu\u1ef9 nh\u00f3m.`,
+      });
 
-    setFundContributionInput('');
-    setFundContributionNote('');
+      applyWorkspaceUpdate(selectedGroup.id, updatedGroup, notification);
+      setFundContributionInput('');
+      setFundContributionNote('');
+    } catch (error) {
+      Alert.alert('Kh\u00f4ng th\u1ec3 th\u00eam \u0111\u00f3ng g\u00f3p', error.response?.data?.message || 'Vui l\u00f2ng th\u1eed l\u1ea1i.');
+    }
   };
 
-  const handleAddExpense = () => {
+  const handleAddExpense = async () => {
     if (!selectedGroup) return;
 
     const amount = parseMoneyInput(fundExpenseInput);
-    if (!amount || !fundExpenseTitle.trim()) return;
+    const expenseTitle = fundExpenseTitle.trim();
+    if (!amount || !expenseTitle) return;
 
     const expense = {
       id: Date.now(),
-      title: fundExpenseTitle.trim(),
+      title: expenseTitle,
       amount,
-      createdAt: Date.now(),
+      createdAt: new Date().toISOString(),
     };
 
-    updateGroupById(selectedGroup.id, (group) => ({
-      ...group,
-      fund: {
-        ...group.fund,
-        expenses: [expense, ...group.fund.expenses],
-      },
-    }));
+    try {
+      const { group: updatedGroup, notification } = await updateChatGroupWorkspace(selectedGroup.id, ownerId, {
+        expense,
+        announcement: `${currentUserMember.name} v\u1eeba th\u00eam kho\u1ea3n chi ${expenseTitle} ${formatMoney(amount)}.`,
+      });
 
-    setFundExpenseTitle('');
-    setFundExpenseInput('');
+      applyWorkspaceUpdate(selectedGroup.id, updatedGroup, notification);
+      setFundExpenseTitle('');
+      setFundExpenseInput('');
+    } catch (error) {
+      Alert.alert('Kh\u00f4ng th\u1ec3 th\u00eam kho\u1ea3n chi', error.response?.data?.message || 'Vui l\u00f2ng th\u1eed l\u1ea1i.');
+    }
   };
 
   const handleGenerateItinerary = async () => {
@@ -1287,7 +1456,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     }
 
     if (getInclusiveDayCount(startDate, endDate) <= 0) {
-      Alert.alert('Ngày chưa hợp lệ', 'Ngày kết thúc cần cùng ngày hoặc sau ngày bắt đầu.');
+      Alert.alert('Ng\u00e0y ch\u01b0a h\u1ee3p l\u1ec7', 'Ng\u00e0y k\u1ebft th\u00fac c\u1ea7n c\u00f9ng ng\u00e0y ho\u1eb7c sau ng\u00e0y b\u1eaft \u0111\u1ea7u.');
       return;
     }
 
@@ -1306,12 +1475,12 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
           languageCode: 'vi',
         });
       } catch (error) {
-        forecastSource = 'Dự phòng nội bộ';
+        forecastSource = 'D\u1ef1 ph\u00f2ng n\u1ed9i b\u1ed9';
         forecast = buildFallbackForecast(activeDestination, buildDateList(startDate, endDate));
         setPlanStatusMessage(
           error.message === 'MISSING_GOOGLE_WEATHER_API_KEY'
-            ? 'Chưa có EXPO_PUBLIC_GOOGLE_WEATHER_API_KEY nên lịch trình đang dùng dự báo dự phòng. Nút Google bên dưới vẫn mở thời tiết thực tế.'
-            : 'Không lấy được Google Weather API ở lần này, mình đã tạo lịch trình bằng dự báo dự phòng để bạn tiếp tục thao tác.'
+            ? 'Ch\u01b0a c\u00f3 EXPO_PUBLIC_GOOGLE_WEATHER_API_KEY n\u00ean l\u1ecbch tr\u00ecnh \u0111ang d\u00f9ng d\u1ef1 b\u00e1o d\u1ef1 ph\u00f2ng. N\u00fat Google b\u00ean d\u01b0\u1edbi v\u1eabn m\u1edf th\u1eddi ti\u1ebft th\u1ef1c t\u1ebf.'
+            : 'Kh\u00f4ng l\u1ea5y \u0111\u01b0\u1ee3c Google Weather API \u1edf l\u1ea7n n\u00e0y, m\u00ecnh \u0111\u00e3 t\u1ea1o l\u1ecbch tr\u00ecnh b\u1eb1ng d\u1ef1 b\u00e1o d\u1ef1 ph\u00f2ng \u0111\u1ec3 b\u1ea1n ti\u1ebfp t\u1ee5c thao t\u00e1c.'
         );
       }
 
@@ -1322,16 +1491,19 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
         forecast,
         source: forecastSource,
       });
-
-      updateGroupById(selectedGroup.id, (group) => ({
-        ...group,
+      const destinationName = itinerary.destinationName || activeDestination.name;
+      const { group: updatedGroup, notification } = await updateChatGroupWorkspace(selectedGroup.id, ownerId, {
         itinerary,
-      }));
+        announcement: `${currentUserMember.name} \u0111\u00e3 c\u1eadp nh\u1eadt l\u1ecbch tr\u00ecnh ${destinationName} t\u1eeb ${formatShortDate(itinerary.startDate)} \u0111\u1ebfn ${formatShortDate(itinerary.endDate)}.`,
+      });
 
+      applyWorkspaceUpdate(selectedGroup.id, updatedGroup, notification);
       setPlanDaysInput(String(itinerary.daysCount));
       setPlanStartDate(itinerary.startDate);
       setPlanEndDate(itinerary.endDate);
       setWorkspaceTab('planner');
+    } catch (error) {
+      Alert.alert('Kh\u00f4ng th\u1ec3 c\u1eadp nh\u1eadt l\u1ecbch tr\u00ecnh', error.response?.data?.message || 'Vui l\u00f2ng th\u1eed l\u1ea1i.');
     } finally {
       setIsGeneratingPlan(false);
     }
@@ -1524,7 +1696,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                     </View>
 
                     {selectedGroup.messages.map((message) => {
-                      if (message.user === 'Hệ thống') {
+                      if (isSystemChatEntry(message)) {
                         return (
                           <View key={message.id} style={[styles.systemBubble, { backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.55)' : 'rgba(255,255,255,0.78)', borderColor: theme.border }]}>
                             <Text style={[styles.systemBubbleText, { color: theme.textSecondary }]}>{message.text}</Text>
@@ -2722,3 +2894,4 @@ const styles = StyleSheet.create({
   },
   leaveGroupText: { color: '#ef4444', fontSize: 12.5, fontWeight: '900' },
 });
+
