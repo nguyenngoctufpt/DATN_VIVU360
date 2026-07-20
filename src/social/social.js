@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal, Dimensions, Share, Alert, Platform, StatusBar, Animated, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { loadAppData, saveAppData } from '../services/appDataService';
 import { searchFriends } from '../services/userService';
+import { getFriendships, sendFriendRequest, acceptFriendRequest, rejectFriendRequest } from '../services/friendshipService';
+import { getFeed, createPost, togglePostLike } from '../services/postService';
 import {
   Heart,
   MessageSquare,
@@ -233,47 +234,47 @@ const initialPosts = [];
 
 const initialGroups = [];
 
-const SEEDED_POST_IDS = new Set([1, 2, 3]);
-
-const sanitizePosts = (items) => (
-  Array.isArray(items)
-    ? items.filter((post) => post && !SEEDED_POST_IDS.has(Number(post.id)))
-    : []
-);
-
 export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, onLogout }) {
   const [posts, setPosts] = useState(initialPosts);
-  const [postsOwnerId, setPostsOwnerId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
   const [menuVisible, setMenuVisible] = useState(false);
   const [notificationVisible, setNotificationVisible] = useState(false);
+  const [friendships, setFriendships] = useState([]);
+  const [friendActionId, setFriendActionId] = useState(null);
+
+  const normalizeFeed = feed => feed.map(post => ({
+    ...post, id: post._id, image: post.images?.[0] || '', likes: post.likesCount || 0,
+    likedByUser: Boolean(post.likedByMe), time: new Date(post.createdAt).toLocaleString('vi-VN'),
+    title: post.category || 'Hành trình mới', user: post.author || {}, comments: [],
+  }));
+
+  const refreshSocialData = async () => {
+    if (!ownerId) return;
+    const [feed, relations] = await Promise.all([getFeed(ownerId), getFriendships(ownerId)]);
+    setPosts(normalizeFeed(feed));
+    setFriendships(Array.isArray(relations) ? relations : []);
+  };
 
   useEffect(() => {
     if (!ownerId) return;
     let active = true;
-    loadAppData(ownerId, 'social')
-      .then(saved => {
+    Promise.all([getFeed(ownerId), getFriendships(ownerId)])
+      .then(([feed, relations]) => {
         if (active) {
-          setPosts(sanitizePosts(saved?.posts));
+          setPosts(normalizeFeed(feed));
+          setFriendships(Array.isArray(relations) ? relations : []);
         }
       })
-      .catch(error => console.warn('Không thể tải bài viết:', error.message))
-      .finally(() => active && setPostsOwnerId(ownerId));
+      .catch(error => console.warn('Không thể tải bảng tin:', error.message));
     return () => { active = false; };
   }, [ownerId]);
 
-  useEffect(() => {
-    if (!ownerId || postsOwnerId !== ownerId) return;
-    const timer = setTimeout(() => {
-      saveAppData(ownerId, 'social', { posts })
-        .catch(error => console.warn('Không thể lưu bài viết:', error.message));
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [ownerId, postsOwnerId, posts]);
-
   const mockStories = useMemo(() => [], []);
 
-  const notifications = useMemo(() => [], []);
+  const incomingRequests = useMemo(
+    () => friendships.filter(item => item.status === 'pending' && item.direction === 'incoming'),
+    [friendships]
+  );
 
   // View states within social tab: 'feed' | 'createPost'
   const [activeView, setActiveView] = useState('feed');
@@ -320,6 +321,22 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   const [friendResults, setFriendResults] = useState([]);
   const [isSearchingFriends, setIsSearchingFriends] = useState(false);
   const [friendSearchError, setFriendSearchError] = useState('');
+
+  const relationFor = userId => friendships.find(item => item.users?.includes(userId));
+
+  const handleFriendAction = async (action, targetId) => {
+    setFriendActionId(targetId);
+    try {
+      if (action === 'send') await sendFriendRequest(ownerId, targetId);
+      if (action === 'accept') await acceptFriendRequest(ownerId, targetId);
+      if (action === 'reject') await rejectFriendRequest(ownerId, targetId);
+      await refreshSocialData();
+    } catch (error) {
+      Alert.alert('Kết bạn', error.response?.data?.message || 'Không thể thực hiện. Vui lòng thử lại.');
+    } finally {
+      setFriendActionId(null);
+    }
+  };
 
   useEffect(() => {
     const query = searchText.trim();
@@ -380,23 +397,17 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   }, [filteredPosts]);
 
   // Likes toggle handler
-  const handleLikePost = (postId) => {
-    setPosts(prevPosts =>
-      prevPosts.map(post => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            likedByUser: !post.likedByUser,
-            likes: post.likedByUser ? post.likes - 1 : post.likes + 1
-          };
-        }
-        return post;
-      })
-    );
+  const handleLikePost = async (postId) => {
+    try {
+      const result = await togglePostLike(ownerId, postId);
+      setPosts(items => items.map(post => post.id === postId ? { ...post, likedByUser: result.likedByMe, likes: result.likesCount } : post));
+    } catch (error) {
+      Alert.alert('Bài viết', 'Không thể cập nhật lượt thích.');
+    }
   };
 
   // Submit Post
-  const handleSubmitPost = () => {
+  const handleSubmitPost = async () => {
     if (!newContent.trim()) return;
 
     const defaultImages = [
@@ -406,33 +417,17 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
     ];
     const finalImg = newImgUrl.trim() || defaultImages[Math.floor(Math.random() * defaultImages.length)];
 
-    const newPostObj = {
-      id: Date.now(),
-      title: newTitle.trim() || 'Bản tin nóng du lịch từ bạn đọc',
-      category: newCategory,
-      source: 'Bạn đọc ' + currentUser.name,
-      time: 'Vừa xong',
-      location: newLocation.trim() || 'Việt Nam',
-      content: newContent,
-      image: finalImg,
-      likes: 0,
-      commentsCount: 0,
-      likedByUser: false,
-      comments: [],
-      user: {
-        firebaseUid: ownerId,
-        name: currentUser.name,
-        avatar: currentUser.avatar,
-        level: currentUser.level || 'Cấp 8',
-        points: currentUser.points || 8250
-      }
-    };
-
-    setPosts([newPostObj, ...posts]);
-    setNewTitle('');
-    setNewLocation('');
-    setNewImgUrl('');
-    setActiveView('feed');
+    try {
+      await createPost(ownerId, { content: newContent, category: newCategory, location: newLocation.trim() || 'Việt Nam', images: [finalImg] });
+      await refreshSocialData();
+      setNewTitle('');
+      setNewContent('');
+      setNewLocation('');
+      setNewImgUrl('');
+      setActiveView('feed');
+    } catch (error) {
+      Alert.alert('Đăng bài', 'Không thể đăng bài. Vui lòng thử lại.');
+    }
   };
 
   // Open User Profile view modal
@@ -512,10 +507,13 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             </Pressable>
             <Pressable 
               style={({ pressed }) => [styles.messengerIconBtn, { backgroundColor: theme.searchBg }, pressed && { opacity: 0.7 }]}
-              onPress={() => setNotificationVisible(true)}
+              onPress={() => {
+                setNotificationVisible(true);
+                refreshSocialData().catch(error => console.warn('Không thể làm mới thông báo:', error.message));
+              }}
             >
               <BellRing size={22} color={theme.textPrimary} />
-              <View style={styles.messengerBadge} />
+              {incomingRequests.length > 0 && <View style={styles.messengerBadge} />}
             </Pressable>
           </View>
         </View>
@@ -591,25 +589,34 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
               <ActivityIndicator color="#3b82f6" style={{ marginVertical: 14 }} />
             ) : friendSearchError ? (
               <Text style={[styles.emptyFriendSearch, { color: '#ef4444' }]}>{friendSearchError}</Text>
-            ) : friendResults.length > 0 ? friendResults.map(friend => (
-              <Pressable
-                key={friend.firebaseUid}
-                style={[styles.friendSearchItem, { borderTopColor: theme.border }]}
-                onPress={() => {
+            ) : friendResults.length > 0 ? friendResults.map(friend => {
+              const relation = relationFor(friend.firebaseUid);
+              const isBusy = friendActionId === friend.firebaseUid;
+              return (
+              <View key={friend.firebaseUid} style={[styles.friendSearchItem, { borderTopColor: theme.border }]}>
+                <Image source={{ uri: friend.avatar || getUserAvatarByName(friend.name) }} style={styles.friendSearchAvatar} />
+                <Pressable style={{ flex: 1 }} onPress={() => {
                   setTargetUsername(friend.name);
                   setProfileModalVisible(true);
-                }}
-              >
-                <Image source={{ uri: friend.avatar || getUserAvatarByName(friend.name) }} style={styles.friendSearchAvatar} />
-                <View style={{ flex: 1 }}>
+                }}>
                   <Text style={[styles.friendSearchName, { color: theme.textPrimary }]}>{friend.name}</Text>
                   <Text style={[styles.friendSearchContact, { color: theme.textSecondary }]} numberOfLines={1}>
                     {friend.email}{friend.phone ? ` · ${friend.phone}` : ''}
                   </Text>
-                </View>
-                <ChevronRight size={18} color={theme.textMuted} />
-              </Pressable>
-            )) : (
+                </Pressable>
+                <Pressable
+                  disabled={Boolean(relation) || isBusy}
+                  onPress={() => handleFriendAction('send', friend.firebaseUid)}
+                  style={[styles.friendActionButton, relation?.status === 'accepted' && styles.friendAcceptedButton]}
+                >
+                  {isBusy ? <ActivityIndicator size="small" color="#fff" /> : (
+                    <Text style={styles.friendActionButtonText}>
+                      {relation?.status === 'accepted' ? 'Bạn bè' : relation?.status === 'pending' ? 'Đã gửi' : 'Kết bạn'}
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            );}) : (
               <Text style={[styles.emptyFriendSearch, { color: theme.textSecondary }]}>Không tìm thấy bạn bè bằng email hoặc số điện thoại này.</Text>
             )}
           </View>
@@ -1047,24 +1054,26 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 8 }}>
-              {notifications.length > 0 ? notifications.map(item => {
-                const Icon = item.Icon;
+              {incomingRequests.length > 0 ? incomingRequests.map(item => {
                 return (
-                  <Pressable
-                    key={item.id}
-                    style={({ pressed }) => [styles.notificationItem, { borderBottomColor: theme.border }, pressed && { backgroundColor: theme.searchBg }]}
-                    onPress={() => {
-                      setNotificationVisible(false);
-                      item.onPress && item.onPress();
-                    }}
+                  <View
+                    key={item._id}
+                    style={[styles.notificationItem, { borderBottomColor: theme.border }]}
                   >
-                    <View style={[styles.notificationIconWrap, { backgroundColor: `${item.color}1A` }]}><Icon size={18} color={item.color} /></View>
+                    <Image source={{ uri: item.friend?.avatar || getUserAvatarByName(item.friend?.name) }} style={styles.friendSearchAvatar} />
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>{item.title}</Text>
-                      <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>{item.message}</Text>
-                      <Text style={[styles.notificationTime, { color: theme.textMuted }]}>{item.time}</Text>
+                      <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>{item.friend?.name || 'Một thành viên'}</Text>
+                      <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>đã gửi cho bạn lời mời kết bạn.</Text>
+                      <View style={styles.requestActions}>
+                        <Pressable disabled={friendActionId === item._id} onPress={() => handleFriendAction('accept', item._id)} style={styles.acceptRequestButton}>
+                          <Text style={styles.requestButtonText}>Đồng ý</Text>
+                        </Pressable>
+                        <Pressable disabled={friendActionId === item._id} onPress={() => handleFriendAction('reject', item._id)} style={[styles.rejectRequestButton, { borderColor: theme.border }]}>
+                          <Text style={[styles.rejectRequestText, { color: theme.textPrimary }]}>Từ chối</Text>
+                        </Pressable>
+                      </View>
                     </View>
-                  </Pressable>
+                  </View>
                 );
               }) : (
                 <View style={{ paddingHorizontal: 18, paddingVertical: 28 }}>
@@ -1900,6 +1909,22 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   friendSearchAvatar: { width: 42, height: 42, borderRadius: 21 },
+  friendActionButton: {
+    minWidth: 72,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#3b82f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendAcceptedButton: { backgroundColor: '#10b981' },
+  friendActionButtonText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  requestActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  acceptRequestButton: { backgroundColor: '#3b82f6', borderRadius: 9, paddingHorizontal: 14, paddingVertical: 8 },
+  rejectRequestButton: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 14, paddingVertical: 8 },
+  requestButtonText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  rejectRequestText: { fontSize: 11, fontWeight: '800' },
   friendSearchName: { fontSize: 13, fontWeight: '800', marginBottom: 3 },
   friendSearchContact: { fontSize: 11, fontWeight: '500' },
   emptyFriendSearch: { fontSize: 12, paddingVertical: 14, lineHeight: 18 },
