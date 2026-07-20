@@ -17,6 +17,11 @@ export async function createChatGroup({ name, avatar, ownerId, memberIds = [], i
   return response.data.data;
 }
 
+export async function getOrCreateDirectChat(ownerId, friendId) {
+  const response = await api.post('/chat/direct', { ownerId, friendId });
+  return response.data.data;
+}
+
 export async function getChatMessages(groupId, requesterId) {
   const response = await api.get(`/chat/groups/${encodeURIComponent(groupId)}/messages`, {
     params: { requesterId, limit: 100 },

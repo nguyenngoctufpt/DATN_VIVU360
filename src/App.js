@@ -51,6 +51,7 @@ import {
 export default function App() {
   const [activeNav, setActiveNav] = useState('social');
   const [prevNav, setPrevNav] = useState('social');
+  const [directChatGroupId, setDirectChatGroupId] = useState(null);
   const [ticketFlowSource, setTicketFlowSource] = useState('profile');
   const activeNavRef = React.useRef(activeNav);
 
@@ -353,9 +354,9 @@ export default function App() {
           />
         );
       case 'social':
-        return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} onLogout={handleLogout} />;
+        return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab, groupId) => { if (tab === 'chat') setDirectChatGroupId(groupId || null); setActiveNav(tab); }} onLogout={handleLogout} />;
       case 'chat':
-        return <ChatScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} prevScreen={prevNav} />;
+        return <ChatScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} prevScreen={prevNav} initialGroupId={directChatGroupId} />;
       case 'camera':
         return (
           <CameraScreen
@@ -501,7 +502,7 @@ export default function App() {
         );
       case 'home':
       default:
-        return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} onLogout={handleLogout} />;
+        return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab, groupId) => { if (tab === 'chat') setDirectChatGroupId(groupId || null); setActiveNav(tab); }} onLogout={handleLogout} />;
     }
   };
 

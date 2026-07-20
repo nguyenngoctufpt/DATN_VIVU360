@@ -71,7 +71,7 @@ const buildGenericProfile = ({ username, currentUser, isMe }) => {
   };
 };
 
-export function UserProfileModal({ username, visible, onClose, isDarkMode, theme, currentUser }) {
+export function UserProfileModal({ username, visible, onClose, isDarkMode, theme, currentUser, onMessage }) {
   const [isFollowing, setIsFollowing] = useState(false);
 
   const rank = useMemo(() => {
@@ -132,7 +132,7 @@ export function UserProfileModal({ username, visible, onClose, isDarkMode, theme
                 </Pressable>
                 <Pressable
                   style={styles.msgBtn}
-                  onPress={() => Alert.alert('Trò chuyện', `Tính năng nhắn tin trực tiếp với ${profile.name} đang được kết nối!`)}
+                  onPress={() => onMessage ? onMessage() : Alert.alert('Trò chuyện', 'Không thể mở cuộc trò chuyện này.')}
                 >
                   <MessageCircle size={18} color="#fff" />
                 </Pressable>

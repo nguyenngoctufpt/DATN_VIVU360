@@ -5,6 +5,7 @@ import { searchFriends } from '../services/userService';
 import { getFriendships, sendFriendRequest, acceptFriendRequest, rejectFriendRequest } from '../services/friendshipService';
 import { getFeed, createPost, togglePostLike, addPostComment } from '../services/postService';
 import { getSocialNotifications, markSocialNotificationsRead } from '../services/socialNotificationService';
+import { getOrCreateDirectChat } from '../services/chatService';
 import {
   Heart,
   MessageSquare,
@@ -251,21 +252,23 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
 
   const refreshSocialData = async () => {
     if (!ownerId) return;
-    const [feed, relations, notifications] = await Promise.all([getFeed(ownerId), getFriendships(ownerId), getSocialNotifications(ownerId)]);
-    setPosts(normalizeFeed(feed));
-    setFriendships(Array.isArray(relations) ? relations : []);
-    setSocialNotifications(Array.isArray(notifications) ? notifications : []);
+    const [feedResult, friendshipResult, notificationResult] = await Promise.allSettled([
+      getFeed(ownerId), getFriendships(ownerId), getSocialNotifications(ownerId),
+    ]);
+    if (feedResult.status === 'fulfilled') setPosts(normalizeFeed(feedResult.value));
+    if (friendshipResult.status === 'fulfilled') setFriendships(Array.isArray(friendshipResult.value) ? friendshipResult.value : []);
+    if (notificationResult.status === 'fulfilled') setSocialNotifications(Array.isArray(notificationResult.value) ? notificationResult.value : []);
   };
 
   useEffect(() => {
     if (!ownerId) return;
     let active = true;
-    Promise.all([getFeed(ownerId), getFriendships(ownerId), getSocialNotifications(ownerId)])
-      .then(([feed, relations, notifications]) => {
+    Promise.allSettled([getFeed(ownerId), getFriendships(ownerId), getSocialNotifications(ownerId)])
+      .then(([feedResult, friendshipResult, notificationResult]) => {
         if (active) {
-          setPosts(normalizeFeed(feed));
-          setFriendships(Array.isArray(relations) ? relations : []);
-          setSocialNotifications(Array.isArray(notifications) ? notifications : []);
+          if (feedResult.status === 'fulfilled') setPosts(normalizeFeed(feedResult.value));
+          if (friendshipResult.status === 'fulfilled') setFriendships(Array.isArray(friendshipResult.value) ? friendshipResult.value : []);
+          if (notificationResult.status === 'fulfilled') setSocialNotifications(Array.isArray(notificationResult.value) ? notificationResult.value : []);
         }
       })
       .catch(error => console.warn('Không thể tải bảng tin:', error.message));
@@ -320,6 +323,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   const [commentInput, setCommentInput] = useState('');
   
   const [targetUsername, setTargetUsername] = useState('');
+  const [targetUserId, setTargetUserId] = useState('');
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [shareAlertVisible, setShareAlertVisible] = useState(false);
   
@@ -340,12 +344,33 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   const handleFriendAction = async (action, targetId) => {
     setFriendActionId(targetId);
     try {
-      if (action === 'send') await sendFriendRequest(ownerId, targetId);
+      if (action === 'send') {
+        setFriendships(items => items.some(item => item.users?.includes(targetId)) ? items : [{
+          _id: `pending-${targetId}`,
+          users: [ownerId, targetId],
+          requesterId: ownerId,
+          status: 'pending',
+          direction: 'outgoing',
+        }, ...items]);
+        const friendship = await sendFriendRequest(ownerId, targetId);
+        if (friendship) {
+          const normalizedFriendship = { ...friendship, direction: friendship.requesterId === ownerId ? 'outgoing' : 'incoming' };
+          setFriendships(items => [
+            normalizedFriendship,
+            ...items.filter(item => item._id !== `pending-${targetId}` && String(item._id) !== String(friendship._id)),
+          ]);
+          setFriendResults(items => items.map(friend => friend.firebaseUid === targetId ? { ...friend, friendship: normalizedFriendship } : friend));
+        }
+      }
       if (action === 'accept') await acceptFriendRequest(ownerId, targetId);
       if (action === 'reject') await rejectFriendRequest(ownerId, targetId);
       await refreshSocialData();
     } catch (error) {
-      Alert.alert('Kết bạn', error.response?.data?.message || 'Không thể thực hiện. Vui lòng thử lại.');
+      if (action === 'send' && error.response?.status === 409) {
+        refreshSocialData().catch(refreshError => console.warn('Không thể đồng bộ trạng thái kết bạn:', refreshError.message));
+      } else {
+        Alert.alert('Kết bạn', error.response?.data?.message || 'Không thể thực hiện. Vui lòng thử lại.');
+      }
     } finally {
       setFriendActionId(null);
     }
@@ -444,9 +469,23 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   };
 
   // Open User Profile view modal
-  const handleOpenUserProfile = (username) => {
-    setTargetUsername(username);
+  const handleOpenUserProfile = (user) => {
+    const username = typeof user === 'string' ? user : user?.name;
+    const matchedFriend = friendships.find(item => item.friend?.name === username)?.friend;
+    setTargetUsername(username || 'Thành viên Vivu360');
+    setTargetUserId((typeof user === 'object' && user?.firebaseUid) || matchedFriend?.firebaseUid || '');
     setProfileModalVisible(true);
+  };
+
+  const handleStartDirectChat = async () => {
+    if (!targetUserId) return Alert.alert('Tin nhắn', 'Không xác định được tài khoản người nhận.');
+    try {
+      const group = await getOrCreateDirectChat(ownerId, targetUserId);
+      setProfileModalVisible(false);
+      onNavigateToTab && onNavigateToTab('chat', group._id);
+    } catch (error) {
+      Alert.alert('Tin nhắn', 'Không thể mở cuộc trò chuyện. Vui lòng thử lại.');
+    }
   };
 
   // Open Comments modal
@@ -504,7 +543,9 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
               style={({ pressed }) => [styles.messengerIconBtn, { backgroundColor: theme.searchBg }, pressed && { opacity: 0.7 }]}
               onPress={() => {
                 setNotificationVisible(true);
-                refreshSocialData()
+                getFriendships(ownerId)
+                  .then(relations => setFriendships(Array.isArray(relations) ? relations : []))
+                  .then(() => refreshSocialData())
                   .then(() => markSocialNotificationsRead(ownerId))
                   .then(() => setSocialNotifications(items => items.map(item => ({ ...item, read: true }))))
                   .catch(error => console.warn('Không thể làm mới thông báo:', error.message));
@@ -588,15 +629,12 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             ) : friendSearchError ? (
               <Text style={[styles.emptyFriendSearch, { color: '#ef4444' }]}>{friendSearchError}</Text>
             ) : friendResults.length > 0 ? friendResults.map(friend => {
-              const relation = relationFor(friend.firebaseUid);
+              const relation = relationFor(friend.firebaseUid) || friend.friendship;
               const isBusy = friendActionId === friend.firebaseUid;
               return (
               <View key={friend.firebaseUid} style={[styles.friendSearchItem, { borderTopColor: theme.border }]}>
                 <Image source={{ uri: friend.avatar || getUserAvatarByName(friend.name) }} style={styles.friendSearchAvatar} />
-                <Pressable style={{ flex: 1 }} onPress={() => {
-                  setTargetUsername(friend.name);
-                  setProfileModalVisible(true);
-                }}>
+                <Pressable style={{ flex: 1 }} onPress={() => handleOpenUserProfile(friend)}>
                   <Text style={[styles.friendSearchName, { color: theme.textPrimary }]}>{friend.name}</Text>
                   <Text style={[styles.friendSearchContact, { color: theme.textSecondary }]} numberOfLines={1}>
                     {friend.email}{friend.phone ? ` · ${friend.phone}` : ''}
@@ -609,7 +647,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                 >
                   {isBusy ? <ActivityIndicator size="small" color="#fff" /> : (
                     <Text style={styles.friendActionButtonText}>
-                      {relation?.status === 'accepted' ? 'Bạn bè' : relation?.status === 'pending' ? 'Đã gửi' : 'Kết bạn'}
+                      {relation?.status === 'accepted' ? 'Bạn bè' : relation?.status === 'pending' ? 'Đã gửi lời mời' : 'Kết bạn'}
                     </Text>
                   )}
                 </Pressable>
@@ -633,7 +671,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
               <Plus size={20} color={theme.textSecondary} />
             </Pressable>
             {acceptedFriends.length > 0 ? acceptedFriends.map((friend) => (
-              <Pressable key={friend.firebaseUid} style={styles.friendAvatarCheck} onPress={() => handleOpenUserProfile(friend.name)}>
+              <Pressable key={friend.firebaseUid} style={styles.friendAvatarCheck} onPress={() => handleOpenUserProfile(friend)}>
                 <View style={styles.friendAvatarWrap}>
                   <Image source={{ uri: friend.avatar || getUserAvatarByName(friend.name) }} style={styles.friendAvatarCircle} />
                 </View>
@@ -934,6 +972,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
         isDarkMode={isDarkMode}
         theme={theme}
         currentUser={currentUser}
+        onMessage={handleStartDirectChat}
       />
 
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
@@ -1904,7 +1943,7 @@ const styles = StyleSheet.create({
   },
   friendSearchAvatar: { width: 42, height: 42, borderRadius: 21 },
   friendActionButton: {
-    minWidth: 72,
+    minWidth: 112,
     height: 34,
     paddingHorizontal: 12,
     borderRadius: 10,

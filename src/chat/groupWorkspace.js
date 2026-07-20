@@ -886,7 +886,7 @@ const MetricCard = ({ title, value, subtitle, icon, theme, isDarkMode }) => (
   </View>
 );
 
-export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, prevScreen }) {
+export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, prevScreen, initialGroupId }) {
   const [groups, setGroups] = useState(() => buildDefaultGroups(currentUser, ownerId));
   const [groupsOwnerId, setGroupsOwnerId] = useState(null);
   const [groupModalVisible, setGroupModalVisible] = useState(false);
@@ -1179,6 +1179,12 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     setWorkspaceTab('chat');
     setChatModalVisible(true);
   };
+
+  useEffect(() => {
+    if (!initialGroupId || isLoadingGroups) return;
+    const group = groups.find(item => String(item.id) === String(initialGroupId));
+    if (group) handleOpenChat(group);
+  }, [initialGroupId, isLoadingGroups, groups.length]);
 
   const handleSendChatMessage = async () => {
     if (!chatInput.trim() || !selectedGroup) return;
