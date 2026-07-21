@@ -10,7 +10,8 @@
       "bundleIdentifier": "com.vivu360"
     },
     "android": {
-      "package": "com.vivu360"
+      "package": "com.vivu360",
+      "usesCleartextTraffic": true
     }
   }
 }

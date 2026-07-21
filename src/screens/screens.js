@@ -2225,7 +2225,7 @@ export function ProfileScreen({ isDarkMode, setIsDarkMode, theme, userInfo, setU
 // ==========================================
 // CSS STYLING
 // ==========================================
-const styles = StyleSheet.create({
+export const styles = StyleSheet.create({
   tabContainer: { width: '100%' },
 
   // Hero Section

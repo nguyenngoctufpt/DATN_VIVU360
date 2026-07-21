@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal, Dimensions, Share, Alert, Platform, StatusBar, Animated } from 'react-native';
+import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal, Dimensions, Share, Alert, Platform, StatusBar, Animated, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { loadAppData, saveAppData } from '../services/appDataService';
+import { searchFriends } from '../services/userService';
 import {
   Heart,
   MessageSquare,
@@ -24,7 +26,13 @@ import {
   Check,
   CheckCheck,
   Newspaper,
-  Search
+  Search,
+  Menu,
+  BellRing,
+  Compass,
+  Map,
+  Ticket,
+  User
 } from 'lucide-react-native';
 
 import { UserProfileModal } from './userProfile';
@@ -87,35 +95,17 @@ const { width, height } = Dimensions.get('window');
 
 const getUserAvatarByName = (name) => {
   if (!name) return 'https://i.pravatar.cc/150?img=11';
-  if (name === 'Thanh Hằng') return 'https://i.pravatar.cc/150?img=47';
-  if (name === 'Trần Nam') return 'https://i.pravatar.cc/150?img=12';
-  if (name === 'Quốc Bảo') return 'https://i.pravatar.cc/150?img=33';
-  if (name === 'Linh Chi') return 'https://i.pravatar.cc/150?img=26';
-  if (name === 'Minh Trang') return 'https://i.pravatar.cc/150?img=48';
-  if (name === 'Duy Mạnh') return 'https://i.pravatar.cc/150?img=15';
-  if (name === 'Mai Phương') return 'https://i.pravatar.cc/150?img=28';
-  if (name === 'Hoàng Anh') return 'https://i.pravatar.cc/150?img=18';
-  if (name === 'Tuấn Đạt') return 'https://i.pravatar.cc/150?img=14';
-  
-  // Hash name to get a consistent image index between 1 and 70
+
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
+
   const imgIndex = Math.abs(hash % 70) + 1;
   return `https://i.pravatar.cc/150?img=${imgIndex}`;
 };
 
 const getUserLevelByName = (name) => {
-  if (name === 'Thanh Hằng') return 'Cấp 12';
-  if (name === 'Quốc Bảo') return 'Cấp 15';
-  if (name === 'Khánh An') return 'Cấp 9';
-  if (name === 'Duy Mạnh') return 'Cấp 10';
-  if (name === 'Minh Trang') return 'Cấp 11';
-  if (name === 'Mai Phương') return 'Cấp 8';
-  if (name === 'Hoàng Anh') return 'Cấp 14';
-  if (name === 'Tuấn Đạt') return 'Cấp 7';
-  
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -126,11 +116,9 @@ const getUserLevelByName = (name) => {
 const isSourceVerified = (name) => {
   if (!name) return false;
   const verifiedNames = [
-    'Ban truyền thông Vivu360', 
-    'Tạp chí Phượt Việt', 
-    'Góc Ẩm Thực Việt',
-    'Thanh Hằng',
-    'Quốc Bảo'
+    'Ban truyền thông Vivu360',
+    'Tạp chí Phượt Việt',
+    'Góc Ẩm Thực Việt'
   ];
   return verifiedNames.includes(name.trim());
 };
@@ -239,166 +227,53 @@ const popularCities = [
   }
 ];
 
-const travelFriends = [
-  { id: 1, name: 'Thanh Hằng', avatar: 'https://i.pravatar.cc/150?img=47', online: true },
-  { id: 2, name: 'Trần Nam', avatar: 'https://i.pravatar.cc/150?img=12', online: true },
-  { id: 3, name: 'Quốc Bảo', avatar: 'https://i.pravatar.cc/150?img=33', online: true },
-  { id: 4, name: 'Linh Chi', avatar: 'https://i.pravatar.cc/150?img=26', online: false },
-  { id: 5, name: 'Minh Trang', avatar: 'https://i.pravatar.cc/150?img=48', online: true },
-  { id: 6, name: 'Duy Mạnh', avatar: 'https://i.pravatar.cc/150?img=15', online: false },
-  { id: 7, name: 'Mai Phương', avatar: 'https://i.pravatar.cc/150?img=28', online: true },
-];
+const travelFriends = [];
 
-const initialPosts = [
-  {
-    id: 1,
-    title: 'Hành trình 3 ngày 2 đêm săn hoàng hôn và Carnival rực rỡ tại Vịnh Hạ Long',
-    category: 'Khám phá',
-    source: 'Thanh Hằng',
-    time: '15 phút trước',
-    location: 'Vịnh Hạ Long, Quảng Ninh',
-    duration: '3 ngày 2 đêm',
-    companions: [
-      'https://i.pravatar.cc/150?img=47',
-      'https://i.pravatar.cc/150?img=12',
-      'https://i.pravatar.cc/150?img=33'
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1555921015-5532091f6026?auto=format&fit=crop&w=400&q=80'
-    ],
-    itinerary: [
-      { day: 'Ngày 1', text: 'Nhận phòng khách sạn nghỉ ngơi, chiều đi du thuyền khám phá Hòn Trống Mái, Hang Sửng Sốt.' },
-      { day: 'Ngày 2', text: 'Chèo kayak quanh Hang Luồn, chiều tối hoà mình vào lễ hội diễu hành Hạ Long Carnival sầm uất.' },
-      { day: 'Ngày 3', text: 'Check-in bảo tàng Quảng Ninh cực chất và thưởng thức chả mực nóng nổi trước khi về.' }
-    ],
-    content: 'Chúng tôi vừa hoàn thành chuyến đi tuyệt vời tại Vịnh Hạ Long. Mùa hè này thời tiết vô cùng lý tưởng để chèo kayak và ngắm nhìn những dãy núi đá vôi hùng vĩ. Đêm hội Carnival vô cùng sôi động với dàn công nghệ 3D Mapping hoành tráng.',
-    image: 'https://images.unsplash.com/photo-1524230507669-e297d477b24d?auto=format&fit=crop&w=600&q=80',
-    likes: 124,
-    commentsCount: 2,
-    likedByUser: false,
-    comments: [
-      { id: 1, user: 'Trần Nam', text: 'Quá hoành tráng! Tôi vừa đặt vé và phòng khách sạn trên app để đi vào cuối tuần này.' },
-      { id: 2, user: 'Quốc Bảo', text: 'Đợt này đi Hạ Long xem bản đồ hướng dẫn 3D trên app rất tiện lợi, đỡ bị lạc đường.' }
-    ],
-    user: { name: 'Thanh Hằng', avatar: 'https://i.pravatar.cc/150?img=47', level: 'Cấp 12', points: 12400 }
-  },
-  {
-    id: 2,
-    title: 'Chinh phục đỉnh Fansipan mùa săn mây trắng xoá trôi bồng bềnh',
-    category: 'Cẩm nang',
-    source: 'Quốc Bảo',
-    time: '2 giờ trước',
-    location: 'Đỉnh Fansipan, Sa Pa',
-    duration: '2 ngày 1 đêm',
-    companions: [
-      'https://i.pravatar.cc/150?img=26',
-      'https://i.pravatar.cc/150?img=33',
-      'https://i.pravatar.cc/150?img=48'
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1486916856992-e4db22c8df33?auto=format&fit=crop&w=400&q=80'
-    ],
-    itinerary: [
-      { day: 'Ngày 1', text: 'Di chuyển lên thị trấn Sa Pa xe giường nằm, tham quan bản Cát Cát mộc mạc và ăn đồ nướng.' },
-      { day: 'Ngày 2', text: 'Dậy sớm đi cáp treo lên Fansipan đón bình minh và săn biển mây cuộn sóng, ngắm nhìn nóc nhà Đông Dương.' }
-    ],
-    content: 'Chuyến săn mây thành công ngoài mong đợi! Biển mây Sapa dày đặc bao phủ toàn bộ thung lũng tạo cảm giác như đứng giữa thiên đường. Nhiệt độ trên đỉnh Fansipan buổi sáng khá lạnh (khoảng 8 độ C), các bạn nhớ mang theo áo phao giữ ấm dày nhé.',
-    image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=600&q=80',
-    likes: 258,
-    commentsCount: 2,
-    likedByUser: true,
-    comments: [
-      { id: 1, user: 'Linh Chi', text: 'Sapa mùa này đúng là thiên đường săn mây luôn đó cả nhà, mê mệt!' },
-      { id: 2, user: 'Minh Trang', text: 'Ảnh chụp xuất sắc quá, mình cũng muốn lên đây cắm trại ngắm bình minh quá.' }
-    ],
-    user: { name: 'Quốc Bảo', avatar: 'https://i.pravatar.cc/150?img=33', level: 'Cấp 15', points: 15200 }
-  },
-  {
-    id: 3,
-    title: 'Khám phá thiên đường Đảo Ngọc: Top 5 đặc sản hải sản tại Chợ Đêm',
-    category: 'Ẩm thực',
-    source: 'Khánh An',
-    time: '5 giờ trước',
-    location: 'Bãi Sao, Phú Quốc',
-    duration: '3 ngày 2 đêm',
-    companions: [
-      'https://i.pravatar.cc/150?img=22',
-      'https://i.pravatar.cc/150?img=15',
-      'https://i.pravatar.cc/150?img=28'
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=400&q=80'
-    ],
-    itinerary: [
-      { day: 'Ngày 1', text: 'Check-in khách sạn sát biển, đi dạo hoàng hôn Bãi Trường và ăn tối Chợ đêm Dương Đông.' },
-      { day: 'Ngày 2', text: 'Đi tour 4 đảo cáp treo Hòn Thơm, lặn ngắm san hô biển Nam Đảo hoang sơ.' },
-      { day: 'Ngày 3', text: 'Tắm biển nghỉ ngơi thư giãn tại resort trước khi ra sân bay về lại Hà Nội.' }
-    ],
-    content: 'Gỏi cá trích cuốn bánh tráng chấm sốt đậu phộng bùi bùi, ghẹ Hàm Ninh ngọt lịm chắc thịt hay bún quậy Kiến Xây nóng hổi cay nồng là những món ăn ngon nức tiếng tại Phú Quốc. Hãy ghé chợ đêm để được thưởng thức hải sản tươi rói chế biến tại chỗ nhé.',
-    image: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=600&q=80',
-    likes: 95,
-    commentsCount: 0,
-    likedByUser: false,
-    comments: [],
-    user: { name: 'Khánh An', avatar: 'https://i.pravatar.cc/150?img=22', level: 'Cấp 9', points: 9150 }
-  }
-];
+const initialPosts = [];
 
-const initialGroups = [
-  {
-    id: 1,
-    name: 'Hội Săn Mây Sa Pa 2026',
-    tag: 'Sapa / Phượt',
-    members: 342,
-    image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=300&q=80',
-    lastMessage: 'Minh Trang: Ngày mai có ai lên đỉnh đèo Ô Quy Hồ ngắm bình minh không?',
-    messages: [
-      { id: 1, user: 'Duy Mạnh', text: 'Dự báo mai mây dày lắm đó mn.' },
-      { id: 2, user: 'Minh Trang', text: 'Ngày mai có ai lên đỉnh đèo Ô Quy Hồ ngắm bình minh không?' }
-    ]
-  },
-  {
-    id: 2,
-    name: 'Kinh Nghiệm Phú Quốc Tự Túc',
-    tag: 'Ẩm thực / Khách sạn',
-    members: 1205,
-    image: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=300&q=80',
-    lastMessage: 'Hoàng Anh: Mọi người ăn ghẹ ở Hàm Ninh nhớ chọn quán ven bè ăn tươi hơn nhé.',
-    messages: [
-      { id: 1, user: 'Mai Phương', text: 'Ghẹ Hàm Ninh đang vào mùa ngon lắm ạ.' },
-      { id: 2, user: 'Hoàng Anh', text: 'Mọi người ăn ghẹ ở Hàm Ninh nhớ chọn quán ven bè ăn tươi hơn nhé.' }
-    ]
-  },
-  {
-    id: 3,
-    name: 'Đồng Hành Đà Nẵng - Hội An',
-    tag: 'Kết bạn / Ghép xe',
-    members: 184,
-    image: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?auto=format&fit=crop&w=300&q=80',
-    lastMessage: 'Tuấn Đạt: Nhóm mình còn trống 2 chỗ đi Bà Nà Hills sáng thứ 5, ai đi cùng không?',
-    messages: [
-      { id: 1, user: 'Tuấn Đạt', text: 'Nhóm mình còn trống 2 chỗ đi Bà Nà Hills sáng thứ 5, ai đi cùng không?' }
-    ]
-  }
-];
+const initialGroups = [];
 
-export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }) {
+const SEEDED_POST_IDS = new Set([1, 2, 3]);
+
+const sanitizePosts = (items) => (
+  Array.isArray(items)
+    ? items.filter((post) => post && !SEEDED_POST_IDS.has(Number(post.id)))
+    : []
+);
+
+export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, onLogout, onStartDirectChat }) {
   const [posts, setPosts] = useState(initialPosts);
+  const [postsOwnerId, setPostsOwnerId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [notificationVisible, setNotificationVisible] = useState(false);
 
-  const mockStories = useMemo(() => [
-    { id: 1, name: 'Tin của bạn', image: currentUser.avatar, isCreate: true },
-    { id: 2, name: 'Thanh Hằng', image: 'https://images.unsplash.com/photo-1524230507669-e297d477b24d?auto=format&fit=crop&w=300&q=80', avatar: 'https://i.pravatar.cc/150?img=47' },
-    { id: 3, name: 'Quốc Bảo', image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=300&q=80', avatar: 'https://i.pravatar.cc/150?img=33' },
-    { id: 4, name: 'Linh Chi', image: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?auto=format&fit=crop&w=300&q=80', avatar: 'https://i.pravatar.cc/150?img=26' },
-    { id: 5, name: 'Minh Trang', image: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=300&q=80', avatar: 'https://i.pravatar.cc/150?img=48' },
-  ], [currentUser]);
+  useEffect(() => {
+    if (!ownerId) return;
+    let active = true;
+    loadAppData(ownerId, 'social')
+      .then(saved => {
+        if (active) {
+          setPosts(sanitizePosts(saved?.posts));
+        }
+      })
+      .catch(error => console.warn('Không thể tải bài viết:', error.message))
+      .finally(() => active && setPostsOwnerId(ownerId));
+    return () => { active = false; };
+  }, [ownerId]);
+
+  useEffect(() => {
+    if (!ownerId || postsOwnerId !== ownerId) return;
+    const timer = setTimeout(() => {
+      saveAppData(ownerId, 'social', { posts })
+        .catch(error => console.warn('Không thể lưu bài viết:', error.message));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [ownerId, postsOwnerId, posts]);
+
+  const mockStories = useMemo(() => [], []);
+
+  const notifications = useMemo(() => [], []);
 
   // View states within social tab: 'feed' | 'createPost'
   const [activeView, setActiveView] = useState('feed');
@@ -442,6 +317,44 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
   const [newImgUrl, setNewImgUrl] = useState('');
 
   const [searchText, setSearchText] = useState('');
+  const [friendResults, setFriendResults] = useState([]);
+  const [isSearchingFriends, setIsSearchingFriends] = useState(false);
+  const [friendSearchError, setFriendSearchError] = useState('');
+
+  useEffect(() => {
+    const query = searchText.trim();
+    if (query.length < 2) {
+      setFriendResults([]);
+      setIsSearchingFriends(false);
+      setFriendSearchError('');
+      return;
+    }
+
+    let active = true;
+    setIsSearchingFriends(true);
+    setFriendSearchError('');
+    const timer = setTimeout(() => {
+      searchFriends(query, ownerId)
+        .then(users => active && setFriendResults(Array.isArray(users) ? users : []))
+        .catch(error => {
+          if (active) {
+            setFriendResults([]);
+            setFriendSearchError(
+              error.response
+                ? 'Máy chủ không thể xử lý tìm kiếm. Vui lòng thử lại.'
+                : 'Không thể kết nối Vivu360_API. Hãy kiểm tra API đang chạy ở cổng 3000.'
+            );
+            console.warn('Khong the tim ban be:', error.message);
+          }
+        })
+        .finally(() => active && setIsSearchingFriends(false));
+    }, 350);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [searchText, ownerId]);
 
   const filteredPosts = useMemo(() => {
     let result = posts;
@@ -507,6 +420,7 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
       likedByUser: false,
       comments: [],
       user: {
+        firebaseUid: ownerId,
         name: currentUser.name,
         avatar: currentUser.avatar,
         level: currentUser.level || 'Cấp 8',
@@ -583,289 +497,304 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
     }
   };
 
+  // Story avatar colors — rainbow rings như trong design
+  const STORY_RING_COLORS = [
+    ['#f43f5e', '#fb923c'],
+    ['#a855f7', '#3b82f6'],
+    ['#10b981', '#06b6d4'],
+    ['#f59e0b', '#ef4444'],
+    ['#6366f1', '#ec4899'],
+  ];
+
+  // Mock stories từ popularCities
+  const storyItems = [
+    { id: 'me', isMe: true, name: 'Story của bạn', avatar: currentUser?.avatar },
+    ...popularCities.map((c, i) => ({ id: c.id, name: c.city, avatar: c.avatars[0], ring: STORY_RING_COLORS[i % STORY_RING_COLORS.length] })),
+  ];
+
   return (
     <View style={styles.tabContainer}>
-      {/* HEADER SECTION */}
-      <View style={styles.socialHeader}>
-        <View style={styles.headerTopRow}>
-          <Text style={[styles.socialTitle, { color: theme.textPrimary }]}>Khám phá điểm đến</Text>
-          <Pressable 
-            style={({ pressed }) => [
-              styles.messengerIconBtn, 
-              { backgroundColor: theme.searchBg },
-              pressed && { opacity: 0.7 }
-            ]}
-            onPress={() => {
-              if (onNavigateToTab) {
-                onNavigateToTab('chat');
-              } else {
-                Alert.alert('Lỗi điều hướng', 'onNavigateToTab prop is undefined!');
-              }
-            }}
-          >
-            <MessageCircle size={22} color={theme.textPrimary} />
-            <View style={styles.messengerBadge} />
-          </Pressable>
-        </View>
-        <Text style={[styles.socialSubtitle, { color: theme.textSecondary }]}>
-          Mạng xã hội chia sẻ hành trình du lịch Vivu360
-        </Text>
 
-        {/* Sleek Search Input */}
+      {/* ── HEADER ─────────────────────────────────────────────────────── */}
+      <View style={[styles.socialHeader, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        {/* Top Row: Search icon | Title | Messenger + Plus */}
+        <View style={styles.headerTopRow}>
+          <Pressable style={[styles.hdrIconBtn, { backgroundColor: theme.searchBg }]}>
+            <Search size={18} color={theme.textPrimary} />
+          </Pressable>
+
+          <Text style={[styles.socialTitle, { color: theme.textPrimary }]}>Vivu360</Text>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {/* Messenger icon — điều hướng sang tab Chat */}
+            <Pressable
+              style={[styles.hdrIconBtn, { backgroundColor: theme.searchBg }]}
+              onPress={() => onNavigateToTab && onNavigateToTab('chat')}
+            >
+              <MessageSquare size={18} color={theme.textPrimary} />
+              <View style={styles.messengerBadge}>
+                <Text style={styles.messengerBadgeText}>3</Text>
+              </View>
+            </Pressable>
+
+            {/* Nút tạo bài viết mới */}
+            <Pressable
+              style={[styles.hdrIconBtn, { backgroundColor: '#2563eb' }]}
+              onPress={() => setActiveView('createPost')}
+            >
+              <Plus size={18} color="#fff" />
+            </Pressable>
+          </View>
+        </View>
+
+
+        {/* Search bar */}
         <View style={[styles.socialSearchContainer, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
-          <Search size={16} color={theme.textSecondary} />
+          <Search size={14} color={theme.textMuted} />
           <TextInput
-            placeholder="Tìm kiếm bài viết, tỉnh thành hoặc bạn bè..."
+            placeholder="Tìm bài viết, bạn bè..."
             placeholderTextColor={theme.textMuted}
             value={searchText}
             onChangeText={setSearchText}
             style={[styles.socialSearchInput, { color: theme.textPrimary }]}
           />
           {searchText.length > 0 && (
-            <Pressable onPress={() => setSearchText('')} style={{ padding: 6 }}>
-              <X size={14} color={theme.textMuted} />
+            <Pressable onPress={() => setSearchText('')} style={{ padding: 4 }}>
+              <X size={13} color={theme.textMuted} />
             </Pressable>
           )}
         </View>
 
-        {/* Category horizontal tabs */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          contentContainerStyle={{ gap: 8, paddingVertical: 12 }}
-        >
-          {['Tất cả', 'Khám phá', 'Cẩm nang', 'Ẩm thực', 'Sự kiện'].map((cat) => {
-            const isActive = selectedCategory === cat;
-            const catColors = isActive 
-              ? { bg: '#3b82f6', text: '#ffffff', border: '#3b82f6' }
-              : getCategoryColor(cat === 'Tất cả' ? 'Khác' : cat, isDarkMode);
-            return (
-              <Pressable
-                key={cat}
-                onPress={() => setSelectedCategory(cat)}
-                style={[
-                  styles.categoryTabBtn,
-                  {
-                    backgroundColor: catColors.bg,
-                    borderColor: catColors.border,
-                  },
-                  isActive && styles.categoryTabBtnActive
-                ]}
-              >
-                <Text style={[
-                  styles.categoryTabBtnText,
-                  {
-                    color: catColors.text
-                  }
-                ]}>
-                  {cat}
-                </Text>
-              </Pressable>
-            );
-          })}
+        {/* ── STORIES BAR ─────────────────────────────────────────────── */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesRow}>
+          {storyItems.map((story, idx) => (
+            <Pressable
+              key={story.id}
+              style={styles.storyItem}
+              onPress={() => story.isMe ? setActiveView('createPost') : Alert.alert(story.name, 'Story đang được tải...')}
+            >
+              {story.isMe ? (
+                <View style={[styles.storyAvatarWrap, { borderColor: theme.border }]}>
+                  <Image
+                    source={{ uri: story.avatar || getUserAvatarByName('me') }}
+                    style={styles.storyAvatar}
+                  />
+                  <View style={styles.storyAddBadge}>
+                    <LinearGradient colors={['#2563eb', '#3b82f6']} style={styles.storyAddGrad}>
+                      <Plus size={9} color="#fff" strokeWidth={3} />
+                    </LinearGradient>
+                  </View>
+                </View>
+              ) : (
+                <LinearGradient
+                  colors={story.ring || ['#f43f5e', '#fb923c']}
+                  style={styles.storyRingGrad}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <View style={[styles.storyRingInner, { backgroundColor: theme.card }]}>
+                    <Image source={{ uri: story.avatar }} style={styles.storyAvatar} />
+                  </View>
+                </LinearGradient>
+              )}
+              <Text style={[styles.storyName, { color: theme.textSecondary }]} numberOfLines={1}>
+                {story.isMe ? 'Your story' : story.name}
+              </Text>
+            </Pressable>
+          ))}
         </ScrollView>
       </View>
 
-      {/* Scrollable Feed Section */}
-      <ScrollView 
-        style={{ backgroundColor: isDarkMode ? '#121212' : '#f8fafc' }}
-        contentContainerStyle={{ paddingBottom: 100 }} 
+      {/* ── FEED SCROLL ─────────────────────────────────────────────────── */}
+      <ScrollView
+        style={{ backgroundColor: isDarkMode ? '#0f1117' : '#f0f2f5' }}
+        contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* EXPLORE POPULAR CITIES */}
-        <View style={[styles.sectionContainer, { backgroundColor: theme.card, borderBottomColor: theme.border, paddingBottom: 18, borderBottomWidth: 1 }]}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitleLabel, { color: theme.textPrimary }]}>Điểm đến nổi bật</Text>
-            <Pressable>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#3b82f6' }}>Xem tất cả</Text>
-            </Pressable>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12, marginTop: 12 }}>
-            {popularCities.map((city) => (
-              <Pressable 
-                key={city.id} 
-                style={[styles.popularCityCard, { borderColor: theme.border }]}
-                onPress={() => setSearchText(city.city)}
+        {/* Friend search results */}
+        {searchText.trim().length >= 2 && (
+          <View style={[styles.friendSearchResults, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+            <Text style={[styles.sectionTitleLabel, { color: theme.textPrimary }]}>Bạn bè trên Vivu360</Text>
+            {isSearchingFriends ? (
+              <ActivityIndicator color="#3b82f6" style={{ marginVertical: 14 }} />
+            ) : friendSearchError ? (
+              <Text style={[styles.emptyFriendSearch, { color: '#ef4444' }]}>{friendSearchError}</Text>
+            ) : friendResults.length > 0 ? friendResults.map(friend => (
+              <Pressable
+                key={friend.firebaseUid}
+                style={[styles.friendSearchItem, { borderTopColor: theme.border }]}
+                onPress={() => { setTargetUsername(friend.name); setProfileModalVisible(true); }}
               >
-                <Image source={{ uri: city.image }} style={styles.popularCityImage} />
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.85)']}
-                  style={StyleSheet.absoluteFillObject}
-                />
-                <View style={styles.popularCityContent}>
-                  <Text style={styles.popularCityTitle}>{city.city}</Text>
-                  <Text style={styles.popularCitySub}>{city.region}</Text>
-                  
-                  {/* Companion avatars overlaid */}
-                  <View style={styles.popularCityAvatarsRow}>
-                    <View style={styles.avatarGroupContainer}>
-                      {city.avatars.map((av, idx) => (
-                        <Image key={idx} source={{ uri: av }} style={[styles.avatarGroupItem, { marginLeft: idx > 0 ? -10 : 0 }]} />
-                      ))}
-                    </View>
-                    <Text style={styles.activeFriendsCountText}>{city.activeFriends}</Text>
-                  </View>
-                </View>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* TRAVEL WITH FRIENDS ROW */}
-        <View style={[styles.sectionContainer, { backgroundColor: theme.card, borderBottomColor: theme.border, paddingVertical: 14, borderBottomWidth: 1 }]}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitleLabel, { color: theme.textPrimary }]}>Bạn đồng hành đồng bộ</Text>
-            <Pressable>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#3b82f6' }}>Xem hết</Text>
-            </Pressable>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10, marginTop: 12 }}>
-            <Pressable style={styles.addFriendCircle} onPress={() => Alert.alert('Tính năng', 'Tìm bạn đồng hành qua mã QR quét vị trí!')}>
-              <Plus size={20} color={theme.textSecondary} />
-            </Pressable>
-            {travelFriends.map((friend) => (
-              <Pressable key={friend.id} style={styles.friendAvatarCheck} onPress={() => setSearchText(friend.name)}>
-                <View style={styles.friendAvatarWrap}>
-                  <Image source={{ uri: friend.avatar }} style={styles.friendAvatarCircle} />
-                  {friend.online && <View style={styles.friendOnlineDot} />}
-                </View>
-                <Text style={[styles.friendNameMin, { color: theme.textPrimary }]} numberOfLines={1}>{friend.name.split(' ')[1] || friend.name}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
-        <View style={styles.feedSection}>
-            {/* Quick Create Post Card */}
-            <Pressable
-              style={[styles.createPostTriggerCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-              onPress={() => setActiveView('createPost')}
-            >
-              <View style={styles.triggerTopRow}>
-                <Image
-                  source={{ uri: currentUser.avatar }}
-                  style={styles.triggerAvatar}
-                />
-                <View style={[styles.triggerInputContainer, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
-                  <Text style={{ color: theme.textSecondary, fontSize: 12.5, fontWeight: '500' }}>
-                    Bạn vừa đi đâu về thế, {currentUser.name}? Chia sẻ chuyến đi nhé!
+                <Image source={{ uri: friend.avatar || getUserAvatarByName(friend.name) }} style={styles.friendSearchAvatar} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.friendSearchName, { color: theme.textPrimary }]}>{friend.name}</Text>
+                  <Text style={[styles.friendSearchContact, { color: theme.textSecondary }]} numberOfLines={1}>
+                    {friend.email}{friend.phone ? ` · ${friend.phone}` : ''}
                   </Text>
                 </View>
-              </View>
-              <View style={[styles.triggerDivider, { backgroundColor: theme.border }]} />
-              <View style={styles.triggerBottomRow}>
-                <Pressable style={styles.triggerActionItem} onPress={() => setActiveView('createPost')}>
-                  <Camera size={15} color="#ef4444" />
-                  <Text style={[styles.triggerActionText, { color: theme.textSecondary }]}>Trực tiếp</Text>
-                </Pressable>
-                <Pressable style={styles.triggerActionItem} onPress={() => setActiveView('createPost')}>
-                  <ImageIcon size={15} color="#10b981" />
-                  <Text style={[styles.triggerActionText, { color: theme.textSecondary }]}>Ảnh/video</Text>
-                </Pressable>
-                <Pressable style={styles.triggerActionItem} onPress={() => setActiveView('createPost')}>
-                  <Smile size={15} color="#f59e0b" />
-                  <Text style={[styles.triggerActionText, { color: theme.textSecondary }]}>Cảm xúc</Text>
-                </Pressable>
-              </View>
-            </Pressable>
-
-            {/* TRIP FEED LISTINGS */}
-            {(() => {
-              const listToRender = displayListPosts;
-              if (listToRender.length === 0) {
-                return (
-                  <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                    <Text style={{ color: theme.textSecondary, fontWeight: '700', fontSize: 13 }}>
-                      Không tìm thấy chuyến đi tương ứng.
-                    </Text>
-                  </View>
-                );
-              }
-              return listToRender.map((post) => (
-                <View key={post.id} style={[styles.tripPostCard, { backgroundColor: theme.card, borderColor: theme.border, overflow: 'hidden' }]}>
-                  {/* Large cover image pressable to open details */}
-                  <Pressable style={styles.tripCoverPressable} onPress={() => handleOpenComments(post)}>
-                    <Image source={{ uri: post.image }} style={styles.tripCoverImage} />
-                    <LinearGradient
-                      colors={['rgba(0,0,0,0.15)', 'transparent', 'rgba(0,0,0,0.85)']}
-                      style={StyleSheet.absoluteFillObject}
-                    />
-                    
-                    {/* Floating location tag */}
-                    <View style={styles.tripLocationFloatBadge}>
-                      <MapPin size={10} color="#fff" fill="#ef4444" style={{ marginRight: 2 }} />
-                      <Text style={styles.tripLocationFloatText}>{post.location}</Text>
-                    </View>
-
-                    {/* Floating category tag */}
-                    <View style={[
-                      styles.tripCategoryFloatBadge, 
-                      { 
-                        backgroundColor: getCategoryColor(post.category, isDarkMode).bg, 
-                        borderColor: getCategoryColor(post.category, isDarkMode).border 
-                      }
-                    ]}>
-                      <Text style={[
-                        styles.tripCategoryFloatText, 
-                        { color: getCategoryColor(post.category, isDarkMode).text }
-                      ]}>
-                        {post.category}
-                      </Text>
-                    </View>
-
-                    {/* Overlay Title & Duration */}
-                    <View style={styles.tripOverlayContent}>
-                      <Text style={styles.tripDurationText}>🕒 {post.duration || '3 ngày 2 đêm'}</Text>
-                      <Text style={styles.tripOverlayTitle} numberOfLines={2}>{post.title}</Text>
-                    </View>
-                  </Pressable>
-
-                  {/* Trip Card Footer */}
-                  <View style={styles.tripCardFooter}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      {/* Companion avatars list */}
-                      <View style={styles.avatarGroupContainer}>
-                        {(post.companions || ['https://i.pravatar.cc/150?img=47', 'https://i.pravatar.cc/150?img=12']).map((cAvatar, idx) => (
-                          <Image key={idx} source={{ uri: cAvatar }} style={[styles.tripCompanionAvatar, { marginLeft: idx > 0 ? -12 : 0 }]} />
-                        ))}
-                      </View>
-                      <Pressable style={styles.addCompanionMiniBtn} onPress={() => Alert.alert('Bạn đồng hành', 'Thêm bạn đồng hành chia sẻ nhật ký này!')}>
-                        <Plus size={10} color={theme.textSecondary} />
-                      </Pressable>
-                    </View>
-
-                    {/* Actions panel */}
-                    <View style={styles.tripCardActions}>
-                      <Pressable style={styles.tripActionIconBtn} onPress={() => handleLikePost(post.id)}>
-                        <Heart size={16} color={post.likedByUser ? '#ef4444' : theme.textSecondary} fill={post.likedByUser ? '#ef4444' : 'transparent'} />
-                        <Text style={[styles.tripActionText, { color: post.likedByUser ? '#ef4444' : theme.textSecondary }]}>
-                          {post.likes}
-                        </Text>
-                      </Pressable>
-                      <Pressable style={styles.tripActionIconBtn} onPress={() => handleOpenComments(post)}>
-                        <MessageSquare size={16} color={theme.textSecondary} />
-                        <Text style={[styles.tripActionText, { color: theme.textSecondary }]}>
-                          {post.comments?.length || post.commentsCount}
-                        </Text>
-                      </Pressable>
-                      <Pressable style={styles.tripActionIconBtn} onPress={() => handleSharePost(post)}>
-                        <Share2 size={16} color={theme.textSecondary} />
-                      </Pressable>
-                    </View>
-                  </View>
-
-                  {/* Excerpt author name */}
-                  <View style={{ paddingHorizontal: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Image source={{ uri: post.user?.avatar || getUserAvatarByName(post.source) }} style={styles.authorAvatarMini} />
-                    <Text style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '600' }}>
-                      Nhật ký của <Text style={{ color: theme.textPrimary, fontWeight: '700' }}>{post.user?.name || post.source}</Text> • {post.time}
-                    </Text>
-                  </View>
-                </View>
-              ));
-            })()}
+                <ChevronRight size={18} color={theme.textMuted} />
+              </Pressable>
+            )) : (
+              <Text style={[styles.emptyFriendSearch, { color: theme.textSecondary }]}>Không tìm thấy người dùng này.</Text>
+            )}
           </View>
+        )}
+
+        {/* ── CREATE POST TRIGGER ──────────────────────────────────────── */}
+        <View style={[styles.createPostCard, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <Pressable style={styles.createPostRow} onPress={() => setActiveView('createPost')}>
+            <Image source={{ uri: currentUser?.avatar }} style={styles.createPostAvatar} />
+            <View style={[styles.createPostInput, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
+              <Text style={{ color: theme.textMuted, fontSize: 13, fontWeight: '500' }}>
+                Bạn đang nghĩ gì, {currentUser?.name?.split(' ')[0]}?
+              </Text>
+            </View>
+          </Pressable>
+          <View style={[styles.createPostDivider, { backgroundColor: theme.border }]} />
+          <View style={styles.createPostActions}>
+            <Pressable style={styles.createPostActionBtn} onPress={() => setActiveView('createPost')}>
+              <Camera size={16} color="#ef4444" />
+              <Text style={[styles.createPostActionText, { color: theme.textSecondary }]}>Trực tiếp</Text>
+            </Pressable>
+            <Pressable style={styles.createPostActionBtn} onPress={() => setActiveView('createPost')}>
+              <ImageIcon size={16} color="#10b981" />
+              <Text style={[styles.createPostActionText, { color: theme.textSecondary }]}>Ảnh/Video</Text>
+            </Pressable>
+            <Pressable style={styles.createPostActionBtn} onPress={() => setActiveView('createPost')}>
+              <MapPin size={16} color="#f59e0b" />
+              <Text style={[styles.createPostActionText, { color: theme.textSecondary }]}>Check-in</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* ── POST FEED ────────────────────────────────────────────────── */}
+        {(() => {
+          if (displayListPosts.length === 0) {
+            return (
+              <View style={{ alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24 }}>
+                <Text style={{ fontSize: 40, marginBottom: 12 }}>📭</Text>
+                <Text style={{ color: theme.textSecondary, fontWeight: '700', fontSize: 14, textAlign: 'center' }}>
+                  {posts.length === 0 ? 'Chưa có bài đăng nào. Hãy chia sẻ chuyến đi đầu tiên!' : 'Không tìm thấy bài viết phù hợp.'}
+                </Text>
+              </View>
+            );
+          }
+          return displayListPosts.map((post) => (
+            <View key={post.id} style={[styles.postCard, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+
+              {/* ── Post Header ─────────────────────────────────────── */}
+              <View style={styles.postHeader}>
+                <Pressable onPress={() => handleOpenUserProfile(post.user?.name || post.source)} style={styles.postHeaderLeft}>
+                  <LinearGradient
+                    colors={getUserRankColors(post.user?.name || post.source).colors}
+                    style={styles.postAvatarRing}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <View style={[styles.postAvatarInner, { backgroundColor: theme.card }]}>
+                      <Image
+                        source={{ uri: post.user?.avatar || getUserAvatarByName(post.user?.name || post.source) }}
+                        style={styles.postAvatar}
+                      />
+                    </View>
+                  </LinearGradient>
+                  <View style={{ marginLeft: 10 }}>
+                    <Text style={[styles.postUserName, { color: theme.textPrimary }]}>
+                      {post.user?.name || post.source}
+                    </Text>
+                    <Text style={[styles.postTimeText, { color: theme.textMuted }]}>{post.time}</Text>
+                  </View>
+                </Pressable>
+                <Pressable style={styles.postMenuBtn} onPress={() => Alert.alert('Tùy chọn', `Bài viết của ${post.user?.name || post.source}`, [
+                  { text: 'Lưu bài viết' },
+                  { text: 'Báo cáo' },
+                  { text: 'Đóng', style: 'cancel' }
+                ])}>
+                  <View style={styles.postMenuDots}>
+                    <View style={[styles.dot, { backgroundColor: theme.textMuted }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.textMuted }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.textMuted }]} />
+                  </View>
+                </Pressable>
+              </View>
+
+              {/* ── Post Content ─────────────────────────────────────── */}
+              <Pressable onPress={() => handleOpenComments(post)} style={styles.postBody}>
+                <Text style={[styles.postContentText, { color: theme.textPrimary }]} numberOfLines={3}>
+                  {post.content || post.title}
+                  {(post.content || post.title).length > 120 ? (
+                    <Text style={{ color: '#3b82f6', fontWeight: '700' }}> ...xem thêm</Text>
+                  ) : null}
+                </Text>
+              </Pressable>
+
+              {/* ── Post Media ───────────────────────────────────────── */}
+              {post.image && (
+                <Pressable onPress={() => handleOpenComments(post)} style={styles.postMediaWrap}>
+                  <Image source={{ uri: post.image }} style={styles.postMedia} />
+                  {/* Play button overlay for video-like feel */}
+                  <View style={styles.playOverlay}>
+                    <View style={styles.playBtn}>
+                      <View style={styles.playTriangle} />
+                    </View>
+                  </View>
+                  {/* Location chip */}
+                  {post.location && (
+                    <View style={styles.mediaLocationChip}>
+                      <MapPin size={9} color="#fff" fill="#ef4444" />
+                      <Text style={styles.mediaLocationText}>{post.location}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              )}
+
+              {/* ── Reaction counts ──────────────────────────────────── */}
+              <View style={[styles.postReactionBar, { borderTopColor: theme.border, borderBottomColor: theme.border }]}>
+                <Pressable style={styles.reactionItem} onPress={() => handleLikePost(post.id)}>
+                  <View style={[styles.reactionIconCircle, { backgroundColor: '#ef4444' }]}>
+                    <Heart size={10} color="#fff" fill="#fff" />
+                  </View>
+                  <Text style={[styles.reactionCount, { color: post.likedByUser ? '#ef4444' : theme.textSecondary }]}>{post.likes || 105}</Text>
+                </Pressable>
+                <Pressable style={styles.reactionItem} onPress={() => handleOpenComments(post)}>
+                  <View style={[styles.reactionIconCircle, { backgroundColor: '#3b82f6' }]}>
+                    <MessageSquare size={10} color="#fff" />
+                  </View>
+                  <Text style={[styles.reactionCount, { color: theme.textSecondary }]}>{post.commentsCount || post.comments?.length || 15}</Text>
+                </Pressable>
+                <Pressable style={styles.reactionItem} onPress={() => handleSharePost(post)}>
+                  <View style={[styles.reactionIconCircle, { backgroundColor: '#06b6d4' }]}>
+                    <Share2 size={10} color="#fff" />
+                  </View>
+                  <Text style={[styles.reactionCount, { color: theme.textSecondary }]}>50</Text>
+                </Pressable>
+              </View>
+
+              {/* ── Action Buttons ────────────────────────────────────── */}
+              <View style={styles.postActions}>
+                <Pressable style={styles.postActionBtn} onPress={() => handleLikePost(post.id)}>
+                  <Heart
+                    size={18}
+                    color={post.likedByUser ? '#ef4444' : theme.textSecondary}
+                    fill={post.likedByUser ? '#ef4444' : 'transparent'}
+                  />
+                  <Text style={[styles.postActionText, { color: post.likedByUser ? '#ef4444' : theme.textSecondary }]}>Thích</Text>
+                </Pressable>
+                <Pressable style={styles.postActionBtn} onPress={() => handleOpenComments(post)}>
+                  <MessageSquare size={18} color={theme.textSecondary} />
+                  <Text style={[styles.postActionText, { color: theme.textSecondary }]}>Bình luận</Text>
+                </Pressable>
+                <Pressable style={styles.postActionBtn} onPress={() => handleSharePost(post)}>
+                  <Share2 size={18} color={theme.textSecondary} />
+                  <Text style={[styles.postActionText, { color: theme.textSecondary }]}>Chia sẻ</Text>
+                </Pressable>
+              </View>
+
+            </View>
+          ));
+        })()}
       </ScrollView>
+    
 
       {/* ======================================================== */}
       {/* MODALS SECTION */}
@@ -923,7 +852,7 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
                     <Text style={{ fontSize: 10.5, color: theme.textMuted }}>{selectedPost.time} • Tác giả ký sự</Text>
                   </View>
                   <View style={styles.tripDetailCompanionGroup}>
-                    {(selectedPost.companions || ['https://i.pravatar.cc/150?img=47', 'https://i.pravatar.cc/150?img=12']).map((cAv, idx) => (
+                    {(selectedPost.companions || []).map((cAv, idx) => (
                       <Image key={idx} source={{ uri: cAv }} style={[styles.detailCompanionAvatarCircle, { marginLeft: idx > 0 ? -8 : 0 }]} />
                     ))}
                   </View>
@@ -939,11 +868,7 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
                 {/* Photo Carousel (Scroll deck of secondary images like screen 3 in mockup) */}
                 <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textSecondary, marginLeft: 16, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Bộ ảnh hành trình</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10, marginBottom: 20 }}>
-                  {(selectedPost.images || [
-                    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=300&q=80',
-                    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=300&q=80',
-                    'https://images.unsplash.com/photo-1555921015-5532091f6026?auto=format&fit=crop&w=300&q=80'
-                  ]).map((imgUrl, index) => (
+                  {((selectedPost.images && selectedPost.images.length ? selectedPost.images : [selectedPost.image].filter(Boolean))).map((imgUrl, index) => (
                     <Image key={index} source={{ uri: imgUrl }} style={styles.itineraryCarouselImage} />
                   ))}
                 </ScrollView>
@@ -951,11 +876,7 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
                 {/* Day-by-Day Itinerary (like screen 3 list in mockup) */}
                 <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textSecondary, marginLeft: 16, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Lịch trình chi tiết</Text>
                 <View style={{ paddingHorizontal: 16, gap: 12, marginBottom: 24 }}>
-                  {(selectedPost.itinerary || [
-                    { day: 'Ngày 1', text: 'Nhận phòng, di chuyển ra bến tàu du lịch tham quan phong cảnh ảo di sản.' },
-                    { day: 'Ngày 2', text: 'Trải nghiệm quét điểm đến bằng AR 360°, thưởng thức ẩm thực đặc sắc.' },
-                    { day: 'Ngày 3', text: 'Chụp ảnh lưu niệm tại quảng trường địa phương và làm thủ tục check-out.' }
-                  ]).map((it, idx) => (
+                  {selectedPost.itinerary?.length ? selectedPost.itinerary.map((it, idx) => (
                     <View key={idx} style={[styles.itineraryDayCard, { backgroundColor: theme.searchBg, borderColor: theme.border }]}>
                       <View style={styles.itineraryDayHeader}>
                         <LinearGradient
@@ -967,7 +888,13 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
                       </View>
                       <Text style={[styles.itineraryDayText, { color: theme.textPrimary }]}>{it.text}</Text>
                     </View>
-                  ))}
+                  )) : (
+                    <View style={[styles.itineraryDayCard, { backgroundColor: theme.searchBg, borderColor: theme.border }]}>
+                      <Text style={[styles.itineraryDayText, { color: theme.textSecondary }]}>
+                        B?i vi?t n?y ch?a c? l?ch tr?nh chi ti?t.
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Comments section title */}
@@ -1043,7 +970,11 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
         isDarkMode={isDarkMode}
         theme={theme}
         currentUser={currentUser}
+        onStartDirectChat={onStartDirectChat}
       />
+
+      {/* Modal Menu Drawer đã được lược bỏ theo yêu cầu */}
+
 
       {/* TOAST SHARING FEEDBACK ALERT */}
       {shareAlertVisible && (
@@ -1218,13 +1149,327 @@ export function SocialScreen({ isDarkMode, theme, currentUser, onNavigateToTab }
 const styles = StyleSheet.create({
   tabContainer: { flex: 1, width: '100%' },
 
-  // Header styles
-  socialHeader: { paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 44 },
-  headerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
+  // ── Header ──────────────────────────────────────────────────────────────
+  socialHeader: {
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 52,
+    paddingHorizontal: 0,
+    borderBottomWidth: 1,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  hdrIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  socialTitle: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  socialSubtitle: { fontSize: 12, fontWeight: '500', marginTop: 4, lineHeight: 16 },
+
+  // ── Search ──────────────────────────────────────────────────────────────
+  socialSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    height: 36,
+    borderWidth: 1,
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  socialSearchInput: { flex: 1, fontSize: 13, fontWeight: '500' },
+
+  // ── Stories ─────────────────────────────────────────────────────────────
+  storiesRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 12,
+  },
+  storyItem: {
+    alignItems: 'center',
+    width: 64,
+  },
+  storyAvatarWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  storyRingGrad: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    padding: 2.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  storyRingInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+    padding: 2,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  storyAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+  },
+  storyAddBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  storyAddGrad: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyName: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 5,
+    textAlign: 'center',
+    maxWidth: 60,
+  },
+
+  // ── Create Post trigger ──────────────────────────────────────────────────
+  createPostCard: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 8,
+    marginBottom: 0,
+  },
+  createPostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  createPostAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  createPostInput: {
+    flex: 1,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  createPostDivider: {
+    height: 1,
+    marginHorizontal: -16,
+    marginBottom: 8,
+  },
+  createPostActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  createPostActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  createPostActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  // ── Post Card ────────────────────────────────────────────────────────────
+  postCard: {
+    marginBottom: 8,
+    borderBottomWidth: 1,
+  },
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 10,
+  },
+  postHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  postAvatarRing: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  postAvatarInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    padding: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  postAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  postUserName: { fontSize: 13.5, fontWeight: '800' },
+  postTimeText: { fontSize: 11, fontWeight: '500', marginTop: 1 },
+  postMenuBtn: {
+    padding: 8,
+  },
+  postMenuDots: {
+    flexDirection: 'row',
+    gap: 3,
+    alignItems: 'center',
+  },
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  postBody: {
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+  postContentText: {
+    fontSize: 14,
+    fontWeight: '400',
+    lineHeight: 21,
+  },
+  postMediaWrap: {
+    marginHorizontal: 0,
+    marginBottom: 0,
+    position: 'relative',
+  },
+  postMedia: {
+    width: '100%',
+    height: 220,
+    resizeMode: 'cover',
+  },
+  playOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+  playBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playTriangle: {
+    width: 0,
+    height: 0,
+    borderTopWidth: 9,
+    borderBottomWidth: 9,
+    borderLeftWidth: 16,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: '#1a1a1a',
+    marginLeft: 3,
+  },
+  mediaLocationChip: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  mediaLocationText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  postReactionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginTop: 2,
+  },
+  reactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  reactionIconCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reactionCount: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  postActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  postActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 8,
+  },
+  postActionText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+
+  // Legacy — giữ lại các icon btn cũ dùng trong modal
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   messengerIconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  messengerBadge: { position: 'absolute', top: 8, right: 8, width: 9, height: 9, borderRadius: 4.5, backgroundColor: '#ef4444', borderWidth: 1.5, borderColor: '#fff' },
-  socialTitle: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
-  socialSubtitle: { fontSize: 12, fontWeight: '500', marginTop: 4, lineHeight: 16, marginLeft: 4 },
+  messengerBadge: { position: 'absolute', top: -3, right: -3, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fff', paddingHorizontal: 3 },
+  messengerBadgeText: { color: '#fff', fontSize: 8.5, fontWeight: '900', textAlign: 'center' },
 
   // Tab Toggle Buttons
   tabBarContainer: {
@@ -1818,23 +2063,24 @@ const styles = StyleSheet.create({
   categorySelectorPillActive: {
     borderColor: '#3b82f6',
   },
-  // Search input on social header
-  socialSearchContainer: {
+
+  friendSearchResults: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+  },
+  friendSearchItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    marginTop: 14,
+    gap: 12,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  socialSearchInput: {
-    flex: 1,
-    fontSize: 12.5,
-    fontWeight: '600',
-    marginLeft: 8,
-    paddingVertical: 0,
-  },
+  friendSearchAvatar: { width: 42, height: 42, borderRadius: 21 },
+  friendSearchName: { fontSize: 13, fontWeight: '800', marginBottom: 3 },
+  friendSearchContact: { fontSize: 11, fontWeight: '500' },
+  emptyFriendSearch: { fontSize: 12, paddingVertical: 14, lineHeight: 18 },
 
   // Custom Sections
   sectionContainer: {

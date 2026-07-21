@@ -32,11 +32,31 @@ export function LoginScreen({ theme, isDarkMode, onRegisterPress, onLoginSuccess
 
   const handleLogin = () => {
     if (!email.trim() || !password.trim()) {
+      Alert.alert('Lỗi ⚠️', 'Vui lòng điền đầy đủ tài khoản và mật khẩu.');
       sendLocalNotification('Lỗi ⚠️', 'Vui lòng điền đầy đủ tài khoản và mật khẩu.');
       return;
     }
 
     setIsLoading(true);
+
+    // MOCK BYPASS FOR TESTING & OFFLINE GRADUATION PRESENTATION (ONLY FOR TEST EMAILS)
+    const trimmedEmail = email.trim().toLowerCase();
+    if (trimmedEmail === 'admin@vivu360.vn' || trimmedEmail === 'test@vivu360.vn') {
+      setTimeout(() => {
+        setIsLoading(false);
+        sendLocalNotification(
+          'Đăng nhập thành công (Bypass)! 🎉',
+          `Chào mừng ${trimmedEmail === 'admin@vivu360.vn' ? 'Quản trị viên' : 'Hội Viên'} đã đăng nhập Vivu360.`
+        );
+        if (onLoginSuccess) {
+          onLoginSuccess({
+            name: trimmedEmail === 'admin@vivu360.vn' ? 'Admin Vivu360' : 'Hội Viên Thử Nghiệm',
+            email: email.trim(),
+          });
+        }
+      }, 800);
+      return;
+    }
 
     signInWithEmailAndPassword(auth, email.trim(), password.trim())
       .then((userCredential) => {
@@ -59,6 +79,9 @@ export function LoginScreen({ theme, isDarkMode, onRegisterPress, onLoginSuccess
       })
       .catch((error) => {
         setIsLoading(false);
+
+
+
         let errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
         if (
           error.code === 'auth/user-not-found' ||
@@ -73,31 +96,32 @@ export function LoginScreen({ theme, isDarkMode, onRegisterPress, onLoginSuccess
         } else {
           errorMessage = error.message;
         }
+        Alert.alert('Lỗi đăng nhập ⚠️', errorMessage);
         sendLocalNotification('Lỗi đăng nhập ⚠️', errorMessage);
       });
   };
 
   const getBorderColor = (fieldName) => {
-    if (focusedField === fieldName) return '#bef264';
+    if (focusedField === fieldName) return '#3b82f6';
     return theme.border;
   };
 
   const getIconColor = (fieldName) => {
-    if (focusedField === fieldName) return '#bef264';
+    if (focusedField === fieldName) return '#3b82f6';
     return theme.textMuted;
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: isDarkMode ? '#000000' : theme.background }]}>
       {/* Travel Background Image */}
       <Image
         source={{ uri: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1000&q=80' }}
-        style={StyleSheet.absoluteFillObject}
+        style={[StyleSheet.absoluteFillObject, isDarkMode && { opacity: 0.18 }]}
         resizeMode="cover"
       />
       {/* Gradient Overlay (Sunset Violet & Purple Tinted) */}
       <LinearGradient
-        colors={isDarkMode ? ['rgba(88, 28, 135, 0.45)', 'rgba(15, 10, 28, 0.96)'] : ['rgba(243, 232, 255, 0.45)', 'rgba(243, 232, 255, 0.98)']}
+        colors={isDarkMode ? ['rgba(15, 23, 42, 0.65)', 'rgba(0, 0, 0, 0.98)'] : ['rgba(243, 232, 255, 0.45)', 'rgba(243, 232, 255, 0.98)']}
         style={StyleSheet.absoluteFillObject}
       />
 
@@ -110,24 +134,24 @@ export function LoginScreen({ theme, isDarkMode, onRegisterPress, onLoginSuccess
             {/* Logo & Slogan Header */}
             <View style={styles.logoSection}>
               <LinearGradient
-                colors={['#a855f7', '#6366f1']}
+                colors={['#3b82f6', '#8b5cf6']}
                 style={styles.logoRing}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <View style={[styles.logoInner, { backgroundColor: isDarkMode ? '#170f2c' : '#fff' }]}>
-                  <Globe size={42} color="#a855f7" />
-                  <Sparkles size={16} color="#bef264" style={styles.logoSparkle} />
+                <View style={[styles.logoInner, { backgroundColor: isDarkMode ? '#1e293b' : '#fff' }]}>
+                  <Globe size={42} color="#3b82f6" />
+                  <Sparkles size={16} color="#00f2fe" style={styles.logoSparkle} />
                 </View>
               </LinearGradient>
               <Text style={[styles.appName, { color: theme.textPrimary }]}>Vivu360</Text>
-              <Text style={[styles.appSlogan, { color: isDarkMode ? '#c084fc' : theme.textSecondary }]}>
+              <Text style={[styles.appSlogan, { color: isDarkMode ? '#60a5fa' : theme.textSecondary }]}>
                 Hành trình ảo, Trải nghiệm thật
               </Text>
             </View>
 
             {/* Form Credentials Section (Glassmorphic Violet/Purple) */}
-            <View style={[styles.glassCard, { backgroundColor: isDarkMode ? 'rgba(23, 15, 38, 0.72)' : 'rgba(255, 255, 255, 0.78)', borderColor: isDarkMode ? 'rgba(168, 85, 247, 0.22)' : 'rgba(168, 85, 247, 0.12)' }]}>
+            <View style={[styles.glassCard, { backgroundColor: isDarkMode ? 'rgba(24, 24, 27, 0.45)' : 'rgba(255, 255, 255, 0.78)', borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.22)' : 'rgba(59, 130, 246, 0.12)' }]}>
               <Text style={[styles.welcomeText, { color: theme.textPrimary }]}>Chào mừng bạn trở lại</Text>
               <Text style={[styles.subWelcomeText, { color: isDarkMode ? '#cbd5e1' : theme.textSecondary }]}>
                 Đăng nhập để tiếp tục tham quan ảo và kết nối cộng đồng du lịch
@@ -203,18 +227,25 @@ export function LoginScreen({ theme, isDarkMode, onRegisterPress, onLoginSuccess
               {/* Login Button */}
               <Pressable style={styles.loginBtn} onPress={handleLogin} disabled={isLoading}>
                 <LinearGradient
-                  colors={['#d4fc34', '#bef264']}
+                  colors={['#3b82f6', '#06b6d4']}
                   style={styles.loginGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                 >
                   {isLoading ? (
-                    <ActivityIndicator size="small" color="#0f172a" />
+                    <ActivityIndicator size="small" color="#ffffff" />
                   ) : (
                     <Text style={styles.loginText}>Đăng nhập</Text>
                   )}
                 </LinearGradient>
               </Pressable>
+
+              {/* Demo accounts hint */}
+              <View style={{ marginTop: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 11.5, color: isDarkMode ? '#94a3b8' : '#475569', fontWeight: '700', textAlign: 'center', lineHeight: 16 }}>
+                  💡 Tài khoản Demo: admin@vivu360.vn hoặc test@vivu360.vn (Mật khẩu: 123456)
+                </Text>
+              </View>
             </View>
 
             {/* Social Sign In Option */}
@@ -366,7 +397,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   forgotText: {
-    color: '#bef264',
+    color: '#3b82f6',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -374,7 +405,7 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#bef264',
+    shadowColor: '#3b82f6',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
@@ -386,7 +417,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loginText: {
-    color: '#0f172a',
+    color: '#ffffff',
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.3,
@@ -468,7 +499,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   registerLinkText: {
-    color: '#bef264',
+    color: '#3b82f6',
     fontSize: 12,
     fontWeight: '800',
   },

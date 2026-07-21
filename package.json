@@ -3,18 +3,35 @@
   "version": "1.0.0",
   "main": "src/index.js",
   "scripts": {
-    "start": "expo start"
+    "start:expo": "expo start",
+    "dev:api": "npm --prefix vivu360-api run dev",
+    "dev:travel-api": "npm --prefix vietnam-travel/api run dev",
+    "dev:web": "npm --prefix vietnam-travel/public run dev",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:travel-api\" \"npm run dev:web\"",
+    "start": "concurrently --handle-input \"npm run start:expo\" \"npm run dev:api\" \"npm run dev:travel-api\" \"npm run dev:web\"",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "1.23.1",
+    "@types/react": "~18.2.79",
+    "axios": "^1.18.1",
+    "better-sqlite3": "^12.11.1",
     "expo": "^51.0.0",
     "expo-constants": "~16.0.2",
     "expo-linear-gradient": "~13.0.2",
     "expo-notifications": "~0.28.19",
+    "express": "^5.2.1",
     "firebase": "^12.15.0",
     "lucide-react-native": "^1.18.0",
     "react": "18.2.0",
     "react-native": "0.74.5",
-    "react-native-svg": "15.2.0"
+    "react-native-svg": "15.2.0",
+    "react-native-webview": "13.8.6",
+    "socket.io": "^4.8.3",
+    "typescript": "~5.3.3"
   }
 }

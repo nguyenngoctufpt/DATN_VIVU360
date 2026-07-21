@@ -19,11 +19,11 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Khởi tạo Firebase Auth (Tránh lỗi auth/already-initialized khi Hot Reload)
 let auth;
-if (getApps().length === 0) {
+try {
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage)
   });
-} else {
+} catch (error) {
   auth = getAuth(app);
 }
 
