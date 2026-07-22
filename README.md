@@ -1,74 +1,114 @@
-# Vivu360 - Ứng dụng du lịch ảo 3D tương tác
+# Vivu360 - Ứng dụng du lịch ảo 3D & Bản đồ số Việt Nam 360°
 
-Vivu360 là một ứng dụng di động React Native (sử dụng Expo) cho phép người dùng trải nghiệm tham quan ảo các địa danh du lịch nổi tiếng dưới dạng hình ảnh/video 360 độ và công nghệ AR Spatial Reconstruction, kết hợp hệ thống mạng xã hội bảng tin, đặt vé điện tử và chat cộng đồng.
-
----
-
-## Yêu cầu hệ thống
-Trước khi bắt đầu, hãy đảm bảo máy tính của bạn đã cài đặt:
-- **Node.js** (Phiên bản khuyến nghị: LTS 18.x hoặc 20.x)
-- Điện thoại di động đã cài sẵn ứng dụng **Expo Go** (tải miễn phí trên CH Play hoặc App Store) để chạy thử.
+Vivu360 là ứng dụng di động React Native (sử dụng Expo) kết hợp hệ thống Backend MongoDB Express và Bản đồ Web Vite. Ứng dụng cho phép người dùng trải nghiệm tham quan ảo các địa danh du lịch nổi tiếng 63 tỉnh thành Việt Nam với công nghệ Virtual Tour 360°, hệ thống nhắn tin & thông báo thời gian thực, bảng tin mạng xã hội chia sẻ hành trình du lịch.
 
 ---
 
-## Hướng dẫn cài đặt và chạy ứng dụng
+## 📋 Yêu cầu hệ thống (Prerequisites)
+Trước khi bắt đầu cài đặt, hãy đảm bảo máy tính của bạn đã cài sẵn:
+- **Node.js**: Phiên bản Node LTS (v18.x hoặc v20.x).
+- **Git**: Để clone dự án từ GitHub.
+- **Expo Go** (trên điện thoại) hoặc **Android Studio / Genymotion** (nếu chạy máy ảo).
 
-### Bước 1: Clone dự án và cài đặt dependencies
-Mở Terminal (hoặc Command Prompt/PowerShell) tại thư mục dự án và chạy lệnh sau để tải tất cả các thư viện cần thiết:
+---
+
+## 🚀 Hướng dẫn cài đặt & Chạy ứng dụng từ A - Z (Đỡ bị lỗi)
+
+### 1️⃣ Bước 1: Clone dự án từ GitHub
+Mở Terminal (hoặc CMD / PowerShell / Git Bash) tại thư mục máy tính của bạn:
 ```bash
+git clone https://github.com/nguyenngoctufpt/Vivu360.git
+cd Vivu360
+git checkout main
+```
+
+---
+
+### 2️⃣ Bước 2: Cài đặt các gói phụ thuộc (Dependencies)
+Để đảm bảo ứng dụng di động và các server backend chạy chuẩn xác không thiếu gói, chạy lệnh cài đặt cho từng thư mục:
+
+```bash
+# 1. Cài đặt thư mục gốc (App Mobile React Native / Expo)
+npm install --legacy-peer-deps
+
+# 2. Cài đặt Backend MongoDB API
+cd vivu360-api
 npm install
+cd ..
+
+# 3. Cài đặt Bản đồ Web (Vite Public Map)
+cd vietnam-travel/public
+npm install
+cd ../..
+
+# 4. Cài đặt Travel API
+cd vietnam-travel/api
+npm install
+cd ../..
 ```
 
-### Bước 2: Cấu hình thông số kết nối Firebase
-Mở file `src/auth/firebaseConfig.js` trong thư mục code của bạn và cập nhật các thông số cấu hình chính xác từ dự án Firebase Web App của bạn:
-```javascript
-const firebaseConfig = {
-  apiKey: "MÃ_API_KEY_CỦA_BẠN",
-  authDomain: "dự-án.firebaseapp.com",
-  projectId: "dự-án",
-  storageBucket: "dự-án.appspot.com",
-  messagingSenderId: "mã-số",
-  appId: "mã-ứng-dụng",
-  measurementId: "mã-đo-lường"
-};
-```
-*(Hãy nhớ kích hoạt phương thức đăng nhập bằng **Email/Password** trong tab **Authentication -> Sign-in method** trên Firebase Console để tính năng đăng nhập/đăng ký hoạt động).*
+---
 
-### Bước 3: Khởi động máy chủ phát triển (Metro Bundler)
-Chạy lệnh sau để khởi động Expo:
+### 3️⃣ Bước 3: Cấu hình biến môi trường (`.env`)
+Tạo tệp `.env` trong thư mục `vivu360-api/.env` (nếu chưa có) để kết nối Cơ sở dữ liệu MongoDB:
+```env
+PORT=5001
+MONGODB_URI=mongodb+srv://ngoctuboy2k4:Tu24102004@cluster0.oev5q.mongodb.net/Vivu360?retryWrites=true&w=majority
+```
+
+---
+
+### 4️⃣ Bước 4: Khởi chạy dự án (Run Application)
+
+#### ⚡ Cách 1: Chạy tất cả tự động bằng 1 câu lệnh (Khuyên dùng)
+Tại thư mục gốc `Vivu360`, chạy lệnh:
 ```bash
 npm start
 ```
-Hoặc:
-```bash
-npx expo start
-```
+Lệnh này sẽ tự động chạy đồng thời:
+- **Backend MongoDB API**: `http://localhost:5001`
+- **Bản đồ Web 360°**: `http://localhost:3005`
+- **Travel API**: `http://localhost:5002`
+- **Expo Mobile App**: Cửa sổ Metro Bundler chứa mã QR.
 
-### Bước 4: Chạy ứng dụng trên thiết bị
-
-#### Cách 1: Chạy trên điện thoại thật (Khuyên dùng)
-1. Kết nối điện thoại và máy tính của bạn vào **cùng một mạng Wi-Fi**.
-2. **Android:** Mở ứng dụng **Expo Go**, chọn tính năng quét mã QR và quét mã QR hiển thị trên màn hình Terminal máy tính.
-3. **iOS:** Mở ứng dụng **Camera** mặc định quét mã QR, nhấp vào liên kết mở trong ứng dụng **Expo Go**.
-
-#### Cách 2: Chạy trên máy ảo (Emulator / Simulator)
-- Nhấn phím **`a`** trên bàn phím Terminal để mở ứng dụng trên máy ảo Android (yêu cầu đã mở sẵn Android Studio Emulator).
-- Nhấn phím **`i`** trên bàn phím Terminal để mở ứng dụng trên máy ảo iOS (yêu cầu máy Mac đã cài sẵn Xcode Simulator).
+#### 🛠️ Cách 2: Chạy riêng bằng 2 Terminal
+- **Terminal 1 (Backend APIs & Web Map)**:
+  ```bash
+  npm run dev
+  ```
+- **Terminal 2 (App Mobile Expo)**:
+  ```bash
+  npm run start:expo
+  ```
 
 ---
 
-## Cấu trúc thư mục chính của dự án
+### 5️⃣ Bước 5: Trải nghiệm trên Điện thoại / Máy ảo
+
+#### 📲 Trên Điện thoại thật:
+1. Kết nối điện thoại và máy tính vào **cùng một mạng Wi-Fi**.
+2. Mở ứng dụng **Expo Go** trên điện thoại, chọn **Scan QR Code** và quét mã QR trên màn hình Terminal.
+
+#### 🖥️ Trên Máy ảo Android (Emulator):
+1. Mở sẵn Android Studio / Genymotion.
+2. Nhấn phím **`a`** trên giao diện Terminal Expo để khởi chạy tự động.
+
+---
+
+## 📁 Cấu trúc thư mục dự án
 ```text
-DATN_VIVU360/
+Vivu360/
 ├── src/
-│   ├── auth/            # Quản lý Đăng nhập, Đăng ký, Cấu hình Firebase & Thông báo đẩy
-│   ├── chat/            # Giao diện nhóm chat cộng đồng du khách
-│   ├── map/             # Bản đồ tương tác, Virtual Tour 360°, chi tiết vé
-│   ├── screens/         # Các màn hình chính (Trang chủ, Khám phá, Camera AR, Cá nhân)
-│   ├── settings/        # Cài đặt cá nhân, cấp bậc hội viên, thử thách hành trình
-│   ├── social/          # Bảng tin mạng xã hội chia sẻ ảnh du lịch
-│   ├── App.js           # Điểm đầu vào chính và xử lý điều hướng tab của ứng dụng
-│   └── data.js          # Dữ liệu mô phỏng (mock data) của ứng dụng
-├── package.json         # Cấu hình dự án và danh sách thư viện phụ thuộc
-└── app.json             # Cấu hình hiển thị của ứng dụng Expo (được khuyên khích tạo thêm)
+│   ├── auth/            # Đăng nhập, đăng ký, Firebase & Thông báo đẩy
+│   ├── chat/            # Nhắn tin nhóm/1-1 & Thông báo thời gian thực
+│   ├── map/             # Bản đồ 63 tỉnh thành Việt Nam & Virtual Tour 360°
+│   ├── screens/         # Màn hình chính (Home, Explore, PlaceDetail, Profile)
+│   ├── settings/        # Cài đặt cá nhân & chỉnh sửa hồ sơ
+│   ├── services/        # Kết nối API Backend (chatService, api)
+│   ├── social/          # Mạng xã hội du lịch & trang cá nhân
+│   └── App.js           # Điểm vào chính của ứng dụng di động
+├── vivu360-api/         # Backend Node.js Express & MongoDB Database
+├── vietnam-travel/      # Module Bản đồ tương tác Web 3D (Vite)
+├── package.json         # Cấu hình phụ thuộc chính của dự án
+└── README.md            # Hướng dẫn chi tiết dự án
 ```
