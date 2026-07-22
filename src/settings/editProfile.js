@@ -133,7 +133,7 @@ export function EditProfileScreen({ theme, isDarkMode, onBack, onSave, currentUs
               <Text style={styles.rankBadgeText}>{rank.rankName}</Text>
             </View>
             
-            <Text style={[styles.avatarTip, { color: theme.textSecondary }]}>Khung tích điểm xếp hạng: {rank.rankName}</Text>
+            <Text style={[styles.avatarTip, { color: theme.textSecondary }]}>Ảnh đại diện hồ sơ cá nhân Vivu360</Text>
           </View>
 
           {/* Preset Travel Avatars selection */}

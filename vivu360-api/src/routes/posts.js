@@ -99,7 +99,7 @@ router.post("/:id/like", async (req, res, next) => {
     if (post.authorId !== req.user.firebaseUid) {
       const filter = { recipientId: post.authorId, actorId: req.user.firebaseUid, postId: post._id, type: "post_like" };
       if (index >= 0) await SocialNotification.deleteOne(filter);
-      else await SocialNotification.findOneAndUpdate(filter, { $set: { read: false } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+      else await SocialNotification.findOneAndUpdate(filter, { $set: { read: false } }, { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true });
     }
     res.json({ success: true, data: { likedByMe: index < 0, likesCount: post.likes.length } });
   } catch (error) { next(error); }

@@ -21,7 +21,7 @@ router.put("/:ownerId/:namespace", async (req, res, next) => {
     const record = await AppData.findOneAndUpdate(
       req.params,
       { $set: { data: req.body.data } },
-      { upsert: true, new: true, runValidators: true }
+      { upsert: true, returnDocument: 'after', runValidators: true }
     ).lean();
 
     res.json({ success: true, data: record.data });

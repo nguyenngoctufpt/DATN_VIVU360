@@ -54,3 +54,28 @@ export async function removeChatMember(groupId, requesterId, memberId) {
   });
   return response.data.data;
 }
+
+export async function sendTypingStatus(groupId, userId, userName, avatar, isTyping) {
+  try {
+    const response = await api.post(`/chat/groups/${encodeURIComponent(groupId)}/typing`, {
+      userId,
+      userName,
+      avatar,
+      isTyping,
+    });
+    return response.data;
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function getTypingStatus(groupId, requesterId) {
+  try {
+    const response = await api.get(`/chat/groups/${encodeURIComponent(groupId)}/typing`, {
+      params: { requesterId },
+    });
+    return response.data.data;
+  } catch (e) {
+    return { isTyping: false };
+  }
+}

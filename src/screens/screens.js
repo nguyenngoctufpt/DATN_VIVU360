@@ -89,12 +89,8 @@ export function HomeScreen({
     const primary = [
       { key: 'hotel', label: 'Khách sạn', Icon: Building, colors: ['#ff6b6b', '#ee5253'], type: 'explore' },
       { key: 'tour', label: 'Tours Hot', Icon: Compass, colors: ['#0abde3', '#00d2d3'], type: 'explore' },
-      { key: 'ticket', label: 'Vé vui chơi', Icon: Ticket, colors: ['#ff9f43', '#f39c12'], type: 'explore' },
-      { key: 'car', label: 'Thuê xe', Icon: Car, colors: ['#10ac84', '#1dd1a1'], type: 'explore' },
-      { key: 'sim', label: 'WiFi & SIM', Icon: Wifi, colors: ['#5f27cd', '#341f97'], type: 'explore' },
       { key: 'map', label: 'Bản đồ 3D', Icon: MapIcon, colors: ['#3b82f6', '#1d4ed8'], type: 'tab' },
       { key: 'camera', label: 'Quét AR', Icon: Scan, colors: ['#ef4444', '#b91c1c'], type: 'tab' },
-      { key: 'ticketList', label: 'Vé của tôi', Icon: Ticket, colors: ['#d946ef', '#a21caf'], type: 'tab' },
     ];
     
     const secondary = [
@@ -229,45 +225,6 @@ export function HomeScreen({
         action: () => {
           if (onNavigateToExplore) {
             onNavigateToExplore('tour', '');
-          }
-        }
-      },
-      {
-        key: 'book-ticket',
-        label: 'Mua Vé vui chơi',
-        type: 'explore',
-        Icon: Ticket,
-        colors: ['#ff9f43', '#f39c12'],
-        description: 'Mua vé tham quan, vui chơi giải trí',
-        action: () => {
-          if (onNavigateToExplore) {
-            onNavigateToExplore('ticket', '');
-          }
-        }
-      },
-      {
-        key: 'book-car',
-        label: 'Thuê xe tự lái',
-        type: 'explore',
-        Icon: Car,
-        colors: ['#10ac84', '#1dd1a1'],
-        description: 'Thuê xe ô tô, xe máy tự lái giá tốt',
-        action: () => {
-          if (onNavigateToExplore) {
-            onNavigateToExplore('car', '');
-          }
-        }
-      },
-      {
-        key: 'book-sim',
-        label: 'Mua WiFi & SIM du lịch',
-        type: 'explore',
-        Icon: Wifi,
-        colors: ['#5f27cd', '#341f97'],
-        description: 'Mua SIM 4G, thiết bị phát WiFi',
-        action: () => {
-          if (onNavigateToExplore) {
-            onNavigateToExplore('sim', '');
           }
         }
       }

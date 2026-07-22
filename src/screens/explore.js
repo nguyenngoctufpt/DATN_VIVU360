@@ -141,9 +141,6 @@ export function ExploreScreen({
     { key: 'all', label: 'Tất cả' },
     { key: 'hotel', label: 'Địa danh 📍' },
     { key: 'tour', label: 'Ẩm thực 🍲' },
-    { key: 'ticket', label: 'Bản đồ số 🗺️' },
-    { key: 'car', label: 'Bí kíp phượt ⛺' },
-    { key: 'sim', label: 'Di chuyển 🚗' },
   ];
 
   const trendingSearches = [

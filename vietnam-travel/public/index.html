@@ -373,36 +373,97 @@
         </button>
     </div>
 
-    <!-- Favorites List Modal -->
+
+
+    <!-- Dedicated Favorites Screen Transition Page (Bright Light Mode) -->
     <div x-show="favoritesModalOpen"
-         @click.away="favoritesModalOpen = false"
-         x-transition
+         x-transition:enter="transition ease-out duration-300 transform"
+         x-transition:enter-start="opacity-0 translate-x-full"
+         x-transition:enter-end="opacity-100 translate-x-0"
+         x-transition:leave="transition ease-in duration-250 transform"
+         x-transition:leave-start="opacity-100 translate-x-0"
+         x-transition:leave-end="opacity-0 translate-x-full"
          x-cloak
-         class="fixed top-18 right-4 z-[460] w-[320px] bg-white/98 border border-slate-200/90 rounded-2xl shadow-2xl p-4 backdrop-blur-xl flex flex-col gap-3 max-h-[400px]">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
-            <div class="flex items-center gap-2 font-bold text-slate-800 text-sm">
-                <span>❤️</span>
+         class="fixed inset-0 z-[600] bg-slate-50 text-slate-900 flex flex-col overflow-hidden">
+        <!-- Top Navigation Header -->
+        <div class="px-4 py-3.5 border-b border-slate-200/80 flex items-center justify-between bg-white/90 backdrop-blur-md shadow-sm">
+            <button @click="favoritesModalOpen = false" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">
+                <i data-lucide="arrow-left" class="w-4 h-4 text-slate-600"></i>
+                <span>Quay lại</span>
+            </button>
+            <div class="flex items-center gap-2 font-black text-sm text-slate-900">
+                <span class="text-rose-500">❤️</span>
                 <span>Địa điểm yêu thích</span>
+                <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-600 text-xs font-extrabold" x-text="favoritePlaces.length"></span>
             </div>
-            <button @click="favoritesModalOpen = false" class="text-slate-400 hover:text-slate-600 text-base font-bold">✕</button>
+            <button @click="loadSuggestedFavorites()" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition border border-rose-200/80">
+                <span>🌟 Gợi ý nổi tiếng</span>
+            </button>
         </div>
 
-        <template x-if="favoritePlaces.length === 0">
-            <div class="text-center py-6 text-slate-400 text-xs leading-relaxed">
-                Chưa có địa điểm yêu thích nào.<br>Nhấn ❤️ tại điểm du lịch để lưu!
+        <!-- Content Area -->
+        <div class="flex-1 overflow-y-auto p-4 lg:p-6 max-w-2xl mx-auto w-full">
+            <!-- Search & Control Toolbar -->
+            <div class="mb-4 flex flex-col sm:flex-row gap-2.5 items-center justify-between" x-show="favoritePlaces.length > 0">
+                <div class="relative w-full sm:flex-1">
+                    <input type="text"
+                           x-model="favoriteSearchQuery"
+                           placeholder="Tìm kiếm địa điểm yêu thích..."
+                           class="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-rose-400 shadow-xs" />
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <button @click="loadSuggestedFavorites()" class="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition border border-rose-200/80 flex items-center justify-center gap-1">
+                        <span>🌟 Thêm gợi ý</span>
+                    </button>
+                    <button @click="clearAllFavorites()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 text-xs font-bold transition flex items-center justify-center gap-1">
+                        <span>🗑️ Xóa tất cả</span>
+                    </button>
+                </div>
             </div>
-        </template>
 
-        <div class="overflow-y-auto space-y-2 max-h-[300px] pr-1">
-            <template x-for="item in favoritePlaces" :key="item.name">
-                <div class="p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 rounded-xl flex items-center justify-between gap-2">
-                    <div @click="selectMapSearchResult(item); favoritesModalOpen = false;" class="flex-1 cursor-pointer truncate">
-                        <div class="font-bold text-slate-800 text-xs truncate" x-text="item.name"></div>
-                        <div class="text-[10px] text-slate-500 truncate" x-text="item.address || 'Việt Nam'"></div>
+            <!-- Empty State -->
+            <template x-if="favoritePlaces.length === 0">
+                <div class="flex flex-col items-center justify-center py-16 text-center">
+                    <div class="w-16 h-16 rounded-full bg-rose-100 border border-rose-200 flex items-center justify-center text-3xl mb-4 shadow-sm">
+                        📌
                     </div>
-                    <button @click="toggleFavorite(item)" class="text-slate-400 hover:text-rose-500 p-1 text-xs">✕</button>
+                    <h3 class="text-base font-bold text-slate-900 mb-1.5">Chưa có địa điểm yêu thích nào</h3>
+                    <p class="text-xs text-slate-500 max-w-xs leading-relaxed mb-6">
+                        Khám phá các danh thắng tuyệt đẹp trên bản đồ 360° và nhấn ❤️ tại từng điểm du lịch để lưu lại bộ sưu tập.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-2.5 w-full max-w-xs">
+                        <button @click="loadSuggestedFavorites()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white text-xs font-bold shadow-lg shadow-rose-500/20 transition hover:scale-105 flex items-center justify-center gap-1.5">
+                            <span>🌟 Tải danh thắng nổi tiếng gợi ý</span>
+                        </button>
+                        <button @click="favoritesModalOpen = false" class="w-full py-2.5 px-4 rounded-xl bg-slate-200 text-slate-800 text-xs font-bold transition hover:bg-slate-300">
+                            <span>Khám phá bản đồ ngay ➔</span>
+                        </button>
+                    </div>
                 </div>
             </template>
+
+            <!-- Places Cards Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5" x-show="favoritePlaces.length > 0">
+                <template x-for="item in filteredFavorites" :key="item.name">
+                    <div class="p-4 bg-white border border-slate-200/90 hover:border-rose-300 rounded-2xl flex flex-col justify-between gap-3.5 transition shadow-sm hover:shadow-md group">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0 flex-1">
+                                <span class="inline-block px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 text-[9.5px] font-black uppercase tracking-wider">❤️ Đã lưu</span>
+                                <h4 class="font-bold text-slate-900 text-sm truncate mt-1.5" x-text="item.name"></h4>
+                                <p class="text-xs text-slate-500 truncate mt-0.5" x-text="item.address || 'Việt Nam'"></p>
+                            </div>
+                            <button @click="toggleFavorite(item)" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition" title="Xóa khỏi danh sách">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <button @click="selectMapSearchResult(item); favoritesModalOpen = false;" class="w-full py-2.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white border border-rose-200/80 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs">
+                            <span>Khám phá trên bản đồ 360°</span>
+                            <i data-lucide="compass" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </template>
+            </div>
         </div>
     </div>
 
@@ -429,7 +490,11 @@
                         :title="isFavorite(activeSubLocation?.name) ? 'Bỏ yêu thích' : 'Thêm yêu thích'">
                     <span x-text="isFavorite(activeSubLocation?.name) ? '❤️' : '🤍'"></span>
                 </button>
-                <button @click="activeSubLocation = null" class="text-slate-400 hover:text-slate-600 transition-colors text-lg leading-none p-1">×</button>
+                <button @click="closePlaceCard()"
+                        class="w-7 h-7 rounded-full bg-slate-100 hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center text-xs font-black transition active:scale-90"
+                        title="Đóng thông tin">
+                    ✕
+                </button>
             </div>
         </div>
 
@@ -474,16 +539,21 @@
         </div>
     </div>
 
-    <!-- Premium Custom Zoom Control -->
-    <div x-show="viewMode === 'map' && mapReady"
-         class="fixed right-4 z-[400] flex flex-col bg-white/95 border border-slate-200/80 rounded-xl shadow-lg backdrop-blur-md overflow-hidden transition-all duration-300"
-         :class="activeSubLocation ? 'bottom-[250px]' : 'bottom-6'">
-        <button @click="map.zoomIn()" 
-                class="w-9 h-9 flex items-center justify-center text-slate-600 hover:text-slate-800 hover:bg-slate-50 active:scale-95 transition-all text-lg font-bold border-b border-slate-100 outline-none select-none">
+    <!-- Synchronized Premium Custom Zoom Control (Middle-Right Centered) -->
+    <div x-show="viewMode === 'map' && mapReady && !favoritesModalOpen"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-90"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-cloak
+         class="fixed right-3.5 top-1/2 -translate-y-1/2 z-[420] flex flex-col bg-white/95 border border-slate-200/90 rounded-2xl shadow-2xl backdrop-blur-md overflow-hidden transition-all duration-300">
+        <button @click="handleZoomIn()" 
+                title="Phóng to bản đồ"
+                class="w-10 h-10 flex items-center justify-center text-slate-800 hover:text-blue-600 hover:bg-blue-50/80 active:scale-90 transition-all text-lg font-extrabold border-b border-slate-100 outline-none select-none">
             ＋
         </button>
-        <button @click="map.zoomOut()" 
-                class="w-9 h-9 flex items-center justify-center text-slate-600 hover:text-slate-800 hover:bg-slate-50 active:scale-95 transition-all text-lg font-bold outline-none select-none">
+        <button @click="handleZoomOut()" 
+                title="Thu nhỏ bản đồ"
+                class="w-10 h-10 flex items-center justify-center text-slate-800 hover:text-blue-600 hover:bg-blue-50/80 active:scale-90 transition-all text-lg font-extrabold outline-none select-none">
             －
         </button>
     </div>
@@ -1857,7 +1927,11 @@
                 <button @click="toggleFavorite({ name: markerPopup?.name })" class="text-xs hover:scale-110 transition-transform p-1">
                     <span x-text="isFavorite(markerPopup?.name) ? '❤️' : '🤍'"></span>
                 </button>
-                <button @click="markerPopup = null" class="text-slate-400 hover:text-white text-base leading-none p-1 font-bold">×</button>
+                <button @click="closePlaceCard()"
+                        class="w-6 h-6 rounded-full bg-white/10 hover:bg-rose-500 text-slate-300 hover:text-white flex items-center justify-center text-xs font-black transition active:scale-90"
+                        title="Đóng popup">
+                    ✕
+                </button>
             </div>
         </div>
 
@@ -2106,28 +2180,84 @@
                 mapSearchDropdownOpen: false,
                 favoritePlaces: JSON.parse(localStorage.getItem('vivu360_favorites') || '[]'),
                 favoritesModalOpen: false,
+                favoriteSearchQuery: '',
+
+                get filteredFavorites() {
+                    let list = this.favoritePlaces || [];
+                    if (this.favoriteSearchQuery && this.favoriteSearchQuery.trim()) {
+                        const q = this.favoriteSearchQuery.toLowerCase().trim();
+                        list = list.filter(item => 
+                            (item.name || '').toLowerCase().includes(q) || 
+                            (item.address || '').toLowerCase().includes(q)
+                        );
+                    }
+                    return list;
+                },
+
+                loadSuggestedFavorites() {
+                    const defaultSpots = [
+                        { name: 'Vịnh Hạ Long', address: 'Quảng Ninh, Việt Nam', lat: 20.9101, lng: 107.1839 },
+                        { name: 'Phố cổ Hội An', address: 'Quảng Nam, Việt Nam', lat: 15.8801, lng: 108.3380 },
+                        { name: 'Nhà thờ Đá Sa Pa', address: 'Lào Cai, Việt Nam', lat: 22.3364, lng: 103.8438 },
+                        { name: 'Quần thể Tràng An', address: 'Ninh Bình, Việt Nam', lat: 20.2506, lng: 105.9125 },
+                        { name: 'Bãi Sao Phú Quốc', address: 'Kiên Giang, Việt Nam', lat: 10.0450, lng: 104.0300 },
+                    ];
+                    this.favoritePlaces = defaultSpots;
+                    localStorage.setItem('vivu360_favorites', JSON.stringify(this.favoritePlaces));
+                },
+
+                clearAllFavorites() {
+                    this.favoritePlaces = [];
+                    localStorage.setItem('vivu360_favorites', JSON.stringify([]));
+                },
+
+                closePlaceCard() {
+                    this.activeSubLocation = null;
+                    this.markerPopup = null;
+                    this.activeId = null;
+                    this.detailMode = 'overview';
+                    if (this.map && typeof this.map.closePopup === 'function') {
+                        this.map.closePopup();
+                    }
+                    this.updateMap(true, true);
+                },
 
                 isFavorite(name) {
                     if (!name) return false;
-                    return (this.favoritePlaces || []).some(item => item.name === name);
+                    const cleanName = String(name).trim().toLowerCase();
+                    return (this.favoritePlaces || []).some(item => String(item.name || '').trim().toLowerCase() === cleanName);
                 },
 
                 toggleFavorite(place) {
-                    if (!place || !place.name) return;
-                    const exists = this.isFavorite(place.name);
+                    if (!place) return;
+                    const placeName = typeof place === 'string' ? place : place.name;
+                    if (!placeName) return;
+
+                    const cleanName = String(placeName).trim().toLowerCase();
+                    const exists = (this.favoritePlaces || []).some(item => String(item.name || '').trim().toLowerCase() === cleanName);
+                    
                     if (exists) {
-                        this.favoritePlaces = (this.favoritePlaces || []).filter(item => item.name !== place.name);
+                        this.favoritePlaces = (this.favoritePlaces || []).filter(item => String(item.name || '').trim().toLowerCase() !== cleanName);
                     } else {
                         if (!this.favoritePlaces) this.favoritePlaces = [];
                         this.favoritePlaces.push({
-                            name: place.name,
-                            address: place.address || place.viTri || '',
-                            lat: place.lat || 21.0285,
-                            lng: place.lng || 105.8542,
-                            planSlug: place.planSlug || this.currentPlanId,
+                            name: typeof place === 'object' ? (place.name || placeName) : placeName,
+                            address: typeof place === 'object' ? (place.address || place.viTri || 'Việt Nam') : 'Việt Nam',
+                            lat: typeof place === 'object' ? (place.lat || 21.0285) : 21.0285,
+                            lng: typeof place === 'object' ? (place.lng || 105.8542) : 105.8542,
+                            planSlug: typeof place === 'object' ? (place.planSlug || this.currentPlanId) : this.currentPlanId,
                         });
                     }
                     localStorage.setItem('vivu360_favorites', JSON.stringify(this.favoritePlaces));
+                    
+                    if (window.ReactNativeWebView) {
+                        window.ReactNativeWebView.postMessage(JSON.stringify({
+                            type: 'favoriteToggled',
+                            placeName,
+                            isFavorite: !exists,
+                            favorites: this.favoritePlaces
+                        }));
+                    }
                 },
 
                 getAllAvailableLocations() {
@@ -2304,9 +2434,10 @@
                 },
 
                 get activeLocation() {
+                    if (!this.activeId) return null;
                     const ordered = this.orderedPlanLocations();
-                    if (!ordered.length) return {};
-                    return ordered.find(l => l.id === this.activeId) || ordered[0];
+                    if (!ordered.length) return null;
+                    return ordered.find(l => l.id === this.activeId) || null;
                 },
 
                 setViewMode(mode, options = {}) {
@@ -2458,17 +2589,22 @@
                             }, 500);
                         }
                         const tourParam = url.searchParams.get('tourId') || url.searchParams.get('vr');
-                        if (tourParam) {
+                        if (tourParam && tourParam !== '1') {
                             const title = tourParam.replace(/^attraction-|^province-/, '');
-                            setTimeout(() => {
-                                this.openWebVR(title || 'Văn Miếu - Quốc Tử Giám');
-                            }, 500);
+                            if (title && title.trim()) {
+                                setTimeout(() => {
+                                    this.openWebVR(title);
+                                }, 500);
+                            }
                         }
                     } catch (e) {
                         console.error("Lỗi khi tải dữ liệu kế hoạch:", e);
                         await this.changePlan('ha-noi-nghe-an-ninh-binh-ha-long-ha-noi');
                     }
 
+                    this.activeId = null;
+                    this.activeSubLocation = null;
+                    this.detailMode = 'overview';
                     this.initMap();
 
                     this.$watch('activeId', () => {
@@ -2525,6 +2661,22 @@
                     return 'map';
                 },
 
+                handleZoomIn() {
+                    if (this.map && typeof this.map.zoomIn === 'function') {
+                        this.map.zoomIn();
+                    } else if (window.leafletMap) {
+                        window.leafletMap.zoomIn();
+                    }
+                },
+
+                handleZoomOut() {
+                    if (this.map && typeof this.map.zoomOut === 'function') {
+                        this.map.zoomOut();
+                    } else if (window.leafletMap) {
+                        window.leafletMap.zoomOut();
+                    }
+                },
+
                 initMap() {
                     this.map = L.map('map', {
                         center: [16.047079, 108.20623],
@@ -2532,19 +2684,22 @@
                         zoomControl: false,
                         attributionControl: false
                     });
+                    window.leafletMap = this.map;
 
                     const mapUrl = this.theme === 'light'
-                        ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                        ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
                         : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
                     this.tileLayer = L.tileLayer(mapUrl, {
-                        attribution: '&copy; OpenStreetMap contributors',
+                        attribution: '&copy; CARTO &copy; OpenStreetMap',
+                        subdomains: 'abcd',
+                        maxZoom: 20,
                         keepBuffer: 4,
                         updateWhenIdle: false,
                     }).addTo(this.map);
 
                     this.$watch('theme', (val) => {
                         const newUrl = val === 'light'
-                            ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                            ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
                             : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
                         if (this.tileLayer) {
                             this.tileLayer.setUrl(newUrl);
@@ -2566,10 +2721,13 @@
                     this.map.on('movestart zoomstart', () => { this.markerPopup = null; });
                     this.map.on('zoomend', () => {
                         const zoom = this.map.getZoom();
-                        if (this.activeId && zoom <= 9) {
-                            this.activeId = null;
-                            this.detailMode = 'overview';
-                            this.updateMap(false, true);
+                        if (zoom <= 10) {
+                            if (this.activeId || this.detailMode === 'detail' || this.activeSubLocation) {
+                                this.activeId = null;
+                                this.activeSubLocation = null;
+                                this.detailMode = 'overview';
+                                this.updateMap(false, true);
+                            }
                         }
                     });
                     this.map.on('click', () => {
@@ -2617,17 +2775,29 @@
                         }
 
                         subs.forEach((sub, subIndex) => {
-                            const isSelected = this.activeSubLocation && this.activeSubLocation.id === sub.id;
+                            const isSelected = this.activeSubLocation && (this.activeSubLocation.id === sub.id || this.activeSubLocation.name === sub.name);
+                            const shortName = sub.name.length > 16 ? sub.name.substring(0, 14) + '...' : sub.name;
+                            
                             const markerHtml = isSelected
-                                ? `<div class="relative w-8 h-8 flex items-center justify-center">
-                                            <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg border border-white shadow-xl font-bold text-xs whitespace-nowrap">${sub.name}</div>
-                                        </div>`
-                                : `<div class="relative w-8 h-8 flex items-center justify-center">
-                                            <div class="w-6 h-6 bg-emerald-600 rounded-full border border-white shadow-md flex items-center justify-center text-white font-bold text-[10px]">${subIndex + 1}</div>
-                                        </div>`;
+                                ? `<div class="flex flex-col items-center cursor-pointer group z-[1000]">
+                                        <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2.5 py-1 rounded-xl border-2 border-white shadow-2xl font-black text-xs whitespace-nowrap transform scale-110 mb-1">
+                                            ${sub.name}
+                                        </div>
+                                        <div class="w-6 h-6 bg-emerald-600 text-white rounded-full border-2 border-white shadow-lg flex items-center justify-center font-black text-[10px]">
+                                            ${subIndex + 1}
+                                        </div>
+                                   </div>`
+                                : `<div class="flex flex-col items-center cursor-pointer group">
+                                        <div class="bg-white/95 text-slate-800 border border-slate-200 hover:border-emerald-500 px-2 py-0.5 rounded-lg shadow-md font-extrabold text-[10px] whitespace-nowrap hover:bg-emerald-50 hover:text-emerald-700 transition-all mb-1">
+                                            ${shortName}
+                                        </div>
+                                        <div class="w-5 h-5 bg-emerald-600 text-white rounded-full border border-white shadow-md flex items-center justify-center font-black text-[9px]">
+                                            ${subIndex + 1}
+                                        </div>
+                                   </div>`;
 
                             const marker = L.marker([sub.lat, sub.lng], {
-                                icon: L.divIcon({ className: 'custom-div-icon', html: markerHtml, iconSize: [32, 32], iconAnchor: [16, 16] }),
+                                icon: L.divIcon({ className: 'custom-div-icon', html: markerHtml, iconSize: [120, 50], iconAnchor: [60, 46] }),
                                 zIndexOffset: isSelected ? 1000 : 0
                             }).addTo(this.map);
                             marker.on('click', (e) => {
@@ -3276,8 +3446,9 @@
                     this.scheduleSaveStatus = '';
                     this.restoreExcluded(planId);
                     this.restoreExcludedLocations(planId);
-                    const firstLoc = this.orderedPlanLocations()[0];
-                    this.activeId = firstLoc?.id ?? null;
+                    this.activeId = null;
+                    this.activeSubLocation = null;
+                    this.detailMode = 'overview';
                     this.resetScheduleEditState();
                     this.$nextTick(() => {
                         if (!this.map) this.initMap();

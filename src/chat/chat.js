@@ -1,3 +1,4 @@
+// Vivu360 Chat Module - Pure Obsidian Messenger Dark Mode
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -69,6 +70,8 @@ import { ChiTienModal } from './chiTienModal';
 import { AIPlanningModal } from './aiPlanningModal';
 import { EditActivityModal } from './editActivityModal';
 import { SplitBillModal } from './splitBillModal';
+import { GroupSettingsModal } from './groupSettingsModal';
+import { DirectChatSettingsModal } from './directChatSettingsModal';
 
 const { height } = Dimensions.get('window');
 
@@ -714,9 +717,18 @@ const normalizeApiMessage = (message, currentUser, ownerId, membersList = []) =>
 };
 
 const normalizeApiGroup = (group, currentUser, ownerId) => {
-  const otherMember = (group.memberProfiles || []).find(m => m.firebaseUid !== ownerId);
+  const membersRaw = group.memberProfiles && group.memberProfiles.length > 0
+    ? group.memberProfiles
+    : (group.members || []).map(id => typeof id === 'object' ? id : ({
+        firebaseUid: id,
+        id: id,
+        name: id === ownerId ? (currentUser?.name || 'Bạn') : `Thành viên (${String(id).slice(0, 5)})`,
+        avatar: getUserAvatarByName(id),
+      }));
+
+  const otherMember = membersRaw.find(m => (m.firebaseUid || m.id) !== ownerId);
   const groupName = group.isDirect && otherMember ? otherMember.name : group.name;
-  const groupAvatar = group.isDirect && otherMember ? otherMember.avatar : (group.avatar || GROUP_IMAGES[0]);
+  const groupAvatar = group.isDirect && otherMember ? (otherMember.avatar || getUserAvatarByName(otherMember.name)) : (group.avatar || GROUP_IMAGES[0]);
   
   return normalizeGroup({
     id: group._id || group.id,
@@ -726,14 +738,14 @@ const normalizeApiGroup = (group, currentUser, ownerId) => {
     creatorId: group.ownerId,
     leaderId: group.ownerId,
     deputyIds: (group.admins || []).filter((id) => id !== group.ownerId),
-    membersList: group.memberProfiles || [],
+    membersList: membersRaw,
     isDirect: group.isDirect || false,
     lastMessage: group.lastMessage ? (
       group.lastMessage.senderId === 'system' || String(group.lastMessage.content).startsWith('Hệ thống:')
         ? group.lastMessage.content
         : `${group.lastMessage.senderId === ownerId
             ? currentUser?.name || 'Bạn'
-            : group.memberProfiles?.find(member => member.firebaseUid === group.lastMessage.senderId)?.name || 'Thành viên'}: ${group.lastMessage.content}`
+            : membersRaw.find(member => (member.firebaseUid || member.id) === group.lastMessage.senderId)?.name || 'Thành viên'}: ${group.lastMessage.content}`
     ) : 'Chưa có tin nhắn',
     messages: [],
     itinerary: group.itinerary || {},
@@ -900,7 +912,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
         .then((apiGroups) => {
           if (!active) return;
 
-          console.log('[Polling Groups] ownerId:', ownerId, 'groups count:', apiGroups?.length, 'groups details:', (apiGroups || []).map(g => ({ name: g.name, memberIds: g.memberIds })));
+          console.log('[Polling Groups] ownerId:', ownerId, 'groups count:', apiGroups?.length, 'groups details:', (apiGroups || []).map(g => ({ name: g.name, memberIds: g.members || g.memberIds })));
 
           setGroups(prevGroups => {
             return (apiGroups || []).map(apiGroup => {
@@ -1129,7 +1141,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     try {
       const sent = await sendChatMessage(selectedGroup.id, ownerId, trimmedMessage);
       const newMessage = normalizeApiMessage({ ...sent, sender: { name: currentUser?.name, avatar: currentUser?.avatar } }, currentUser, ownerId, selectedGroup.membersList);
-      updateGroupById(selectedGroup.id, (group) => ({ ...group, lastMessage: `${newMessage.user}: ${trimmedMessage}`, messages: [...group.messages, newMessage] }));
+      updateGroupById(selectedGroup.id, (group) => ({ ...group, lastMessage: `${newMessage.user}: ${trimmedMessage}`, messages: [...(group.messages || []), newMessage] }));
       setChatInput('');
     } catch (error) {
       Alert.alert('Gửi tin nhắn thất bại', error.response?.data?.message || 'Vui lòng thử lại.');
@@ -1836,8 +1848,8 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
         />
       ) : selectedGroup ? (
         <Modal animationType="slide" transparent={false} visible={chatModalVisible} onRequestClose={() => setChatModalVisible(false)} statusBarTranslucent>
-          <View style={[styles.chatRoomContainer, { backgroundColor: '#1a0533' }]}>
-            <LinearGradient colors={['#1a0533', '#110829', '#0d0618']} style={{ flex: 1 }} start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }}>
+          <View style={[styles.chatRoomContainer, { backgroundColor: '#000000' }]}>
+            <LinearGradient colors={['#000000', '#0a0a0f', '#121218']} style={{ flex: 1 }} start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }}>
               <View style={styles.chatHeader}>
                 <Pressable style={styles.backChatBtn} onPress={() => { setChatModalVisible(false); setSelectedGroupId(null); }}>
                   <ChevronLeft size={22} color="#fff" strokeWidth={2.5} />
@@ -1872,20 +1884,25 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
                 <View style={styles.headerRightActions}>
                   <Pressable style={styles.chatInfoBtn} onPress={() => Alert.alert('Gọi thoại', 'Tính năng sắp ra mắt')}>
-                    <Phone size={17} color="#c4b5fd" strokeWidth={2} />
+                    <Phone size={19} color="#0084ff" strokeWidth={2.2} />
                   </Pressable>
 
                   <Pressable style={styles.chatInfoBtn} onPress={() => Alert.alert('Gọi video', 'Tính năng sắp ra mắt')}>
-                    <Video size={17} color="#c4b5fd" strokeWidth={2} />
+                    <Video size={19} color="#0084ff" strokeWidth={2.2} />
                   </Pressable>
 
                   <Pressable style={styles.chatInfoBtn} onPress={() => setSettingsVisible(true)}>
-                    <Settings2 size={17} color="#c4b5fd" strokeWidth={2} />
+                    <Settings2 size={19} color="#0084ff" strokeWidth={2.2} />
                   </Pressable>
                 </View>
               </View>
 
-              {!selectedGroup.isDirect && (
+              {selectedGroup && !(
+                selectedGroup.isDirect ||
+                selectedGroup.type === 'direct' ||
+                selectedGroup.isPrivate ||
+                (Array.isArray(selectedGroup.membersList) && selectedGroup.membersList.length <= 2)
+              ) && (
                 <View style={styles.workspaceTabBar}>
                   {WORKSPACE_TABS.map((tabItem) => {
                     const isActive = workspaceTab === tabItem.key;
@@ -1897,8 +1914,8 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                         style={[styles.workspaceTabButton, isActive ? styles.workspaceTabButtonActive : null]}
                         onPress={() => setWorkspaceTab(tabItem.key)}
                       >
-                        <Icon size={15} color={isActive ? '#a855f7' : 'rgba(196,181,253,0.5)'} />
-                        <Text style={[styles.workspaceTabText, { color: isActive ? '#c4b5fd' : 'rgba(196,181,253,0.5)', fontWeight: isActive ? '800' : '600' }]}>
+                        <Icon size={15} color={isActive ? '#0084ff' : '#b0b3b8'} />
+                        <Text style={[styles.workspaceTabText, { color: isActive ? '#0084ff' : '#b0b3b8', fontWeight: isActive ? '800' : '600' }]}>
                           {tabItem.label}
                         </Text>
                       </Pressable>
@@ -1910,12 +1927,12 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
               {workspaceTab === 'chat' ? (
                 <GroupChatTab
                   selectedGroup={selectedGroup}
-                  chatMessages={selectedGroup.messages.map(m => ({
-                    id: m.id,
-                    text: m.text,
-                    sender: m.user,
-                    senderName: m.user,
-                    senderAvatar: m.avatar,
+                  chatMessages={(selectedGroup?.messages || []).map(m => ({
+                    id: m.id || m._id,
+                    text: m.text || m.content,
+                    sender: m.user || m.senderName,
+                    senderName: m.user || m.senderName,
+                    senderAvatar: m.avatar || m.senderAvatar,
                     senderId: m.senderId,
                     time: getFormattedMsgTime(m.createdAt || m.id)
                   }))}
@@ -1958,126 +1975,79 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
       ) : null}
 
       {selectedGroup && (
-        <Modal animationType="slide" transparent visible={settingsVisible} onRequestClose={() => setSettingsVisible(false)}>
-          <View style={styles.modalBackdrop}>
-            <View style={[styles.settingsModalCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
-              <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-                <Text style={[styles.modalHeaderTitle, { color: theme.textPrimary }]}>Cài đặt nhóm</Text>
-                <Pressable style={styles.closeModalBtn} onPress={() => setSettingsVisible(false)}>
-                  <X size={20} color={theme.textPrimary} />
-                </Pressable>
-              </View>
-
-              <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
-                <View style={[styles.workspaceCard, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
-                  <Text style={[styles.workspaceTitle, { color: theme.textPrimary }]}>Đổi tên nhóm</Text>
-                  <View style={[styles.singleField, { backgroundColor: theme.cardGlass, borderColor: theme.border, marginTop: 12 }]}>
-                    <Text style={[styles.miniFieldLabel, { color: theme.textSecondary }]}>Tên mới</Text>
-                    <TextInput
-                      value={renameGroupName}
-                      onChangeText={setRenameGroupName}
-                      style={[styles.miniFieldInput, { color: theme.textPrimary }]}
-                      placeholder="Nhập tên nhóm"
-                      placeholderTextColor={theme.textMuted}
-                    />
-                  </View>
-                  <Pressable style={[styles.secondaryActionBtn, { backgroundColor: theme.cardGlass, borderColor: theme.border, marginTop: 12 }]} onPress={handleRenameGroup}>
-                    <MessageCircle size={15} color="#3b82f6" />
-                    <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Lưu tên nhóm</Text>
-                  </Pressable>
-                </View>
-
-                <View style={[styles.workspaceCard, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
-                  <Text style={[styles.workspaceTitle, { color: theme.textPrimary }]}>Thêm thành viên</Text>
-                  <View style={[styles.searchFieldWrap, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
-                    <Search size={16} color={theme.textMuted} />
-                    <TextInput
-                      value={memberSearchText}
-                      onChangeText={setMemberSearchText}
-                      style={[styles.formTextInput, { color: theme.textPrimary, marginLeft: 8 }]}
-                      placeholder="Nhập tên, email hoặc số điện thoại"
-                      placeholderTextColor={theme.textMuted}
-                    />
-                  </View>
-
-                  {isSearchingMembers ? (
-                    <ActivityIndicator color="#3b82f6" style={{ marginTop: 16 }} />
-                  ) : memberSearchError ? (
-                    <Text style={[styles.helperAlertText, { color: '#f59e0b' }]}>{memberSearchError}</Text>
-                  ) : null}
-
-                  {memberSearchResults.map((member) => (
-                    <Pressable
-                      key={member.id}
-                      style={[styles.memberSearchRow, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
-                      onPress={() => handleAddMember(member)}
-                    >
-                      <Image source={{ uri: member.avatar || getUserAvatarByName(member.name) }} style={styles.memberSearchAvatar} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.memberSearchName, { color: theme.textPrimary }]}>{member.name}</Text>
-                        <Text style={[styles.memberSearchMeta, { color: theme.textSecondary }]} numberOfLines={1}>
-                          {member.email || member.phone || 'Người dùng Vivu360'}
-                        </Text>
-                      </View>
-                      <UserPlus size={16} color="#3b82f6" />
-                    </Pressable>
-                  ))}
-                </View>
-
-                <View style={[styles.workspaceCard, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
-                  <Text style={[styles.workspaceTitle, { color: theme.textPrimary }]}>Quản lý thành viên và vai trò</Text>
-                  {selectedGroup.membersList.map((member) => {
-                    const memberRole = getMemberRole(selectedGroup, member.id);
-                    const isCurrentUser = member.id === currentUserId;
-                    const isLeader = selectedGroup.leaderId === member.id;
-
-                    return (
-                      <View key={member.id} style={[styles.memberManagerRow, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
-                        <Image source={{ uri: member.avatar || getUserAvatarByName(member.name) }} style={styles.memberSearchAvatar} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.memberSearchName, { color: theme.textPrimary }]}>
-                            {member.name}
-                            {isCurrentUser ? ' (Bạn)' : ''}
-                          </Text>
-                          <View style={{ marginTop: 6 }}>
-                            <RolePill role={memberRole} isDarkMode={isDarkMode} />
-                          </View>
-                        </View>
-                        <View style={styles.memberActionColumn}>
-                          {!isLeader && (
-                            <Pressable style={[styles.smallRoleBtn, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]} onPress={() => handleTransferLeader(member.id)}>
-                              <Crown size={13} color="#f59e0b" />
-                              <Text style={[styles.smallRoleBtnText, { color: theme.textPrimary }]}>Làm trưởng</Text>
-                            </Pressable>
-                          )}
-                          {!isLeader && (
-                            <Pressable style={[styles.smallRoleBtn, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]} onPress={() => handleToggleDeputy(member.id)}>
-                              <ShieldCheck size={13} color="#10b981" />
-                              <Text style={[styles.smallRoleBtnText, { color: theme.textPrimary }]}>
-                                {selectedGroup.deputyIds.includes(member.id) ? 'Bỏ phó' : 'Làm phó'}
-                              </Text>
-                            </Pressable>
-                          )}
-                          {!isCurrentUser && (
-                            <Pressable style={[styles.smallRoleBtn, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]} onPress={() => handleRemoveMember(member)}>
-                              <Trash2 size={13} color="#ef4444" />
-                              <Text style={[styles.smallRoleBtnText, { color: theme.textPrimary }]}>Xóa</Text>
-                            </Pressable>
-                          )}
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-
-                <Pressable style={[styles.leaveGroupBtn, { backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.14)' : 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.22)' }]} onPress={handleLeaveGroup}>
-                  <LogOut size={16} color="#ef4444" />
-                  <Text style={styles.leaveGroupText}>Rời nhóm</Text>
-                </Pressable>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+        (selectedGroup.isDirect ||
+        selectedGroup.type === 'direct' ||
+        selectedGroup.isPrivate ||
+        (Array.isArray(selectedGroup.membersList) && selectedGroup.membersList.length <= 2)) ? (
+          <DirectChatSettingsModal
+            visible={settingsVisible}
+            onClose={() => setSettingsVisible(false)}
+            group={selectedGroup}
+            currentUser={currentUser}
+            ownerId={ownerId}
+            isDarkMode={isDarkMode}
+            theme={theme}
+            onDeleteHistory={(groupId) => {
+              updateGroupById(groupId, (g) => ({ ...g, messages: [] }));
+            }}
+          />
+        ) : (
+          <GroupSettingsModal
+            visible={settingsVisible}
+            onClose={() => setSettingsVisible(false)}
+            group={selectedGroup}
+            currentUser={currentUser}
+            ownerId={ownerId}
+            isDarkMode={isDarkMode}
+            theme={theme}
+            onRenameGroup={(groupId, newName) => {
+              updateGroupById(groupId, (g) => ({ ...g, name: newName }));
+            }}
+            onAddMember={async (groupId, memberQuery) => {
+              const users = await searchFriends(memberQuery, ownerId);
+              if (users && users.length > 0) {
+                const userToAdd = users[0];
+                updateGroupById(groupId, (g) => ({
+                  ...g,
+                  membersList: dedupeMembers([...(g.membersList || []), createMember(userToAdd)]),
+                }));
+                Alert.alert('Thành công', `Đã thêm ${userToAdd.name} vào nhóm!`);
+              } else {
+                Alert.alert('Thông báo', 'Không tìm thấy người dùng phù hợp.');
+              }
+            }}
+            onRemoveMember={(groupId, memberIdToRemove) => {
+              updateGroupById(groupId, (g) => ({
+                ...g,
+                membersList: (g.membersList || []).filter((m) => String(m.firebaseUid || m.id) !== String(memberIdToRemove)),
+                deputyIds: (g.deputyIds || []).filter((id) => String(id) !== String(memberIdToRemove)),
+              }));
+              Alert.alert('Thành công', 'Đã xóa thành viên khỏi nhóm.');
+            }}
+            onToggleDeputy={(groupId, memberIdToToggle) => {
+              updateGroupById(groupId, (g) => {
+                const currentDeputies = g.deputyIds || [];
+                const isDep = currentDeputies.includes(memberIdToToggle);
+                const nextDeputies = isDep
+                  ? currentDeputies.filter((id) => String(id) !== String(memberIdToToggle))
+                  : [...currentDeputies, memberIdToToggle];
+                return { ...g, deputyIds: nextDeputies };
+              });
+            }}
+            onLeaveGroup={(groupId) => {
+              setGroups((prev) => prev.filter((g) => g.id !== groupId));
+              setChatModalVisible(false);
+              setSelectedGroupId(null);
+              Alert.alert('Rời nhóm', 'Bạn đã rời khỏi nhóm chat.');
+            }}
+            onDisbandGroup={(groupId) => {
+              setGroups((prev) => prev.filter((g) => g.id !== groupId));
+              setChatModalVisible(false);
+              setSelectedGroupId(null);
+              Alert.alert('Giải tán nhóm', 'Đã giải tán nhóm chat vĩnh viễn.');
+            }}
+          />
+        )
       )}
 
       {/* Modal Thu Tiền */}
@@ -2343,7 +2313,7 @@ const styles = StyleSheet.create({
   modalSubmitBtn: { height: 46, borderRadius: 12, overflow: 'hidden' },
   modalSubmitGradient: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   modalSubmitText: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  chatRoomContainer: { flex: 1, backgroundColor: '#1a0533' },
+  chatRoomContainer: { flex: 1, backgroundColor: '#000000' },
   chatHeader: {
     minHeight: 68,
     flexDirection: 'row',
@@ -2351,9 +2321,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: Platform.OS === 'ios' ? 52 : (StatusBar.currentHeight || 0) + 12,
     paddingBottom: 14,
-    backgroundColor: 'rgba(26, 5, 51, 0.88)',
+    backgroundColor: '#000000',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(168, 85, 247, 0.15)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     zIndex: 10,
   },
   backChatBtn: {
@@ -2414,9 +2384,9 @@ const styles = StyleSheet.create({
   workspaceTabBar: {
     flexDirection: 'row',
     height: 46,
-    backgroundColor: 'rgba(17, 8, 41, 0.9)',
+    backgroundColor: '#000000',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(168, 85, 247, 0.15)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   workspaceTabButton: {
     flex: 1,
@@ -2429,8 +2399,8 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   workspaceTabButtonActive: {
-    borderBottomColor: '#a855f7',
-    backgroundColor: 'rgba(168, 85, 247, 0.08)',
+    borderBottomColor: '#0084ff',
+    backgroundColor: 'rgba(0, 132, 255, 0.08)',
   },
   workspaceTabText: { fontSize: 11.5, fontWeight: '800' },
   messageStream: { flex: 1, padding: 16 },

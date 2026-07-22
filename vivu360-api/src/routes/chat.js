@@ -227,7 +227,19 @@ router.get("/groups", async (req, res, next) => {
 
       return {
         ...group,
-        memberProfiles: group.members.map((id) => profileMap.get(id)).filter(Boolean),
+        memberProfiles: group.members.map((id) => {
+          const profile = profileMap.get(id);
+          if (profile) return profile;
+          return {
+            firebaseUid: id,
+            name: id === memberId ? 'Bạn' : `Thành viên (${String(id).slice(0, 5)})`,
+            email: '',
+            phone: '',
+            avatar: `https://i.pravatar.cc/150?u=${id}`,
+            level: 'Hội viên',
+            points: 100,
+          };
+        }),
         lastMessage,
         lastNotification,
         lastActivity,
@@ -468,6 +480,45 @@ router.patch("/groups/:groupId/messages/read", async (req, res, next) => {
       { $addToSet: { readBy: readerId } }
     );
     res.json({ success: true, data: { updated: result.modifiedCount } });
+  } catch (error) { next(error); }
+});
+
+const typingStateMap = new Map();
+
+router.post("/groups/:groupId/typing", async (req, res, next) => {
+  try {
+    const groupId = String(req.params.groupId || "").trim();
+    const userId = String(req.body.userId || "").trim();
+    const userName = String(req.body.userName || "Thành viên").trim();
+    const avatar = String(req.body.avatar || "").trim();
+    const isTyping = Boolean(req.body.isTyping);
+
+    if (isTyping && userId) {
+      typingStateMap.set(groupId, {
+        userId,
+        userName,
+        avatar,
+        updatedAt: Date.now(),
+      });
+    } else if (typingStateMap.get(groupId)?.userId === userId) {
+      typingStateMap.delete(groupId);
+    }
+
+    res.json({ success: true });
+  } catch (error) { next(error); }
+});
+
+router.get("/groups/:groupId/typing", async (req, res, next) => {
+  try {
+    const groupId = String(req.params.groupId || "").trim();
+    const requesterId = String(req.query.requesterId || "").trim();
+
+    const state = typingStateMap.get(groupId);
+    if (state && Date.now() - state.updatedAt < 5000 && state.userId !== requesterId) {
+      return res.json({ success: true, data: { isTyping: true, user: state } });
+    }
+
+    res.json({ success: true, data: { isTyping: false } });
   } catch (error) { next(error); }
 });
 

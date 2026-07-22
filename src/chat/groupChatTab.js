@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+// Vivu360 Group Chat Tab - Pure Obsidian Messenger Dark Mode
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +12,7 @@ import {
   Platform,
   Alert,
   Dimensions,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -22,7 +24,15 @@ import {
   MapPin,
   Compass,
   Navigation,
+  ThumbsUp,
+  Camera,
+  Image as ImageIcon,
+  Heart,
+  X,
+  MessageSquare,
+  CornerUpLeft,
 } from 'lucide-react-native';
+import { sendTypingStatus, getTypingStatus } from '../services/chatService';
 
 const { width } = Dimensions.get('window');
 
@@ -109,10 +119,92 @@ export function GroupChatTab({
 }) {
   const scrollViewRef = useRef(null);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
+  const [reactionsMap, setReactionsMap] = useState({});
+  const [replyToMsg, setReplyToMsg] = useState(null);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [typingUser, setTypingUser] = useState(null);
+
+  // Real-time MongoDB typing status & continuous fallback loop
+  useEffect(() => {
+    if (!selectedGroup?.id) return;
+    let isMounted = true;
+
+    const checkRealtimeTyping = async () => {
+      const gId = selectedGroup._id || selectedGroup.id;
+      const res = await getTypingStatus(gId, ownerId);
+      if (!isMounted) return;
+
+      if (res?.isTyping && res?.user) {
+        setTypingUser({
+          name: res.user.userName,
+          avatar: res.user.avatar || getUserAvatarByName(res.user.userName),
+        });
+      } else {
+        setTypingUser(null);
+      }
+    };
+
+    const interval = setInterval(checkRealtimeTyping, 1800);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [selectedGroup?.id, ownerId]);
+
+  const handleTextChange = (text) => {
+    setMessageText(text);
+    if (selectedGroup?.id && ownerId) {
+      const gId = selectedGroup._id || selectedGroup.id;
+      sendTypingStatus(gId, ownerId, currentUser?.name || 'Thành viên', currentUser?.avatar || '', text.trim().length > 0);
+    }
+  };
+
+  const FAMOUS_SPOTS = [
+    { name: 'Tràng An', location: 'Ninh Bình, Việt Nam', desc: 'Quần thể danh thắng di sản thiên nhiên thế giới' },
+    { name: 'Chùa Bái Đính', location: 'Ninh Bình, Việt Nam', desc: 'Ngôi chùa lớn nhất Việt Nam sở hữu nhiều kỷ lục' },
+    { name: 'Hang Múa', location: 'Ninh Bình, Việt Nam', desc: 'Tuyệt tác ngắm toàn cảnh Tam Cốc từ trên đỉnh núi' },
+    { name: 'Vịnh Hạ Long', location: 'Quảng Ninh, Việt Nam', desc: 'Kỳ quan thiên nhiên thế giới với hàng ngàn hòn đảo' },
+    { name: 'Phú Quốc', location: 'Kiên Giang, Việt Nam', desc: 'Đảo ngọc với bãi biển cát trắng mịn tuyệt đẹp' },
+    { name: 'Sa Pa', location: 'Lào Cai, Việt Nam', desc: 'Thành phố trong sương với đỉnh Fansipan hùng vĩ' },
+    { name: 'Đà Lạt', location: 'Lâm Đồng, Việt Nam', desc: 'Thành phố ngàn hoa khí hậu ôn hòa quanh năm' },
+    { name: 'Hội An', location: 'Quảng Nam, Việt Nam', desc: 'Phố cổ đèn lồng thơ mộng bên dòng sông Hoài' },
+  ];
 
   const handleQuickReply = (text) => {
     setMessageText(text);
     setShowQuickReplies(false);
+  };
+
+  const handleSendQuickText = (text) => {
+    if (onSendMessage) {
+      setMessageText(text);
+      setTimeout(() => onSendMessage(), 60);
+    }
+  };
+
+  const handleSendLocationSpot = (spot) => {
+    setShowLocationModal(false);
+    const text = `📢 CHIA SẺ ĐỊA ĐIỂM DU LỊCH 360°\n🚩 ${spot.name}\n📌 ${spot.location}\n📝 ${spot.desc}`;
+    if (onSendMessage) {
+      setMessageText(text);
+      setTimeout(() => onSendMessage(), 60);
+    }
+  };
+
+  const handleToggleReaction = (msgId, emoji) => {
+    setReactionsMap((prev) => ({
+      ...prev,
+      [msgId]: prev[msgId] === emoji ? null : emoji,
+    }));
+    setActiveReactionMsgId(null);
+  };
+
+  const handleSendThumbsUp = () => {
+    if (onSendMessage) {
+      setMessageText('👍');
+      setTimeout(() => onSendMessage(), 60);
+    }
   };
 
   const membersLabel = (() => {
@@ -132,11 +224,28 @@ export function GroupChatTab({
       {/* Dark purple BG — fills entire tab */}
       <View style={styles.root}>
 
-        {/* Members chip bar */}
-        {membersLabel ? (
-          <View style={styles.memberBar}>
-            <View style={styles.memberDot} />
-            <Text style={styles.memberBarText} numberOfLines={1}>{membersLabel}</Text>
+        {/* Sleek Floating Glassmorphic Members Capsule */}
+        {membersLabel &&
+        !selectedGroup?.isDirect &&
+        selectedGroup?.type !== 'direct' &&
+        !selectedGroup?.isPrivate &&
+        (selectedGroup?.membersList?.length || 0) > 2 ? (
+          <View style={styles.memberBarContainer}>
+            <View style={styles.memberPill}>
+              <View style={styles.avatarStack}>
+                {(selectedGroup?.membersList || []).slice(0, 3).map((m, idx) => (
+                  <Image
+                    key={`m-stack-${idx}`}
+                    source={{ uri: m.avatar || getUserAvatarByName(m.name) }}
+                    style={[styles.stackAvatar, { marginLeft: idx > 0 ? -7 : 0 }]}
+                  />
+                ))}
+              </View>
+              <View style={styles.memberDot} />
+              <Text style={styles.memberBarText} numberOfLines={1}>
+                {membersLabel} · {selectedGroup?.membersList?.length || 4} thành viên
+              </Text>
+            </View>
           </View>
         ) : null}
 
@@ -165,41 +274,90 @@ export function GroupChatTab({
                 msg.sender === currentUser?.username ||
                 String(msg.senderId) === String(currentUser?.uid);
 
+              const prevMsg = index > 0 ? chatMessages[index - 1] : null;
+              const prevIsMe = prevMsg ? (
+                String(prevMsg.senderId) === String(ownerId) ||
+                prevMsg.senderId === currentUser?.id ||
+                prevMsg.sender === currentUser?.username ||
+                String(prevMsg.senderId) === String(currentUser?.uid)
+              ) : false;
+
+              const isSameSenderAsPrev = !!(prevMsg && !isMe && !prevIsMe && (
+                (prevMsg.senderId && msg.senderId && String(prevMsg.senderId) === String(msg.senderId)) ||
+                (prevMsg.senderName && msg.senderName && prevMsg.senderName === msg.senderName) ||
+                (prevMsg.sender && msg.sender && prevMsg.sender === msg.sender)
+              ));
+
               const senderName = msg.senderName || msg.sender || 'Thành viên';
               const avatarUri = msg.senderAvatar || getUserAvatarByName(senderName);
               const sharedLoc = parseSharedLocation(msg.text);
 
+              const ownerIdOfGroup = selectedGroup?.ownerId || selectedGroup?.creatorId;
+              const isGroupOwner = String(msg.senderId) === String(ownerIdOfGroup);
+              const isGroupDeputy = Array.isArray(selectedGroup?.deputyIds) && selectedGroup.deputyIds.includes(String(msg.senderId));
+              const isSystemMessage = msg.isSystem || msg.type === 'system' || msg.text?.startsWith('📢') || msg.text?.includes('đã gia nhập') || msg.text?.includes('đã tạo nhóm');
+
+              if (isSystemMessage) {
+                return (
+                  <View key={`sys-${msg.id || index}`} style={styles.systemRow}>
+                    <View style={styles.systemPill}>
+                      <Text style={styles.systemText}>{msg.text}</Text>
+                    </View>
+                  </View>
+                );
+              }
+
               if (sharedLoc) {
                 return (
-                  <View key={`msg-${msg.id || index}`} style={isMe ? styles.myRow : styles.otherRow}>
-                    {!isMe && <Image source={{ uri: avatarUri }} style={styles.otherAvatar} />}
+                  <View key={`msg-${msg.id || index}`} style={[isMe ? styles.myRow : styles.otherRow, isSameSenderAsPrev && { marginTop: 2 }]}>
+                    {!isMe && (
+                      isSameSenderAsPrev ? <View style={{ width: 32 }} /> : <Image source={{ uri: avatarUri }} style={styles.otherAvatar} />
+                    )}
                     <View style={isMe ? styles.myCol : styles.otherCol}>
-                      {!isMe && <Text style={styles.otherName}>{senderName}</Text>}
+                      {!isMe && !isSameSenderAsPrev && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <Text style={styles.otherName}>{senderName}</Text>
+                          {isGroupOwner ? (
+                            <View style={styles.ownerBadge}>
+                              <Text style={styles.ownerBadgeText}>👑 Trưởng nhóm</Text>
+                            </View>
+                          ) : isGroupDeputy ? (
+                            <View style={styles.deputyBadge}>
+                              <Text style={styles.deputyBadgeText}>🥈 Phó nhóm</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      )}
                       <Pressable
                         style={styles.locationCardContainer}
                         onPress={() => onNavigateToMapWithPlace && onNavigateToMapWithPlace(sharedLoc.placeName)}
                       >
                         <LinearGradient
-                          colors={['#0f172a', '#1e293b']}
+                          colors={['#0f172a', '#1e293b', '#0f172a']}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
                           style={styles.locationCardGradient}
                         >
                           <View style={styles.locationCardHeader}>
                             <MapPin size={14} color="#34d399" />
-                            <Text style={styles.locationCardTag}>CHIA SẺ ĐỊA ĐIỂM DU LỊCH</Text>
+                            <Text style={styles.locationCardTag}>CHIA SẺ ĐỊA ĐIỂM DU LỊCH 360°</Text>
                           </View>
                           <Text style={styles.locationCardTitle}>{sharedLoc.placeName}</Text>
                           {!!sharedLoc.location && (
-                            <Text style={styles.locationCardSub}>📍 {sharedLoc.location}</Text>
+                            <Text style={styles.locationCardSub}>📍 Vị trí: {sharedLoc.location}</Text>
                           )}
                           {!!sharedLoc.description && (
                             <Text style={styles.locationCardDesc} numberOfLines={2}>{sharedLoc.description}</Text>
                           )}
-                          <View style={styles.locationCardBtn}>
-                            <Compass size={14} color="#10b981" />
+                          <LinearGradient
+                            colors={['#10b981', '#059669']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.locationCardBtn}
+                          >
+                            <Compass size={14} color="#fff" />
                             <Text style={styles.locationCardBtnText}>Khám phá trên bản đồ ➔</Text>
-                          </View>
+                          </LinearGradient>
                         </LinearGradient>
                       </Pressable>
                       <View style={isMe ? styles.myMeta : null}>
@@ -211,21 +369,51 @@ export function GroupChatTab({
                 );
               }
 
+              const msgKey = msg.id || index;
+              const hasReaction = reactionsMap[msgKey];
+              const isShowingReactions = activeReactionMsgId === msgKey;
+
               if (isMe) {
                 return (
-                  <View key={`msg-${msg.id || index}`} style={styles.myRow}>
+                  <View key={`msg-${msgKey}`} style={styles.myRow}>
                     <View style={styles.myCol}>
-                      <LinearGradient
-                        colors={['#a855f7', '#7c3aed', '#6d28d9']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.bubbleMe}
+                      {isShowingReactions && (
+                        <View style={[styles.reactionPickerBar, { right: 0 }]}>
+                          {['❤️', '😆', '😮', '😢', '😡', '👍'].map((emoji) => (
+                            <Pressable
+                              key={emoji}
+                              style={styles.reactionEmojiBtn}
+                              onPress={() => handleToggleReaction(msgKey, emoji)}
+                            >
+                              <Text style={{ fontSize: 19 }}>{emoji}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      )}
+                      <Pressable
+                        onLongPress={() => setActiveReactionMsgId(isShowingReactions ? null : msgKey)}
+                        onPress={() => setActiveReactionMsgId(isShowingReactions ? null : msgKey)}
                       >
-                        <Text style={styles.bubbleTextMe}>{msg.text}</Text>
-                      </LinearGradient>
+                        <LinearGradient
+                          colors={['#0084ff', '#0099ff']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.bubbleMe}
+                        >
+                          <Text style={styles.bubbleTextMe}>{msg.text}</Text>
+                        </LinearGradient>
+                      </Pressable>
+                      {hasReaction && (
+                        <View style={[styles.msgReactionBadge, { right: 6 }]}>
+                          <Text style={{ fontSize: 11 }}>{hasReaction}</Text>
+                        </View>
+                      )}
                       <View style={styles.myMeta}>
+                        <Pressable onPress={() => setReplyToMsg(msg)} style={{ marginRight: 4 }}>
+                          <CornerUpLeft size={10} color="rgba(255,255,255,0.4)" />
+                        </Pressable>
                         <Text style={styles.metaTime}>{msg.time || ''}</Text>
-                        <CheckCheck size={10} color="rgba(168,85,247,0.8)" />
+                        <CheckCheck size={10} color="#0084ff" />
                       </View>
                     </View>
                   </View>
@@ -233,16 +421,61 @@ export function GroupChatTab({
               }
 
               return (
-                <View key={`msg-${msg.id || index}`} style={styles.otherRow}>
+                <View key={`msg-${msgKey}`} style={[styles.otherRow, isSameSenderAsPrev && { marginTop: -6 }]}>
                   {/* Avatar */}
-                  <Image source={{ uri: avatarUri }} style={styles.otherAvatar} />
+                  {isSameSenderAsPrev ? (
+                    <View style={{ width: 32 }} />
+                  ) : (
+                    <Image source={{ uri: avatarUri }} style={styles.otherAvatar} />
+                  )}
 
                   <View style={styles.otherCol}>
-                    <Text style={styles.otherName}>{senderName}</Text>
-                    <View style={styles.bubbleOther}>
-                      <Text style={styles.bubbleTextOther}>{msg.text}</Text>
+                    {!isSameSenderAsPrev && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        <Text style={styles.otherName}>{senderName}</Text>
+                        {isGroupOwner ? (
+                          <View style={styles.ownerBadge}>
+                            <Text style={styles.ownerBadgeText}>👑 Trưởng nhóm</Text>
+                          </View>
+                        ) : isGroupDeputy ? (
+                          <View style={styles.deputyBadge}>
+                            <Text style={styles.deputyBadgeText}>🥈 Phó nhóm</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    )}
+                    {isShowingReactions && (
+                      <View style={[styles.reactionPickerBar, { left: 0 }]}>
+                        {['❤️', '😆', '😮', '😢', '😡', '👍'].map((emoji) => (
+                          <Pressable
+                            key={emoji}
+                            style={styles.reactionEmojiBtn}
+                            onPress={() => handleToggleReaction(msgKey, emoji)}
+                          >
+                            <Text style={{ fontSize: 19 }}>{emoji}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                    <Pressable
+                      onLongPress={() => setActiveReactionMsgId(isShowingReactions ? null : msgKey)}
+                      onPress={() => setActiveReactionMsgId(isShowingReactions ? null : msgKey)}
+                    >
+                      <View style={[styles.bubbleOther, isSameSenderAsPrev && { borderTopLeftRadius: 18 }]}>
+                        <Text style={styles.bubbleTextOther}>{msg.text}</Text>
+                      </View>
+                    </Pressable>
+                    {hasReaction && (
+                      <View style={[styles.msgReactionBadge, { left: 6 }]}>
+                        <Text style={{ fontSize: 11 }}>{hasReaction}</Text>
+                      </View>
+                    )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.metaTime}>{msg.time || ''}</Text>
+                      <Pressable onPress={() => setReplyToMsg(msg)}>
+                        <CornerUpLeft size={10} color="#b0b3b8" />
+                      </Pressable>
                     </View>
-                    <Text style={styles.metaTime}>{msg.time || ''}</Text>
                   </View>
                 </View>
               );
@@ -254,15 +487,111 @@ export function GroupChatTab({
               <Text style={styles.emptyHint}>Hãy bắt đầu trò chuyện cùng nhóm!</Text>
             </View>
           )}
+
+          {/* Typing Indicator Bubble */}
+          {typingUser && (
+            <View style={styles.typingRowContainer}>
+              <Image source={{ uri: typingUser.avatar }} style={styles.typingAvatar} />
+              <View style={styles.typingBubbleCard}>
+                <Text style={styles.typingTextStr}>{typingUser.name} đang soạn tin nhắn...</Text>
+                <View style={styles.dotsWaveRow}>
+                  <View style={[styles.waveDot, { backgroundColor: '#0084ff' }]} />
+                  <View style={[styles.waveDot, { backgroundColor: '#a855f7' }]} />
+                  <View style={[styles.waveDot, { backgroundColor: '#ec4899' }]} />
+                </View>
+              </View>
+            </View>
+          )}
         </ScrollView>
 
-        {/* ── Quick Replies ─────────────────────────────────────────────── */}
+        {/* ── Messenger Meta Action Sheet (Consolidated under Plus +) ────── */}
         {showQuickReplies && (
-          <View style={styles.quickRow}>
+          <View style={styles.metaSheetContainer}>
+            <View style={styles.metaGrid}>
+              <Pressable
+                style={styles.metaGridItem}
+                onPress={() => {
+                  setShowQuickReplies(false);
+                  handleSendQuickText('👋 Xin chào mọi người!');
+                }}
+              >
+                <View style={[styles.metaIconBg, { backgroundColor: '#3b82f6' }]}>
+                  <Text style={{ fontSize: 14 }}>👋</Text>
+                </View>
+                <Text style={styles.metaLabel}>Xin chào</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.metaGridItem}
+                onPress={() => {
+                  setShowQuickReplies(false);
+                  setShowLocationModal(true);
+                }}
+              >
+                <View style={[styles.metaIconBg, { backgroundColor: '#10b981' }]}>
+                  <MapPin size={16} color="#fff" />
+                </View>
+                <Text style={styles.metaLabel}>Vị trí 360°</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.metaGridItem}
+                onPress={() => {
+                  setShowQuickReplies(false);
+                  Alert.alert('Máy ảnh', 'Bật máy ảnh chụp hình nhanh');
+                }}
+              >
+                <View style={[styles.metaIconBg, { backgroundColor: '#0084ff' }]}>
+                  <Camera size={16} color="#fff" />
+                </View>
+                <Text style={styles.metaLabel}>Máy ảnh</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.metaGridItem}
+                onPress={() => {
+                  setShowQuickReplies(false);
+                  Alert.alert('Thư viện', 'Mở thư viện ảnh chuyến đi');
+                }}
+              >
+                <View style={[styles.metaIconBg, { backgroundColor: '#a855f7' }]}>
+                  <ImageIcon size={16} color="#fff" />
+                </View>
+                <Text style={styles.metaLabel}>Thư viện ảnh</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.metaGridItem}
+                onPress={() => {
+                  setShowQuickReplies(false);
+                  Alert.alert('Ghi âm', 'Bật ghi âm tin nhắn thoại');
+                }}
+              >
+                <View style={[styles.metaIconBg, { backgroundColor: '#f59e0b' }]}>
+                  <Mic size={16} color="#fff" />
+                </View>
+                <Text style={styles.metaLabel}>Ghi âm thoại</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.metaGridItem}
+                onPress={() => {
+                  setShowQuickReplies(false);
+                  handleSendQuickText('⏰ Mấy giờ cả nhóm xuất phát nhỉ?');
+                }}
+              >
+                <View style={[styles.metaIconBg, { backgroundColor: '#ec4899' }]}>
+                  <Text style={{ fontSize: 14 }}>⏰</Text>
+                </View>
+                <Text style={styles.metaLabel}>Hẹn giờ</Text>
+              </Pressable>
+            </View>
+
+            {/* Quick Text Chips */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
+              contentContainerStyle={{ paddingHorizontal: 10, gap: 6, marginTop: 6 }}
             >
               {QUICK_REPLIES.map((qr) => (
                 <Pressable key={qr} style={styles.quickChip} onPress={() => handleQuickReply(qr)}>
@@ -270,6 +599,20 @@ export function GroupChatTab({
                 </Pressable>
               ))}
             </ScrollView>
+          </View>
+        )}
+
+        {/* Quoted Reply Banner */}
+        {replyToMsg && (
+          <View style={styles.replyBannerContainer}>
+            <View style={styles.replyBarIndicator} />
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <Text style={styles.replyBannerTitle}>Đang trả lời {replyToMsg.senderName || 'thành viên'}</Text>
+              <Text style={styles.replyBannerText} numberOfLines={1}>{replyToMsg.text}</Text>
+            </View>
+            <Pressable onPress={() => setReplyToMsg(null)} style={styles.closeReplyBtn}>
+              <X size={16} color="#b0b3b8" />
+            </Pressable>
           </View>
         )}
 
@@ -283,41 +626,50 @@ export function GroupChatTab({
             <LinearGradient
               colors={
                 showQuickReplies
-                  ? ['#7c3aed', '#a855f7']
-                  : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']
+                  ? ['#0084ff', '#0099ff']
+                  : ['#242526', '#242526']
               }
               style={styles.inputSideGrad}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Plus size={18} color={showQuickReplies ? '#fff' : 'rgba(196,181,253,0.7)'} />
+              <Plus size={18} color={showQuickReplies ? '#fff' : '#0084ff'} />
             </LinearGradient>
           </Pressable>
 
           {/* Text field */}
           <View style={styles.inputBox}>
             <TextInput
-              placeholder="Message..."
-              placeholderTextColor="rgba(196,181,253,0.4)"
+              placeholder="Tin nhắn..."
+              placeholderTextColor="#b0b3b8"
               value={messageText}
-              onChangeText={setMessageText}
+              onChangeText={handleTextChange}
               style={styles.inputText}
               multiline
               maxLength={1000}
             />
             <Pressable
               style={styles.smileBtn}
-              onPress={() => Alert.alert('Emoji', 'Tính năng emoji sắp ra mắt')}
+              onPress={() => Alert.alert('Emoji', 'Tính năng chọn emoji sắp ra mắt')}
             >
-              <Smile size={17} color="rgba(196,181,253,0.5)" />
+              <Smile size={17} color="#0084ff" />
             </Pressable>
           </View>
 
-          {/* Send / Mic */}
+          {/* Send / ThumbsUp Like */}
           {messageText.trim().length > 0 ? (
-            <Pressable style={styles.sendBtn} onPress={onSendMessage}>
+            <Pressable
+              style={styles.sendBtn}
+              onPress={() => {
+                if (selectedGroup?.id && ownerId) {
+                  const gId = selectedGroup._id || selectedGroup.id;
+                  sendTypingStatus(gId, ownerId, currentUser?.name || '', currentUser?.avatar || '', false);
+                }
+                onSendMessage();
+              }}
+            >
               <LinearGradient
-                colors={['#a855f7', '#7c3aed']}
+                colors={['#0084ff', '#0099ff']}
                 style={styles.sendGrad}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -326,21 +678,50 @@ export function GroupChatTab({
               </LinearGradient>
             </Pressable>
           ) : (
-            <Pressable
-              style={styles.sendBtn}
-              onPress={() => Alert.alert('Ghi âm', 'Tính năng tin nhắn thoại sắp ra mắt')}
-            >
-              <LinearGradient
-                colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-                style={styles.sendGrad}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Mic size={15} color="rgba(196,181,253,0.6)" />
-              </LinearGradient>
+            <Pressable style={styles.sendBtn} onPress={handleSendThumbsUp}>
+              <View style={styles.thumbsUpBtnInner}>
+                <ThumbsUp size={20} color="#0084ff" />
+              </View>
             </Pressable>
           )}
         </View>
+
+        {/* Location Picker Modal */}
+        <Modal animationType="slide" transparent visible={showLocationModal} onRequestClose={() => setShowLocationModal(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.locationModalCard}>
+              <View style={styles.locationModalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <MapPin size={18} color="#10b981" />
+                  <Text style={styles.locationModalTitle}>Chia sẻ địa điểm du lịch 360°</Text>
+                </View>
+                <Pressable onPress={() => setShowLocationModal(false)} style={{ padding: 4 }}>
+                  <X size={18} color="#e4e6eb" />
+                </Pressable>
+              </View>
+              <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                {FAMOUS_SPOTS.map((spot) => (
+                  <Pressable
+                    key={spot.name}
+                    style={styles.spotItemRow}
+                    onPress={() => handleSendLocationSpot(spot)}
+                  >
+                    <View style={styles.spotIconBg}>
+                      <Compass size={18} color="#0084ff" />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={styles.spotNameText}>{spot.name}</Text>
+                      <Text style={styles.spotLocText}>{spot.location}</Text>
+                    </View>
+                    <View style={styles.spotSendBadge}>
+                      <Text style={styles.spotSendText}>Gửi ➔</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -351,31 +732,52 @@ export function GroupChatTab({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#110829',
+    backgroundColor: '#000000',
   },
 
   // Member bar
-  memberBar: {
+  memberBarContainer: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    backgroundColor: 'transparent',
+  },
+  memberPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(168, 85, 247, 0.12)',
+    backgroundColor: 'rgba(30, 27, 51, 0.85)',
+    borderColor: 'rgba(168, 85, 247, 0.35)',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     gap: 8,
+    shadowColor: '#a855f7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  avatarStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stackAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#110829',
   },
   memberDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#10b981',
   },
   memberBarText: {
     fontSize: 11,
-    color: 'rgba(196, 181, 253, 0.7)',
+    color: '#c4b5fd',
     fontWeight: '700',
-    flex: 1,
   },
 
   // Stream
@@ -424,26 +826,26 @@ const styles = StyleSheet.create({
   },
   bubbleMe: {
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderBottomRightRadius: 5,
-    shadowColor: '#7c3aed',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 5,
+    paddingVertical: 9,
+    borderRadius: 18,
+    borderBottomRightRadius: 4,
+    shadowColor: '#0084ff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   bubbleTextMe: {
-    color: '#fff',
-    fontSize: 13.5,
-    fontWeight: '500',
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '400',
     lineHeight: 20,
   },
   myMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 4,
+    marginTop: 3,
     paddingRight: 2,
   },
 
@@ -451,92 +853,212 @@ const styles = StyleSheet.create({
   otherRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginBottom: 10,
+    marginBottom: 8,
     gap: 8,
   },
   otherAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1.5,
-    borderColor: 'rgba(168, 85, 247, 0.35)',
-    marginBottom: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginBottom: 14,
   },
   otherCol: {
-    maxWidth: width * 0.65,
+    maxWidth: width * 0.7,
   },
   otherName: {
-    fontSize: 10.5,
-    color: '#c4b5fd',
-    fontWeight: '800',
-    marginBottom: 4,
+    fontSize: 11,
+    color: '#b0b3b8',
+    fontWeight: '600',
+    marginBottom: 3,
     marginLeft: 2,
   },
   bubbleOther: {
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
-    borderWidth: 1,
-    borderColor: 'rgba(196, 181, 253, 0.15)',
+    backgroundColor: '#242526',
+    borderWidth: 0,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderBottomLeftRadius: 5,
+    paddingVertical: 9,
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
   },
   bubbleTextOther: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 13.5,
-    fontWeight: '500',
+    color: '#e4e6eb',
+    fontSize: 15,
+    fontWeight: '400',
     lineHeight: 20,
   },
 
   // Meta time
   metaTime: {
     fontSize: 9.5,
-    color: 'rgba(196,181,253,0.45)',
-    fontWeight: '600',
+    color: '#b0b3b8',
+    fontWeight: '500',
     marginTop: 3,
     marginLeft: 2,
   },
 
   // Empty state
-  emptyState: {
+  emptyContainer: {
+    paddingVertical: 60,
     alignItems: 'center',
-    paddingTop: 60,
-    paddingBottom: 20,
+    justifyContent: 'center',
+    gap: 12,
   },
-  emptyEmoji: {
-    fontSize: 42,
-    marginBottom: 12,
+  emptyIconBg: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(0, 132, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: 'rgba(196,181,253,0.7)',
-    marginBottom: 6,
+    color: '#ffffff',
   },
-  emptyHint: {
+  emptySub: {
     fontSize: 12,
-    color: 'rgba(196,181,253,0.4)',
-    fontWeight: '500',
+    color: '#b0b3b8',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 24,
+  },
+
+  // Messenger Meta Action Sheet (Compact)
+  metaSheetContainer: {
+    backgroundColor: '#18191a',
+    borderTopWidth: 1,
+    borderTopColor: '#242526',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  metaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    gap: 4,
+  },
+  metaGridItem: {
+    width: (width - 32) / 3,
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  metaIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 3,
+  },
+  metaLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#e4e6eb',
+  },
+
+  // Quick Action Icon Row (Floating Icons matching screenshot)
+  quickIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: '#000000',
+    borderTopWidth: 1,
+    borderTopColor: '#18191a',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+  },
+  quickIconButton: {
+    padding: 6,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Quick replies
   quickRow: {
     paddingVertical: 10,
+    backgroundColor: '#18191a',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(168, 85, 247, 0.12)',
+    borderTopColor: '#242526',
   },
   quickChip: {
-    backgroundColor: 'rgba(124, 58, 237, 0.2)',
+    backgroundColor: '#242526',
     borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.3)',
+    borderColor: '#3a3b3c',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   quickText: {
-    fontSize: 12,
-    color: '#c4b5fd',
+    fontSize: 12.5,
+    color: '#e4e6eb',
+    fontWeight: '600',
+  },
+
+  // Location Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end',
+  },
+  locationModalCard: {
+    backgroundColor: '#18191a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#242526',
+  },
+  locationModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  locationModalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  spotItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#242526',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#3a3b3c',
+  },
+  spotIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 132, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spotNameText: {
+    fontSize: 14,
     fontWeight: '700',
+    color: '#ffffff',
+  },
+  spotLocText: {
+    fontSize: 11.5,
+    color: '#b0b3b8',
+    marginTop: 2,
+  },
+  spotSendBadge: {
+    backgroundColor: '#0084ff',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  spotSendText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ffffff',
   },
 
   // Input bar
@@ -544,17 +1066,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 14,
-    backgroundColor: 'rgba(17, 8, 41, 0.95)',
+    paddingVertical: 8,
+    paddingBottom: Platform.OS === 'ios' ? 26 : 10,
+    backgroundColor: '#000000',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(168, 85, 247, 0.12)',
+    borderTopColor: '#242526',
     gap: 8,
   },
   inputSideBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     overflow: 'hidden',
   },
   inputSideGrad: {
@@ -564,12 +1086,11 @@ const styles = StyleSheet.create({
   },
   inputBox: {
     flex: 1,
-    minHeight: 42,
-    maxHeight: 120,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.22)',
+    minHeight: 38,
+    maxHeight: 110,
+    backgroundColor: '#242526',
+    borderRadius: 20,
+    borderWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 14,
@@ -577,11 +1098,11 @@ const styles = StyleSheet.create({
   },
   inputText: {
     flex: 1,
-    fontSize: 13.5,
-    color: '#fff',
-    fontWeight: '500',
-    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
-    maxHeight: 100,
+    fontSize: 15,
+    color: '#e4e6eb',
+    fontWeight: '400',
+    paddingVertical: Platform.OS === 'ios' ? 8 : 6,
+    maxHeight: 90,
   },
   smileBtn: {
     padding: 6,
@@ -601,6 +1122,79 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  thumbsUpBtnInner: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#242526',
+    borderRadius: 21,
+  },
+
+  // Reply Quoted Banner
+  replyBannerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#18191a',
+    borderTopWidth: 1,
+    borderTopColor: '#242526',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 10,
+  },
+  replyBarIndicator: {
+    width: 3,
+    height: '100%',
+    backgroundColor: '#0084ff',
+    borderRadius: 2,
+  },
+  replyBannerTitle: {
+    fontSize: 11,
+    color: '#0084ff',
+    fontWeight: '700',
+  },
+  replyBannerText: {
+    fontSize: 12,
+    color: '#b0b3b8',
+    marginTop: 1,
+  },
+  closeReplyBtn: {
+    padding: 6,
+  },
+
+  // Reaction Popup Bar
+  reactionPickerBar: {
+    flexDirection: 'row',
+    backgroundColor: '#242526',
+    borderColor: '#3a3b3c',
+    borderWidth: 1,
+    borderRadius: 24,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 6,
+    position: 'absolute',
+    top: -36,
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  reactionEmojiBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  msgReactionBadge: {
+    position: 'absolute',
+    bottom: -8,
+    backgroundColor: '#242526',
+    borderWidth: 1,
+    borderColor: '#3a3b3c',
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    zIndex: 10,
   },
 
   // Location Card
@@ -654,16 +1248,95 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    borderRadius: 10,
-    paddingVertical: 8,
+    borderRadius: 12,
+    paddingVertical: 9,
     marginTop: 8,
   },
   locationCardBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  ownerBadge: {
+    backgroundColor: 'rgba(234, 179, 8, 0.2)',
+    borderColor: 'rgba(234, 179, 8, 0.4)',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+  },
+  ownerBadgeText: {
+    fontSize: 9,
+    fontWeight: '850',
+    color: '#fde047',
+  },
+  deputyBadge: {
+    backgroundColor: 'rgba(148, 163, 184, 0.2)',
+    borderColor: 'rgba(148, 163, 184, 0.4)',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+  },
+  deputyBadgeText: {
+    fontSize: 9,
+    fontWeight: '850',
+    color: '#cbd5e1',
+  },
+  systemRow: {
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  systemPill: {
+    backgroundColor: 'rgba(124, 58, 237, 0.15)',
+    borderColor: 'rgba(168, 85, 247, 0.3)',
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  systemText: {
+    fontSize: 11,
+    color: '#c4b5fd',
+    fontWeight: '600',
+  },
+  typingRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 6,
+    gap: 8,
+  },
+  typingAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+  },
+  typingBubbleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#242526',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 8,
+  },
+  typingTextStr: {
     fontSize: 11.5,
-    fontWeight: '800',
-    color: '#34d399',
+    color: '#38bdf8',
+    fontWeight: '700',
+    fontStyle: 'italic',
+  },
+  dotsWaveRow: {
+    flexDirection: 'row',
+    gap: 3,
+    alignItems: 'center',
+  },
+  waveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
 });

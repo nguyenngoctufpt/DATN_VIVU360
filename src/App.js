@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Animated, ActivityIndicator, LogBox } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Animated, ActivityIndicator, LogBox, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Home,
@@ -9,6 +9,7 @@ import {
   User,
   Newspaper,
   MessageSquare,
+  X,
 } from 'lucide-react-native';
 
 import {
@@ -55,7 +56,8 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: false,
+    shouldSetBadge: true,
+    priority: Notifications.AndroidNotificationPriority.MAX,
   }),
 });
 
@@ -73,7 +75,6 @@ import {
 export default function App() {
   const [activeNav, setActiveNav] = useState('home');
   const [prevNav, setPrevNav] = useState('home');
-  const [ticketFlowSource, setTicketFlowSource] = useState('profile');
   const activeNavRef = React.useRef(activeNav);
 
   useEffect(() => {
@@ -81,10 +82,6 @@ export default function App() {
       const prev = activeNavRef.current;
       setPrevNav(prev);
       activeNavRef.current = activeNav;
-
-      if (prev !== 'ticketList' && prev !== 'ticketDetail') {
-        setTicketFlowSource(prev);
-      }
     }
   }, [activeNav]);
 
@@ -187,6 +184,35 @@ export default function App() {
   const lastOffsetY = React.useRef(0);
   const isNavVisible = React.useRef(true);
   const translateY = React.useRef(new Animated.Value(0)).current;
+
+  // Top In-App Notification Banner State & Anim
+  const [activeBanner, setActiveBanner] = useState(null);
+  const bannerTranslateY = React.useRef(new Animated.Value(-140)).current;
+  const bannerTimerRef = React.useRef(null);
+
+  const showInAppBanner = (bannerData) => {
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    setActiveBanner(bannerData);
+    Animated.spring(bannerTranslateY, {
+      toValue: 0,
+      tension: 50,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
+
+    bannerTimerRef.current = setTimeout(() => {
+      hideInAppBanner();
+    }, 4500);
+  };
+
+  const hideInAppBanner = () => {
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    Animated.timing(bannerTranslateY, {
+      toValue: -140,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => setActiveBanner(null));
+  };
 
   // Track activeNav change to reset bottom nav visibility
   useEffect(() => {
@@ -331,7 +357,9 @@ export default function App() {
           const msgId = String(lastMsg.id || lastMsg._id || lastMsg.createdAt || '');
           const prevLastId = lastSeenMsgMapRef.current[g.id];
 
-          if (prevLastId !== undefined && msgId !== String(prevLastId)) {
+          const isFromOtherUser = String(lastMsg.senderId) !== String(dataOwnerId);
+
+          if (prevLastId !== undefined && msgId !== String(prevLastId) && isFromOtherUser) {
             const senderName = lastMsg.senderName || 'Thành viên';
             const chatTitle = g.isDirect 
               ? `💬 Tin nhắn từ ${senderName}` 
@@ -343,6 +371,13 @@ export default function App() {
               contentText,
               { groupId: g.id, isDirect: !!g.isDirect }
             );
+
+            showInAppBanner({
+              title: chatTitle,
+              body: contentText,
+              avatar: lastMsg.senderAvatar || 'https://i.pravatar.cc/150?img=12',
+              groupId: g.id,
+            });
           }
           lastSeenMsgMapRef.current[g.id] = msgId;
         }
@@ -736,6 +771,42 @@ export default function App() {
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
+      {/* FLOATING TOP IN-APP NOTIFICATION BANNER */}
+      {activeBanner && (
+        <Animated.View
+          style={[
+            styles.inAppBannerContainer,
+            { transform: [{ translateY: bannerTranslateY }] }
+          ]}
+        >
+          <Pressable
+            style={[styles.inAppBannerCard, { backgroundColor: isDarkMode ? '#1e1b4b' : '#ffffff', borderColor: '#818cf8' }]}
+            onPress={() => {
+              if (activeBanner.groupId) {
+                setTargetDirectChatGroupId(activeBanner.groupId);
+                setActiveNav('chat');
+              }
+              hideInAppBanner();
+            }}
+          >
+            <Image source={{ uri: activeBanner.avatar }} style={styles.bannerAvatar} />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text numberOfLines={1} style={[styles.bannerTitle, { color: isDarkMode ? '#ffffff' : '#0f172a' }]}>
+                  {activeBanner.title}
+                </Text>
+                <Text style={styles.bannerTime}>Vừa xong</Text>
+              </View>
+              <Text numberOfLines={2} style={[styles.bannerBody, { color: isDarkMode ? '#cbd5e1' : '#475569' }]}>
+                {activeBanner.body}
+              </Text>
+            </View>
+            <Pressable onPress={hideInAppBanner} style={{ padding: 6, marginLeft: 6 }}>
+              <X size={16} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+            </Pressable>
+          </Pressable>
+        </Animated.View>
+      )}
       {activeNav === 'editProfile' || activeNav === 'membershipTiers' || activeNav === 'travelChallenges' || activeNav === 'virtualTour' || activeNav === 'provinceGallery' || activeNav === 'allDiaDiem' || activeNav === 'diaDiemDetail' || activeNav === 'profileFeed' || activeNav === 'map' || activeNav === 'social' || activeNav === 'chat' || activeNav === 'explore' || activeNav === 'placeDetail' ? (
         renderScreenContent()
       ) : (
@@ -867,5 +938,50 @@ const styles = StyleSheet.create({
     marginTop: 4,
     position: 'absolute',
     bottom: 6,
+  },
+  // In-App Notification Banner Styles
+  inAppBannerContainer: {
+    position: 'absolute',
+    top: 42,
+    left: 14,
+    right: 14,
+    zIndex: 999999,
+  },
+  inAppBannerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    padding: 12,
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  bannerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#3b82f6',
+  },
+  bannerTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: -0.2,
+    flex: 1,
+  },
+  bannerTime: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#38bdf8',
+    marginLeft: 6,
+  },
+  bannerBody: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    marginTop: 3,
+    lineHeight: 16,
   },
 });

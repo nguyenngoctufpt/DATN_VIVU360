@@ -126,14 +126,10 @@ export function HomeScreen({
   // Service Categories Grid List
   const serviceCategories = useMemo(() => {
     const primary = [
-      { key: 'hotel', label: 'Địa danh', Icon: MapPin, colors: ['#ff6b6b', '#ee5253'], type: 'explore' },
-      { key: 'tour', label: 'Ẩm thực', Icon: Compass, colors: ['#ff9f43', '#f39c12'], type: 'explore' },
-      { key: 'ticket', label: 'Bản đồ số', Icon: MapIcon, colors: ['#3b82f6', '#1d4ed8'], type: 'explore' },
-      { key: 'car', label: 'Bí kíp phượt', Icon: Newspaper, colors: ['#10ac84', '#1dd1a1'], type: 'explore' },
-      { key: 'sim', label: 'Di chuyển', Icon: Car, colors: ['#5f27cd', '#341f97'], type: 'explore' },
-      { key: 'map', label: 'Bản đồ 3D', Icon: Globe, colors: ['#0abde3', '#00d2d3'], type: 'tab' },
+      { key: 'hotel', label: 'Khách sạn', Icon: Building, colors: ['#ff6b6b', '#ee5253'], type: 'explore' },
+      { key: 'tour', label: 'Tours', Icon: Compass, colors: ['#0abde3', '#00d2d3'], type: 'explore' },
+      { key: 'map', label: 'Bản đồ 360°', Icon: MapIcon, colors: ['#3b82f6', '#1d4ed8'], type: 'tab' },
       { key: 'camera', label: 'Quét AR', Icon: Scan, colors: ['#ef4444', '#b91c1c'], type: 'tab' },
-      { key: 'ticketList', label: 'Vé của tôi', Icon: Ticket, colors: ['#d946ef', '#a21caf'], type: 'tab' },
     ];
     
     const secondary = [
@@ -228,19 +224,6 @@ export function HomeScreen({
             onNavigateToTab('profile');
           }
         }
-      },
-      {
-        key: 'feat-ticketList',
-        label: 'Vé của tôi / Vé điện tử',
-        type: 'tab',
-        Icon: Ticket,
-        colors: ['#d946ef', '#a21caf'],
-        description: 'Quản lý danh sách vé đã đặt và guides',
-        action: () => {
-          if (onNavigateToTab) {
-            onNavigateToTab('ticketList');
-          }
-        }
       }
     ];
 
@@ -268,45 +251,6 @@ export function HomeScreen({
         action: () => {
           if (onNavigateToExplore) {
             onNavigateToExplore('tour', '');
-          }
-        }
-      },
-      {
-        key: 'book-ticket',
-        label: 'Mua Vé vui chơi',
-        type: 'explore',
-        Icon: Ticket,
-        colors: ['#ff9f43', '#f39c12'],
-        description: 'Mua vé tham quan, vui chơi giải trí',
-        action: () => {
-          if (onNavigateToExplore) {
-            onNavigateToExplore('ticket', '');
-          }
-        }
-      },
-      {
-        key: 'book-car',
-        label: 'Thuê xe tự lái',
-        type: 'explore',
-        Icon: Car,
-        colors: ['#10ac84', '#1dd1a1'],
-        description: 'Thuê xe ô tô, xe máy tự lái giá tốt',
-        action: () => {
-          if (onNavigateToExplore) {
-            onNavigateToExplore('car', '');
-          }
-        }
-      },
-      {
-        key: 'book-sim',
-        label: 'Mua WiFi & SIM du lịch',
-        type: 'explore',
-        Icon: Wifi,
-        colors: ['#5f27cd', '#341f97'],
-        description: 'Mua SIM 4G, thiết bị phát WiFi',
-        action: () => {
-          if (onNavigateToExplore) {
-            onNavigateToExplore('sim', '');
           }
         }
       }
@@ -399,24 +343,12 @@ export function HomeScreen({
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                   >
-                    <Text style={styles.rankBadgeMiniText}>{rank.title}</Text>
+                    <Text style={styles.rankBadgeMiniText}>Khám phá viên</Text>
                   </LinearGradient>
                 </View>
-                {/* Gamified XP Progress bar */}
-                <View style={{ marginTop: 4, width: 130 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                    <Text style={{ fontSize: 8, fontWeight: '800', color: theme.textSecondary }}>{currentPoints} XP</Text>
-                    <Text style={{ fontSize: 8, fontWeight: '800', color: theme.textMuted }}>{nextRankPoints} XP</Text>
-                  </View>
-                  <View style={[styles.progressBarBg, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)' }]}>
-                    <LinearGradient
-                      colors={rank.colors}
-                      style={[styles.progressBarFill, { width: `${progressRatio * 100}%` }]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                    />
-                  </View>
-                </View>
+                <Text style={{ fontSize: 11, color: theme.textSecondary, marginTop: 2, fontWeight: '600' }}>
+                  Chào mừng trở lại Vivu360! ✈️
+                </Text>
               </View>
             </View>
 
@@ -446,14 +378,12 @@ export function HomeScreen({
             </Text>
           </View>
 
-
-
-          {/* Travel Stats Dashboard */}
+          {/* Travel Stats Dashboard (No XP points) */}
           <View style={styles.statsRowDashboard}>
             {[
-              { label: 'TÍCH LŨY', val: `${(currentUser.points || 8250).toLocaleString()} XP`, color: '#facc15', Icon: Award },
+              { label: 'ĐIỂM ĐẾN HOT', val: '100+ địa danh', color: '#3b82f6', Icon: MapPin },
               { label: 'BẢN ĐỒ ĐÃ ĐI', val: '5/12 tỉnh', color: '#06b6d4', Icon: MapIcon },
-              { label: 'VÉ HOẠT ĐỘNG', val: '2 vé', color: '#a21caf', Icon: Ticket },
+              { label: 'VR 360°', val: 'Trải nghiệm', color: '#10b981', Icon: Sparkles },
             ].map((stat, idx) => {
               const StatIcon = stat.Icon;
               return (
@@ -797,6 +727,89 @@ export function HomeScreen({
           </View>
         </View>
       </Pressable>
+
+      {/* NEW SECTION: FEATURED TRIP ITINERARIES */}
+      <View style={styles.sectionHeader}>
+        <View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Compass size={16} color="#3b82f6" />
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Gợi Ý Lịch Trình Hot</Text>
+          </View>
+          <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>Lịch trình du lịch tối ưu được đề xuất bởi AI</Text>
+        </View>
+        <Pressable onPress={() => onNavigateToTab && onNavigateToTab('chat')} style={styles.seeAllBtn}>
+          <Text style={styles.seeAllText}>Tạo lịch trình</Text>
+          <ChevronRight size={14} color="#3b82f6" />
+        </Pressable>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.trendingScroll}
+      >
+        {[
+          {
+            id: 'itinerary-1',
+            title: 'Đà Nẵng - Hội An',
+            duration: '3 Ngày 2 Đêm',
+            tag: 'Biển & Văn Hoá',
+            image: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?auto=format&fit=crop&w=800&q=80',
+            highlights: ['Cầu Vàng Bà Nà', 'Phố cổ Hội An', 'Biển Mỹ Khê'],
+            rating: '4.9 ⭐',
+          },
+          {
+            id: 'itinerary-2',
+            title: 'Hà Giang Vòng Cung',
+            duration: '4 Ngày 3 Đêm',
+            tag: 'Phượt Tây Bắc',
+            image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
+            highlights: ['Mã Pí Lèng', 'Sông Nho Quế', 'Đèo Thẩm Mã'],
+            rating: '5.0 ⭐',
+          },
+          {
+            id: 'itinerary-3',
+            title: 'Phú Quốc Đảo Ngọc',
+            duration: '3 Ngày 2 Đêm',
+            tag: 'Nghỉ Dưỡng',
+            image: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80',
+            highlights: ['Cáp treo Hòn Thơm', 'Grand World', 'Sunset Sanato'],
+            rating: '4.8 ⭐',
+          },
+        ].map((item) => (
+          <Pressable
+            key={item.id}
+            style={[styles.destCard, { borderColor: theme.border, width: 230 }]}
+            onPress={() => onNavigateToTab && onNavigateToTab('chat')}
+          >
+            <Image source={{ uri: item.image }} style={styles.destImg} resizeMode="cover" />
+            <LinearGradient
+              colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
+              style={styles.destGrad}
+            />
+
+            <View style={styles.destCardHeader}>
+              <View style={[styles.destBadgeHot, { backgroundColor: 'rgba(59, 130, 246, 0.9)' }]}>
+                <Sparkles size={10} color="#fff" />
+                <Text style={[styles.destBadgeText, { color: '#fff' }]}>{item.duration}</Text>
+              </View>
+              <View style={{ backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                <Text style={{ fontSize: 10, color: '#facc15', fontWeight: '800' }}>{item.rating}</Text>
+              </View>
+            </View>
+
+            <View style={[styles.destCardFooter, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
+              <Text style={[styles.destCity, { color: theme.textPrimary }]} numberOfLines={1}>{item.title}</Text>
+              <Text style={{ fontSize: 10, color: '#3b82f6', fontWeight: '700', marginTop: 2 }}>🏷️ {item.tag}</Text>
+              <View style={{ marginTop: 6, gap: 2 }}>
+                {item.highlights.slice(0, 2).map((hl, i) => (
+                  <Text key={i} style={{ fontSize: 9.5, color: theme.textSecondary }}>• {hl}</Text>
+                ))}
+              </View>
+            </View>
+          </Pressable>
+        ))}
+      </ScrollView>
 
       {/* VR 360 HIGHLIGHTS SECTION */}
       <View style={styles.sectionHeader}>

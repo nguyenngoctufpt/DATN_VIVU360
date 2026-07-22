@@ -158,7 +158,7 @@ export function GroupFundTab({
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: theme.background }}
+      style={{ flex: 1, backgroundColor: isDarkMode ? '#000000' : '#000000' }}
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
     >
