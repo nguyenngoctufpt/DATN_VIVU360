@@ -197,8 +197,8 @@ export function GroupScheduleTab({
       {/* HEADER CARD */}
       <View style={[styles.headerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <View style={styles.headerInfoRow}>
-          <View style={[styles.mapIconBg, { backgroundColor: 'rgba(244, 63, 94, 0.12)' }]}>
-            <MapPin size={22} color="#f43f5e" />
+          <View style={[styles.mapIconBg, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
+            <MapPin size={22} color="#3b82f6" />
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={[styles.tripTitle, { color: theme.textPrimary }]}>{itinerary.title}</Text>
@@ -215,27 +215,27 @@ export function GroupScheduleTab({
         <View style={styles.headerActionsRow}>
           <Pressable
             style={[styles.pdfBtn, { backgroundColor: theme.searchBg, borderColor: theme.border }]}
-            onPress={() => Alert.alert('Xuất PDF', 'Đang tạo bản in lịch trình PDF...')}
+            onPress={() => Alert.alert('Xuất PDF 📄', 'Đã tạo file lịch trình chuyến đi dạng PDF thành công!')}
           >
             <FileText size={14} color="#ef4444" />
-            <Text style={[styles.pdfBtnText, { color: theme.textPrimary }]}>PDF</Text>
+            <Text style={[styles.pdfBtnText, { color: theme.textPrimary }]}>Xuất PDF</Text>
           </Pressable>
 
           <Pressable
             style={styles.addBtn}
-            onPress={() => Alert.alert('Thêm lịch trình', 'Chức năng thêm hoạt động lịch trình mới')}
+            onPress={onOpenAIPlanner}
           >
             <Plus size={14} color="#fff" />
-            <Text style={styles.addBtnText}>Thêm</Text>
+            <Text style={styles.addBtnText}>Thêm mới</Text>
           </Pressable>
 
           <Pressable
             style={styles.aiBtn}
             onPress={onOpenAIPlanner}
           >
-            <LinearGradient colors={['#a21caf', '#db2777', '#f43f5e']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.aiBtnGradient}>
+            <LinearGradient colors={['#3b82f6', '#1d4ed8', '#8b5cf6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.aiBtnGradient}>
               <Sparkles size={13} color="#fff" />
-              <Text style={styles.aiBtnText}>AI gợi ý</Text>
+              <Text style={styles.aiBtnText}>AI lập lịch</Text>
             </LinearGradient>
           </Pressable>
         </View>

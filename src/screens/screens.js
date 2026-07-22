@@ -43,7 +43,7 @@ import {
   Ticket,
   Newspaper,
 } from 'lucide-react-native';
-import { getDiaDiem } from '../services/diaDiemService';
+
 import {
   allCategories,
   banners,
@@ -73,23 +73,6 @@ export function HomeScreen({
   onNavigateToTab,
   onNavigateToTour,
 }) {
-  //Địa điểm
-  const [diaDiem, setDiaDiem] = useState([]);
-//Hàm gọi API địa điểm
-    const fetchDiaDiem = async () => {
-      try {
-        const data = await getDiaDiem()
-          console.log("API trả về:", data);
-      setDiaDiem(data.slice(0,4));
-      } catch (error) {
-            console.log("Lỗi API:", error);
-      }
-    }
-
-    useEffect(() =>{
-      fetchDiaDiem();
-    },[])
-
   const rank = getRankDetails(currentUser.points || 0);
   const currentPoints = currentUser.points || 8250;
   const nextRankPoints = rank.maxPoints;
@@ -106,12 +89,8 @@ export function HomeScreen({
     const primary = [
       { key: 'hotel', label: 'Khách sạn', Icon: Building, colors: ['#ff6b6b', '#ee5253'], type: 'explore' },
       { key: 'tour', label: 'Tours Hot', Icon: Compass, colors: ['#0abde3', '#00d2d3'], type: 'explore' },
-      { key: 'ticket', label: 'Vé vui chơi', Icon: Ticket, colors: ['#ff9f43', '#f39c12'], type: 'explore' },
-      { key: 'car', label: 'Thuê xe', Icon: Car, colors: ['#10ac84', '#1dd1a1'], type: 'explore' },
-      { key: 'sim', label: 'WiFi & SIM', Icon: Wifi, colors: ['#5f27cd', '#341f97'], type: 'explore' },
       { key: 'map', label: 'Bản đồ 3D', Icon: MapIcon, colors: ['#3b82f6', '#1d4ed8'], type: 'tab' },
       { key: 'camera', label: 'Quét AR', Icon: Scan, colors: ['#ef4444', '#b91c1c'], type: 'tab' },
-      { key: 'ticketList', label: 'Vé của tôi', Icon: Ticket, colors: ['#d946ef', '#a21caf'], type: 'tab' },
     ];
     
     const secondary = [
@@ -123,7 +102,6 @@ export function HomeScreen({
     return expandedCategories ? [...primary, ...secondary] : primary;
   }, [expandedCategories]);
 
-  
   const searchableFeatures = useMemo(() => {
     const categories = allCategories.map(cat => ({
       key: `cat-${cat.key}`,
@@ -142,7 +120,6 @@ export function HomeScreen({
       }
     }));
 
-  
     const appFeatures = [
       {
         key: 'feat-map',
@@ -248,45 +225,6 @@ export function HomeScreen({
         action: () => {
           if (onNavigateToExplore) {
             onNavigateToExplore('tour', '');
-          }
-        }
-      },
-      {
-        key: 'book-ticket',
-        label: 'Mua Vé vui chơi',
-        type: 'explore',
-        Icon: Ticket,
-        colors: ['#ff9f43', '#f39c12'],
-        description: 'Mua vé tham quan, vui chơi giải trí',
-        action: () => {
-          if (onNavigateToExplore) {
-            onNavigateToExplore('ticket', '');
-          }
-        }
-      },
-      {
-        key: 'book-car',
-        label: 'Thuê xe tự lái',
-        type: 'explore',
-        Icon: Car,
-        colors: ['#10ac84', '#1dd1a1'],
-        description: 'Thuê xe ô tô, xe máy tự lái giá tốt',
-        action: () => {
-          if (onNavigateToExplore) {
-            onNavigateToExplore('car', '');
-          }
-        }
-      },
-      {
-        key: 'book-sim',
-        label: 'Mua WiFi & SIM du lịch',
-        type: 'explore',
-        Icon: Wifi,
-        colors: ['#5f27cd', '#341f97'],
-        description: 'Mua SIM 4G, thiết bị phát WiFi',
-        action: () => {
-          if (onNavigateToExplore) {
-            onNavigateToExplore('sim', '');
           }
         }
       }
@@ -829,22 +767,20 @@ export function HomeScreen({
           <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Điểm đến thịnh hành</Text>
           <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>Những điểm khám phá được yêu thích nhất</Text>
         </View>
-        <Pressable style={styles.seeAllBtn}
-        onPress={() => onNavigateToTab("allDiaDiem")}>
+        <Pressable style={styles.seeAllBtn}>
           <Text style={styles.seeAllText}>Xem tất cả</Text>
           <ChevronRight size={14} color="#3b82f6" />
         </Pressable>
       </View>
 
-{/* diaiem */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.trendingScroll}
       >
-        {diaDiem.map((item, index) => (
+        {destinations.map((item, index) => (
           <Pressable key={index} style={[styles.destCard, { borderColor: theme.border }]}>
-            <Image source={{ uri: item.hinhAnh }} style={styles.destImg} resizeMode="cover" />
+            <Image source={{ uri: item.image }} style={styles.destImg} resizeMode="cover" />
             <LinearGradient
               colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
               style={styles.destGrad}
@@ -861,21 +797,26 @@ export function HomeScreen({
             </View>
 
             <View style={[styles.destCardFooter, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
-              <Text style={[styles.destCity, { color: theme.textPrimary }]}>{item.ten}</Text>
+              <Text style={[styles.destCity, { color: theme.textPrimary }]}>{item.city}</Text>
               <View style={styles.destRow}>
                 <MapPin size={11} color={theme.textSecondary} />
-                <Text style={[styles.destRegion, { color: theme.textSecondary }]}>{item.viTri}</Text>
+                <Text style={[styles.destRegion, { color: theme.textSecondary }]}>{item.region}</Text>
               </View>
 
               <View style={styles.destRatingRow}>
                 <View style={styles.ratingStars}>
-                  <Text style={[styles.ratingReviews, { color: theme.textSecondary }]}>Lượt xem:({item.danhGia})</Text>
+                  <Star size={12} color="#facc15" fill="#facc15" />
+                  <Text style={[styles.ratingVal, { color: theme.textPrimary }]}>{item.rating}</Text>
+                  <Text style={[styles.ratingReviews, { color: theme.textSecondary }]}>({item.reviews})</Text>
                 </View>
+                <Text style={[styles.destPrice, { color: '#3b82f6' }]}>{item.price}</Text>
               </View>
             </View>
           </Pressable>
         ))}
       </ScrollView>
+
+
     </View>
   );
 }
@@ -917,7 +858,7 @@ export function ExploreScreen({
   // Booking Form State
   const [bookingDate, setBookingDate] = useState('2026-06-20');
   const [quantity, setQuantity] = useState(1);
-  const [contactName, setContactName] = useState('');
+  const [contactName, setContactName] = useState('Nguyễn Minh');
   const [contactPhone, setContactPhone] = useState('0987654321');
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);

@@ -49,7 +49,7 @@ router.post("/sync", async (req, res, next) => {
         $set: { email, name, ...profile, lastLoginAt: new Date() },
         $setOnInsert: { role: "user", status: "active" },
       },
-      { upsert: true, new: true, runValidators: true }
+      { upsert: true, returnDocument: 'after', runValidators: true }
     );
     res.status(200).json({ success: true, data: user });
   } catch (error) { next(error); }

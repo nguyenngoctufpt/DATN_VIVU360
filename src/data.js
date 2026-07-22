@@ -29,7 +29,6 @@ export const allCategories = [
   { key: 'social', label: 'Bảng tin', Icon: Newspaper, colors: ['#f59e0b', '#b45309'] },
   { key: 'chat', label: 'Nhóm du lịch', Icon: MessageSquare, colors: ['#8b5cf6', '#6d28d9'] },
   { key: 'camera', label: 'Quét AR', Icon: Scan, colors: ['#ef4444', '#b91c1c'] },
-  { key: 'ticketList', label: 'Vé của tôi', Icon: Ticket, colors: ['#d946ef', '#a21caf'] },
   { key: 'profile', label: 'Cá nhân', Icon: User, colors: ['#0ea5e9', '#0369a1'] },
 ];
 
@@ -130,39 +129,6 @@ export const exploreItems = [
     price: '850.000đ / người',
     tag: 'Bán Chạy Nhất',
     description: 'Trải nghiệm ngắm hoàng hôn lãng mạn trên biển đảo ngọc, ăn tối hải sản và câu mực đêm cùng ngư dân bản địa.'
-  },
-  {
-    id: 3,
-    title: 'Vé Vui Chơi VinWonders & Safari Phú Quốc',
-    type: 'ticket',
-    location: 'Gành Dầu, Phú Quốc',
-    image: 'https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?auto=format&fit=crop&w=600&q=80',
-    rating: '4.7',
-    price: '1.350.000đ / vé',
-    tag: 'Thích Hợp Gia Đình',
-    description: 'Tận hưởng trọn vẹn ngày vui chơi tại công viên chủ đề lớn nhất Việt Nam và khám phá vườn thú bán hoang dã kỳ thú.'
-  },
-  {
-    id: 4,
-    title: 'Thuê Xe Tự Lái Hyundai Accent Số Tự Động',
-    type: 'car',
-    location: 'Sân bay Phú Quốc',
-    image: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=600&q=80',
-    rating: '4.6',
-    price: '700.000đ / ngày',
-    tag: 'Tiết Kiệm',
-    description: 'Giao nhận xe miễn phí tại sân bay Phú Quốc hoặc khách sạn trung tâm. Xe đời mới, sạch sẽ, máy lạnh mát rượi.'
-  },
-  {
-    id: 5,
-    title: 'SIM Du Lịch 4G Không Giới Hạn Dung Lượng',
-    type: 'sim',
-    location: 'Toàn quốc',
-    image: 'https://images.unsplash.com/photo-1562408590-e32931084e23?auto=format&fit=crop&w=600&q=80',
-    rating: '4.9',
-    price: '120.000đ / chiếc',
-    tag: 'Tiện Ích',
-    description: 'SIM 4G kết nối internet tốc độ cao không giới hạn dung lượng, sóng cực khỏe ở mọi miền đất nước.'
   }
 ];
 

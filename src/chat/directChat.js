@@ -30,7 +30,7 @@ import {
   MapPin,
   Compass,
 } from 'lucide-react-native';
-import { getChatMessages, sendChatMessage, markMessagesAsRead } from '../services/chatService';
+import { getChatMessages, sendChatMessage, markMessagesAsRead, sendTypingStatus, getTypingStatus } from '../services/chatService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -150,9 +150,39 @@ export function DirectChatScreen({
   const [chatInput, setChatInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Real-time MongoDB typing status
+  useEffect(() => {
+    if (!visible || !groupId) return;
+    let isMounted = true;
+
+    const checkRealtimeTyping = async () => {
+      const res = await getTypingStatus(groupId, ownerId);
+      if (!isMounted) return;
+      if (res?.isTyping && res?.user) {
+        setIsPartnerTyping(true);
+      } else {
+        setIsPartnerTyping(false);
+      }
+    };
+
+    const interval = setInterval(checkRealtimeTyping, 1800);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [visible, groupId, ownerId]);
+
+  const handleTextChange = (text) => {
+    setChatInput(text);
+    if (groupId && ownerId) {
+      sendTypingStatus(groupId, ownerId, currentUser?.name || '', currentUser?.avatar || '', text.trim().length > 0);
+    }
+  };
 
   // ─── Load messages ─────────────────────────────────────────────────────────
 
@@ -227,11 +257,11 @@ export function DirectChatScreen({
 
   return (
     <Modal animationType="slide" transparent={false} visible={visible} onRequestClose={onClose} statusBarTranslucent>
-      <StatusBar barStyle="light-content" backgroundColor="#1a0533" />
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
       <View style={styles.root}>
         {/* Dark gradient BG */}
         <LinearGradient
-          colors={['#1a0533', '#110829', '#0d0618']}
+          colors={['#000000', '#0a0a0f', '#121218']}
           style={StyleSheet.absoluteFillObject}
           start={{ x: 0.3, y: 0 }}
           end={{ x: 0.7, y: 1 }}
@@ -370,7 +400,7 @@ export function DirectChatScreen({
                     {/* Bubble */}
                     {isMe ? (
                       <LinearGradient
-                        colors={['#a855f7', '#7c3aed', '#6d28d9']}
+                        colors={['#0084ff', '#0099ff']}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={[styles.bubble, styles.bubbleMe]}
@@ -412,6 +442,21 @@ export function DirectChatScreen({
                 <Text style={styles.emptyHint}>Bắt đầu trò chuyện ngay nhé! 👋</Text>
               </View>
             )}
+
+            {/* Partner Typing Indicator */}
+            {isPartnerTyping && (
+              <View style={styles.partnerTypingRow}>
+                <Image source={{ uri: avatarUri }} style={styles.partnerTypingAvatar} />
+                <View style={styles.partnerTypingBubble}>
+                  <Text style={styles.partnerTypingText}>{chatName || 'Bạn bè'} đang soạn tin nhắn...</Text>
+                  <View style={styles.partnerDotsRow}>
+                    <View style={[styles.partnerDot, { backgroundColor: '#0084ff' }]} />
+                    <View style={[styles.partnerDot, { backgroundColor: '#a855f7' }]} />
+                    <View style={[styles.partnerDot, { backgroundColor: '#ec4899' }]} />
+                  </View>
+                </View>
+              </View>
+            )}
           </ScrollView>
 
           {/* ── Quick Replies ──────────────────────────────────────────────── */}
@@ -451,7 +496,7 @@ export function DirectChatScreen({
                 placeholder="Message..."
                 placeholderTextColor="rgba(196,181,253,0.45)"
                 value={chatInput}
-                onChangeText={setChatInput}
+                onChangeText={handleTextChange}
                 onSubmitEditing={() => handleSend()}
                 returnKeyType="send"
                 multiline
@@ -650,34 +695,33 @@ const styles = StyleSheet.create({
   // Bubbles
   bubble: {
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingVertical: 9,
+    borderRadius: 18,
     maxWidth: '100%',
   },
   bubbleMe: {
-    borderBottomRightRadius: 5,
-    shadowColor: '#7c3aed',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 5,
+    borderBottomRightRadius: 4,
+    shadowColor: '#0084ff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   bubbleOther: {
-    backgroundColor: 'rgba(255,255,255,0.09)',
-    borderWidth: 1,
-    borderColor: 'rgba(196,181,253,0.18)',
-    borderBottomLeftRadius: 5,
+    backgroundColor: '#242526',
+    borderWidth: 0,
+    borderBottomLeftRadius: 4,
   },
   bubbleTextMe: {
-    color: '#fff',
-    fontSize: 13.5,
-    fontWeight: '500',
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '400',
     lineHeight: 20,
   },
   bubbleTextOther: {
-    color: 'rgba(255,255,255,0.92)',
-    fontSize: 13.5,
-    fontWeight: '500',
+    color: '#e4e6eb',
+    fontSize: 15,
+    fontWeight: '400',
     lineHeight: 20,
   },
 
@@ -686,17 +730,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 4,
+    marginTop: 3,
     paddingHorizontal: 4,
   },
   msgTime: {
     fontSize: 9.5,
-    color: 'rgba(196,181,253,0.5)',
-    fontWeight: '600',
+    color: '#b0b3b8',
+    fontWeight: '500',
   },
   seenLabel: {
     fontSize: 9,
-    color: '#a855f7',
+    color: '#0084ff',
     fontWeight: '800',
   },
 
@@ -711,9 +755,9 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: '#7c3aed',
-    shadowColor: '#a855f7',
+    borderWidth: 2,
+    borderColor: '#0084ff',
+    shadowColor: '#0084ff',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.5,
     shadowRadius: 12,
@@ -723,34 +767,35 @@ const styles = StyleSheet.create({
   emptyName: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#fff',
+    color: '#ffffff',
     letterSpacing: -0.3,
     marginBottom: 6,
   },
   emptyHint: {
     fontSize: 13,
-    color: 'rgba(196,181,253,0.6)',
+    color: '#b0b3b8',
     fontWeight: '500',
   },
 
   // Quick replies
   quickRow: {
     paddingVertical: 10,
+    backgroundColor: '#18191a',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(168, 85, 247, 0.12)',
+    borderTopColor: '#242526',
   },
   quickChip: {
-    backgroundColor: 'rgba(124, 58, 237, 0.2)',
+    backgroundColor: '#242526',
     borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.3)',
+    borderColor: '#3a3b3c',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   quickText: {
     fontSize: 12.5,
-    color: '#c4b5fd',
-    fontWeight: '700',
+    color: '#e4e6eb',
+    fontWeight: '600',
   },
 
   // Input bar
@@ -758,17 +803,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 14,
-    backgroundColor: 'rgba(26, 5, 51, 0.9)',
+    paddingVertical: 8,
+    paddingBottom: Platform.OS === 'ios' ? 26 : 10,
+    backgroundColor: '#000000',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(168, 85, 247, 0.12)',
+    borderTopColor: '#242526',
     gap: 8,
   },
   inputSideBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     overflow: 'hidden',
   },
   inputSideGrad: {
@@ -778,12 +823,11 @@ const styles = StyleSheet.create({
   },
   inputBox: {
     flex: 1,
-    minHeight: 42,
-    maxHeight: 120,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.25)',
+    minHeight: 38,
+    maxHeight: 110,
+    backgroundColor: '#242526',
+    borderRadius: 20,
+    borderWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 14,
@@ -791,11 +835,11 @@ const styles = StyleSheet.create({
   },
   inputText: {
     flex: 1,
-    fontSize: 13.5,
-    color: '#fff',
-    fontWeight: '500',
-    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
-    maxHeight: 100,
+    fontSize: 15,
+    color: '#e4e6eb',
+    fontWeight: '400',
+    paddingVertical: Platform.OS === 'ios' ? 8 : 6,
+    maxHeight: 90,
   },
   smileBtn: {
     padding: 6,
@@ -879,5 +923,44 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     color: '#34d399',
+  },
+  partnerTypingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 6,
+    gap: 8,
+  },
+  partnerTypingAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#38bdf8',
+  },
+  partnerTypingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#242526',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 8,
+  },
+  partnerTypingText: {
+    fontSize: 11.5,
+    color: '#38bdf8',
+    fontWeight: '700',
+    fontStyle: 'italic',
+  },
+  partnerDotsRow: {
+    flexDirection: 'row',
+    gap: 3,
+    alignItems: 'center',
+  },
+  partnerDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
 });

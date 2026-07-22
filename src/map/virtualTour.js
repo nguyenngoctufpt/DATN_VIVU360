@@ -393,7 +393,7 @@ export function VirtualTourScreen({ theme, isDarkMode, tourId, startSpotIdx, onB
 
   // Booking Form State
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
-  const [guestName, setGuestName] = useState('Khách tham quan');
+  const [guestName, setGuestName] = useState('Nguyễn Minh');
   const [guestPhone, setGuestPhone] = useState('0987654321');
   const [travelDate, setTravelDate] = useState('2026-06-20');
   const [guestCount, setGuestCount] = useState(2);

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Image, Pressable, StyleSheet, TextInput, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Camera, Heart, Image as ImageIcon, MapPin, MessageCircle, Pencil, Send, UserRound, X } from 'lucide-react-native';
-import { createPost, getUserPosts } from '../services/postService';
+import { loadAppData, saveAppData } from '../services/appDataService';
 
 const DEFAULT_COVER = 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80';
 
@@ -24,17 +24,9 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
     }
 
     setLoading(true);
-    getUserPosts(ownerId)
-      .then(items => {
-        if (active) setPosts((Array.isArray(items) ? items : []).map(post => ({
-          ...post,
-          id: post._id,
-          image: post.images?.[0] || '',
-          likes: post.likesCount || 0,
-          likedByUser: Boolean(post.likedByMe),
-          time: new Date(post.createdAt).toLocaleString('vi-VN'),
-          user: post.author || {},
-        })));
+    loadAppData(ownerId, 'social')
+      .then(saved => {
+        if (active) setPosts(Array.isArray(saved?.posts) ? saved.posts : []);
       })
       .catch(error => {
         if (active) setPosts([]);
@@ -45,7 +37,10 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
     return () => { active = false; };
   }, [ownerId]);
 
-  const myPosts = useMemo(() => posts, [posts]);
+  const myPosts = useMemo(() => posts.filter(post =>
+    (post.user?.firebaseUid && post.user.firebaseUid === ownerId) ||
+    (!post.user?.firebaseUid && post.user?.name === userInfo.name)
+  ), [posts, ownerId, userInfo.name]);
 
   const publishPost = async () => {
     const content = postContent.trim();
@@ -55,11 +50,33 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
     }
     if (!ownerId || publishing) return;
 
+    const newPost = {
+      id: Date.now(),
+      title: content.length > 70 ? `${content.slice(0, 70)}...` : content,
+      category: 'Khám phá',
+      source: userInfo.name,
+      time: 'Vừa xong',
+      location: postLocation.trim() || 'Việt Nam',
+      content,
+      image: postImage.trim(),
+      likes: 0,
+      commentsCount: 0,
+      likedByUser: false,
+      comments: [],
+      user: {
+        firebaseUid: ownerId,
+        name: userInfo.name,
+        avatar: userInfo.avatar,
+        level: userInfo.level || 'Cấp 1',
+        points: userInfo.points || 0,
+      },
+    };
+    const nextPosts = [newPost, ...posts];
+
     setPublishing(true);
     try {
-      await createPost(ownerId, { content, category: 'Khám phá', location: postLocation.trim() || 'Việt Nam', images: postImage.trim() ? [postImage.trim()] : [] });
-      const items = await getUserPosts(ownerId);
-      setPosts(items.map(post => ({ ...post, id: post._id, image: post.images?.[0] || '', likes: post.likesCount || 0, likedByUser: Boolean(post.likedByMe), time: new Date(post.createdAt).toLocaleString('vi-VN'), user: post.author || {} })));
+      await saveAppData(ownerId, 'social', { posts: nextPosts });
+      setPosts(nextPosts);
       setPostContent('');
       setPostLocation('');
       setPostImage('');

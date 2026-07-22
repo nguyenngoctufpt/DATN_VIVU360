@@ -1,11 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal, Dimensions, Share, Alert, Platform, StatusBar, Animated, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { loadAppData, saveAppData } from '../services/appDataService';
 import { searchFriends } from '../services/userService';
-import { getFriendships, sendFriendRequest, acceptFriendRequest, rejectFriendRequest } from '../services/friendshipService';
-import { getFeed, createPost, togglePostLike, addPostComment } from '../services/postService';
-import { getSocialNotifications, markSocialNotificationsRead } from '../services/socialNotificationService';
-import { getOrCreateDirectChat } from '../services/chatService';
 import {
   Heart,
   MessageSquare,
@@ -230,67 +227,53 @@ const popularCities = [
   }
 ];
 
+const travelFriends = [];
+
 const initialPosts = [];
 
 const initialGroups = [];
 
-export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, onLogout }) {
+const SEEDED_POST_IDS = new Set([1, 2, 3]);
+
+const sanitizePosts = (items) => (
+  Array.isArray(items)
+    ? items.filter((post) => post && !SEEDED_POST_IDS.has(Number(post.id)))
+    : []
+);
+
+export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, onLogout, onStartDirectChat }) {
   const [posts, setPosts] = useState(initialPosts);
+  const [postsOwnerId, setPostsOwnerId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
   const [menuVisible, setMenuVisible] = useState(false);
   const [notificationVisible, setNotificationVisible] = useState(false);
-  const [friendships, setFriendships] = useState([]);
-  const [socialNotifications, setSocialNotifications] = useState([]);
-  const [friendActionId, setFriendActionId] = useState(null);
-
-  const normalizeFeed = feed => feed.map(post => ({
-    ...post, id: post._id, image: post.images?.[0] || '', likes: post.likesCount || 0,
-    likedByUser: Boolean(post.likedByMe), time: new Date(post.createdAt).toLocaleString('vi-VN'),
-    title: post.category || 'Hành trình mới', user: post.author || {},
-    comments: (post.comments || []).map(comment => ({ id: comment._id, user: comment.author?.name || 'Thành viên Vivu360', avatar: comment.author?.avatar, text: comment.text, createdAt: comment.createdAt })),
-  }));
-
-  const refreshSocialData = async () => {
-    if (!ownerId) return;
-    const [feedResult, friendshipResult, notificationResult] = await Promise.allSettled([
-      getFeed(ownerId), getFriendships(ownerId), getSocialNotifications(ownerId),
-    ]);
-    if (feedResult.status === 'fulfilled') setPosts(normalizeFeed(feedResult.value));
-    if (friendshipResult.status === 'fulfilled') setFriendships(Array.isArray(friendshipResult.value) ? friendshipResult.value : []);
-    if (notificationResult.status === 'fulfilled') setSocialNotifications(Array.isArray(notificationResult.value) ? notificationResult.value : []);
-  };
 
   useEffect(() => {
     if (!ownerId) return;
     let active = true;
-    Promise.allSettled([getFeed(ownerId), getFriendships(ownerId), getSocialNotifications(ownerId)])
-      .then(([feedResult, friendshipResult, notificationResult]) => {
+    loadAppData(ownerId, 'social')
+      .then(saved => {
         if (active) {
-          if (feedResult.status === 'fulfilled') setPosts(normalizeFeed(feedResult.value));
-          if (friendshipResult.status === 'fulfilled') setFriendships(Array.isArray(friendshipResult.value) ? friendshipResult.value : []);
-          if (notificationResult.status === 'fulfilled') setSocialNotifications(Array.isArray(notificationResult.value) ? notificationResult.value : []);
+          setPosts(sanitizePosts(saved?.posts));
         }
       })
-      .catch(error => console.warn('Không thể tải bảng tin:', error.message));
+      .catch(error => console.warn('Không thể tải bài viết:', error.message))
+      .finally(() => active && setPostsOwnerId(ownerId));
     return () => { active = false; };
   }, [ownerId]);
 
+  useEffect(() => {
+    if (!ownerId || postsOwnerId !== ownerId) return;
+    const timer = setTimeout(() => {
+      saveAppData(ownerId, 'social', { posts })
+        .catch(error => console.warn('Không thể lưu bài viết:', error.message));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [ownerId, postsOwnerId, posts]);
+
   const mockStories = useMemo(() => [], []);
 
-  const incomingRequests = useMemo(
-    () => friendships.filter(item => item.status === 'pending' && item.direction === 'incoming'),
-    [friendships]
-  );
-  const acceptedFriends = useMemo(
-    () => friendships.filter(item => item.status === 'accepted' && item.friend).map(item => item.friend),
-    [friendships]
-  );
-
-  useEffect(() => {
-    if (!ownerId) return undefined;
-    const timer = setInterval(() => refreshSocialData().catch(error => console.warn('Không thể tự làm mới bảng tin:', error.message)), 15000);
-    return () => clearInterval(timer);
-  }, [ownerId]);
+  const notifications = useMemo(() => [], []);
 
   // View states within social tab: 'feed' | 'createPost'
   const [activeView, setActiveView] = useState('feed');
@@ -323,7 +306,6 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   const [commentInput, setCommentInput] = useState('');
   
   const [targetUsername, setTargetUsername] = useState('');
-  const [targetUserId, setTargetUserId] = useState('');
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [shareAlertVisible, setShareAlertVisible] = useState(false);
   
@@ -338,43 +320,6 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   const [friendResults, setFriendResults] = useState([]);
   const [isSearchingFriends, setIsSearchingFriends] = useState(false);
   const [friendSearchError, setFriendSearchError] = useState('');
-
-  const relationFor = userId => friendships.find(item => item.users?.includes(userId));
-
-  const handleFriendAction = async (action, targetId) => {
-    setFriendActionId(targetId);
-    try {
-      if (action === 'send') {
-        setFriendships(items => items.some(item => item.users?.includes(targetId)) ? items : [{
-          _id: `pending-${targetId}`,
-          users: [ownerId, targetId],
-          requesterId: ownerId,
-          status: 'pending',
-          direction: 'outgoing',
-        }, ...items]);
-        const friendship = await sendFriendRequest(ownerId, targetId);
-        if (friendship) {
-          const normalizedFriendship = { ...friendship, direction: friendship.requesterId === ownerId ? 'outgoing' : 'incoming' };
-          setFriendships(items => [
-            normalizedFriendship,
-            ...items.filter(item => item._id !== `pending-${targetId}` && String(item._id) !== String(friendship._id)),
-          ]);
-          setFriendResults(items => items.map(friend => friend.firebaseUid === targetId ? { ...friend, friendship: normalizedFriendship } : friend));
-        }
-      }
-      if (action === 'accept') await acceptFriendRequest(ownerId, targetId);
-      if (action === 'reject') await rejectFriendRequest(ownerId, targetId);
-      await refreshSocialData();
-    } catch (error) {
-      if (action === 'send' && error.response?.status === 409) {
-        refreshSocialData().catch(refreshError => console.warn('Không thể đồng bộ trạng thái kết bạn:', refreshError.message));
-      } else {
-        Alert.alert('Kết bạn', error.response?.data?.message || 'Không thể thực hiện. Vui lòng thử lại.');
-      }
-    } finally {
-      setFriendActionId(null);
-    }
-  };
 
   useEffect(() => {
     const query = searchText.trim();
@@ -435,17 +380,23 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   }, [filteredPosts]);
 
   // Likes toggle handler
-  const handleLikePost = async (postId) => {
-    try {
-      const result = await togglePostLike(ownerId, postId);
-      setPosts(items => items.map(post => post.id === postId ? { ...post, likedByUser: result.likedByMe, likes: result.likesCount } : post));
-    } catch (error) {
-      Alert.alert('Bài viết', 'Không thể cập nhật lượt thích.');
-    }
+  const handleLikePost = (postId) => {
+    setPosts(prevPosts =>
+      prevPosts.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            likedByUser: !post.likedByUser,
+            likes: post.likedByUser ? post.likes - 1 : post.likes + 1
+          };
+        }
+        return post;
+      })
+    );
   };
 
   // Submit Post
-  const handleSubmitPost = async () => {
+  const handleSubmitPost = () => {
     if (!newContent.trim()) return;
 
     const defaultImages = [
@@ -455,37 +406,39 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
     ];
     const finalImg = newImgUrl.trim() || defaultImages[Math.floor(Math.random() * defaultImages.length)];
 
-    try {
-      await createPost(ownerId, { content: newContent, category: newCategory, location: newLocation.trim() || 'Việt Nam', images: [finalImg] });
-      await refreshSocialData();
-      setNewTitle('');
-      setNewContent('');
-      setNewLocation('');
-      setNewImgUrl('');
-      setActiveView('feed');
-    } catch (error) {
-      Alert.alert('Đăng bài', 'Không thể đăng bài. Vui lòng thử lại.');
-    }
+    const newPostObj = {
+      id: Date.now(),
+      title: newTitle.trim() || 'Bản tin nóng du lịch từ bạn đọc',
+      category: newCategory,
+      source: 'Bạn đọc ' + currentUser.name,
+      time: 'Vừa xong',
+      location: newLocation.trim() || 'Việt Nam',
+      content: newContent,
+      image: finalImg,
+      likes: 0,
+      commentsCount: 0,
+      likedByUser: false,
+      comments: [],
+      user: {
+        firebaseUid: ownerId,
+        name: currentUser.name,
+        avatar: currentUser.avatar,
+        level: currentUser.level || 'Cấp 8',
+        points: currentUser.points || 8250
+      }
+    };
+
+    setPosts([newPostObj, ...posts]);
+    setNewTitle('');
+    setNewLocation('');
+    setNewImgUrl('');
+    setActiveView('feed');
   };
 
   // Open User Profile view modal
-  const handleOpenUserProfile = (user) => {
-    const username = typeof user === 'string' ? user : user?.name;
-    const matchedFriend = friendships.find(item => item.friend?.name === username)?.friend;
-    setTargetUsername(username || 'Thành viên Vivu360');
-    setTargetUserId((typeof user === 'object' && user?.firebaseUid) || matchedFriend?.firebaseUid || '');
+  const handleOpenUserProfile = (username) => {
+    setTargetUsername(username);
     setProfileModalVisible(true);
-  };
-
-  const handleStartDirectChat = async () => {
-    if (!targetUserId) return Alert.alert('Tin nhắn', 'Không xác định được tài khoản người nhận.');
-    try {
-      const group = await getOrCreateDirectChat(ownerId, targetUserId);
-      setProfileModalVisible(false);
-      onNavigateToTab && onNavigateToTab('chat', group._id);
-    } catch (error) {
-      Alert.alert('Tin nhắn', 'Không thể mở cuộc trò chuyện. Vui lòng thử lại.');
-    }
   };
 
   // Open Comments modal
@@ -495,18 +448,36 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   };
 
   // Submit dynamic comment
-  const handleSendComment = async () => {
+  const handleSendComment = () => {
     if (!commentInput.trim() || !selectedPost) return;
-    const text = commentInput.trim();
-    try {
-      const saved = await addPostComment(ownerId, selectedPost.id, text);
-      const newComment = { id: saved._id, user: saved.author?.name || currentUser.name, avatar: saved.author?.avatar, text: saved.text, createdAt: saved.createdAt };
-      setPosts(items => items.map(post => post.id === selectedPost.id ? { ...post, comments: [...(post.comments || []), newComment], commentsCount: (post.comments || []).length + 1 } : post));
-      setSelectedPost(post => ({ ...post, comments: [...(post.comments || []), newComment], commentsCount: (post.comments || []).length + 1 }));
-      setCommentInput('');
-    } catch (error) {
-      Alert.alert('Bình luận', 'Không thể gửi bình luận. Vui lòng thử lại.');
-    }
+
+    const newComment = {
+      id: Date.now(),
+      user: currentUser.name,
+      text: commentInput
+    };
+
+    setPosts(prevPosts =>
+      prevPosts.map(p => {
+        if (p.id === selectedPost.id) {
+          const updatedComments = [...(p.comments || []), newComment];
+          return {
+            ...p,
+            comments: updatedComments,
+            commentsCount: updatedComments.length
+          };
+        }
+        return p;
+      })
+    );
+
+    setSelectedPost(prev => ({
+      ...prev,
+      comments: [...(prev.comments || []), newComment],
+      commentsCount: (prev.comments || []).length + 1
+    }));
+
+    setCommentInput('');
   };
 
   // Native Post Sharing handler
@@ -526,101 +497,121 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
     }
   };
 
+  // Story avatar colors — rainbow rings như trong design
+  const STORY_RING_COLORS = [
+    ['#f43f5e', '#fb923c'],
+    ['#a855f7', '#3b82f6'],
+    ['#10b981', '#06b6d4'],
+    ['#f59e0b', '#ef4444'],
+    ['#6366f1', '#ec4899'],
+  ];
+
+  // Mock stories từ popularCities
+  const storyItems = [
+    { id: 'me', isMe: true, name: 'Story của bạn', avatar: currentUser?.avatar },
+    ...popularCities.map((c, i) => ({ id: c.id, name: c.city, avatar: c.avatars[0], ring: STORY_RING_COLORS[i % STORY_RING_COLORS.length] })),
+  ];
+
   return (
     <View style={styles.tabContainer}>
-      {/* HEADER SECTION */}
-      <View style={styles.socialHeader}>
+
+      {/* ── HEADER ─────────────────────────────────────────────────────── */}
+      <View style={[styles.socialHeader, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        {/* Top Row: Search icon | Title | Messenger + Plus */}
         <View style={styles.headerTopRow}>
+          <Pressable style={[styles.hdrIconBtn, { backgroundColor: theme.searchBg }]}>
+            <Search size={18} color={theme.textPrimary} />
+          </Pressable>
+
           <Text style={[styles.socialTitle, { color: theme.textPrimary }]}>Vivu360</Text>
-          <View style={styles.headerActions}>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {/* Messenger icon — điều hướng sang tab Chat */}
             <Pressable
-              style={[styles.messengerIconBtn, { backgroundColor: theme.searchBg }]}
-              onPress={() => setMenuVisible(true)}
+              style={[styles.hdrIconBtn, { backgroundColor: theme.searchBg }]}
+              onPress={() => onNavigateToTab && onNavigateToTab('chat')}
             >
-              <Menu size={22} color={theme.textPrimary} />
+              <MessageSquare size={18} color={theme.textPrimary} />
+              <View style={styles.messengerBadge}>
+                <Text style={styles.messengerBadgeText}>3</Text>
+              </View>
             </Pressable>
-            <Pressable 
-              style={({ pressed }) => [styles.messengerIconBtn, { backgroundColor: theme.searchBg }, pressed && { opacity: 0.7 }]}
-              onPress={() => {
-                setNotificationVisible(true);
-                getFriendships(ownerId)
-                  .then(relations => setFriendships(Array.isArray(relations) ? relations : []))
-                  .then(() => refreshSocialData())
-                  .then(() => markSocialNotificationsRead(ownerId))
-                  .then(() => setSocialNotifications(items => items.map(item => ({ ...item, read: true }))))
-                  .catch(error => console.warn('Không thể làm mới thông báo:', error.message));
-              }}
+
+            {/* Nút tạo bài viết mới */}
+            <Pressable
+              style={[styles.hdrIconBtn, { backgroundColor: '#2563eb' }]}
+              onPress={() => setActiveView('createPost')}
             >
-              <BellRing size={22} color={theme.textPrimary} />
-              {(incomingRequests.length > 0 || socialNotifications.some(item => !item.read)) && <View style={styles.messengerBadge} />}
+              <Plus size={18} color="#fff" />
             </Pressable>
           </View>
         </View>
-        <Text style={[styles.socialSubtitle, { color: theme.textSecondary }]}>
-          Mạng xã hội chia sẻ hành trình du lịch Vivu360
-        </Text>
 
-        {/* Sleek Search Input */}
+
+        {/* Search bar */}
         <View style={[styles.socialSearchContainer, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
-          <Search size={16} color={theme.textSecondary} />
+          <Search size={14} color={theme.textMuted} />
           <TextInput
-            placeholder="Tìm bài viết, email hoặc số điện thoại bạn bè..."
+            placeholder="Tìm bài viết, bạn bè..."
             placeholderTextColor={theme.textMuted}
             value={searchText}
             onChangeText={setSearchText}
             style={[styles.socialSearchInput, { color: theme.textPrimary }]}
           />
           {searchText.length > 0 && (
-            <Pressable onPress={() => setSearchText('')} style={{ padding: 6 }}>
-              <X size={14} color={theme.textMuted} />
+            <Pressable onPress={() => setSearchText('')} style={{ padding: 4 }}>
+              <X size={13} color={theme.textMuted} />
             </Pressable>
           )}
         </View>
 
-        {/* Category horizontal tabs */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          contentContainerStyle={{ gap: 8, paddingVertical: 12 }}
-        >
-          {['Tất cả', 'Khám phá', 'Cẩm nang', 'Ẩm thực', 'Sự kiện'].map((cat) => {
-            const isActive = selectedCategory === cat;
-            const catColors = isActive 
-              ? { bg: '#3b82f6', text: '#ffffff', border: '#3b82f6' }
-              : getCategoryColor(cat === 'Tất cả' ? 'Khác' : cat, isDarkMode);
-            return (
-              <Pressable
-                key={cat}
-                onPress={() => setSelectedCategory(cat)}
-                style={[
-                  styles.categoryTabBtn,
-                  {
-                    backgroundColor: catColors.bg,
-                    borderColor: catColors.border,
-                  },
-                  isActive && styles.categoryTabBtnActive
-                ]}
-              >
-                <Text style={[
-                  styles.categoryTabBtnText,
-                  {
-                    color: catColors.text
-                  }
-                ]}>
-                  {cat}
-                </Text>
-              </Pressable>
-            );
-          })}
+        {/* ── STORIES BAR ─────────────────────────────────────────────── */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesRow}>
+          {storyItems.map((story, idx) => (
+            <Pressable
+              key={story.id}
+              style={styles.storyItem}
+              onPress={() => story.isMe ? setActiveView('createPost') : Alert.alert(story.name, 'Story đang được tải...')}
+            >
+              {story.isMe ? (
+                <View style={[styles.storyAvatarWrap, { borderColor: theme.border }]}>
+                  <Image
+                    source={{ uri: story.avatar || getUserAvatarByName('me') }}
+                    style={styles.storyAvatar}
+                  />
+                  <View style={styles.storyAddBadge}>
+                    <LinearGradient colors={['#2563eb', '#3b82f6']} style={styles.storyAddGrad}>
+                      <Plus size={9} color="#fff" strokeWidth={3} />
+                    </LinearGradient>
+                  </View>
+                </View>
+              ) : (
+                <LinearGradient
+                  colors={story.ring || ['#f43f5e', '#fb923c']}
+                  style={styles.storyRingGrad}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <View style={[styles.storyRingInner, { backgroundColor: theme.card }]}>
+                    <Image source={{ uri: story.avatar }} style={styles.storyAvatar} />
+                  </View>
+                </LinearGradient>
+              )}
+              <Text style={[styles.storyName, { color: theme.textSecondary }]} numberOfLines={1}>
+                {story.isMe ? 'Your story' : story.name}
+              </Text>
+            </Pressable>
+          ))}
         </ScrollView>
       </View>
 
-      {/* Scrollable Feed Section */}
-      <ScrollView 
-        style={{ backgroundColor: isDarkMode ? '#121212' : '#f8fafc' }}
-        contentContainerStyle={{ paddingBottom: 100 }} 
+      {/* ── FEED SCROLL ─────────────────────────────────────────────────── */}
+      <ScrollView
+        style={{ backgroundColor: isDarkMode ? '#0f1117' : '#f0f2f5' }}
+        contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Friend search results */}
         {searchText.trim().length >= 2 && (
           <View style={[styles.friendSearchResults, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
             <Text style={[styles.sectionTitleLabel, { color: theme.textPrimary }]}>Bạn bè trên Vivu360</Text>
@@ -628,199 +619,182 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
               <ActivityIndicator color="#3b82f6" style={{ marginVertical: 14 }} />
             ) : friendSearchError ? (
               <Text style={[styles.emptyFriendSearch, { color: '#ef4444' }]}>{friendSearchError}</Text>
-            ) : friendResults.length > 0 ? friendResults.map(friend => {
-              const relation = relationFor(friend.firebaseUid) || friend.friendship;
-              const isBusy = friendActionId === friend.firebaseUid;
-              return (
-              <View key={friend.firebaseUid} style={[styles.friendSearchItem, { borderTopColor: theme.border }]}>
+            ) : friendResults.length > 0 ? friendResults.map(friend => (
+              <Pressable
+                key={friend.firebaseUid}
+                style={[styles.friendSearchItem, { borderTopColor: theme.border }]}
+                onPress={() => { setTargetUsername(friend.name); setProfileModalVisible(true); }}
+              >
                 <Image source={{ uri: friend.avatar || getUserAvatarByName(friend.name) }} style={styles.friendSearchAvatar} />
-                <Pressable style={{ flex: 1 }} onPress={() => handleOpenUserProfile(friend)}>
+                <View style={{ flex: 1 }}>
                   <Text style={[styles.friendSearchName, { color: theme.textPrimary }]}>{friend.name}</Text>
                   <Text style={[styles.friendSearchContact, { color: theme.textSecondary }]} numberOfLines={1}>
                     {friend.email}{friend.phone ? ` · ${friend.phone}` : ''}
                   </Text>
-                </Pressable>
-                <Pressable
-                  disabled={Boolean(relation) || isBusy}
-                  onPress={() => handleFriendAction('send', friend.firebaseUid)}
-                  style={[styles.friendActionButton, relation?.status === 'accepted' && styles.friendAcceptedButton]}
-                >
-                  {isBusy ? <ActivityIndicator size="small" color="#fff" /> : (
-                    <Text style={styles.friendActionButtonText}>
-                      {relation?.status === 'accepted' ? 'Bạn bè' : relation?.status === 'pending' ? 'Đã gửi lời mời' : 'Kết bạn'}
-                    </Text>
-                  )}
-                </Pressable>
-              </View>
-            );}) : (
-              <Text style={[styles.emptyFriendSearch, { color: theme.textSecondary }]}>Không tìm thấy bạn bè bằng email hoặc số điện thoại này.</Text>
+                </View>
+                <ChevronRight size={18} color={theme.textMuted} />
+              </Pressable>
+            )) : (
+              <Text style={[styles.emptyFriendSearch, { color: theme.textSecondary }]}>Không tìm thấy người dùng này.</Text>
             )}
           </View>
         )}
 
-        {/* TRAVEL WITH FRIENDS ROW */}
-        <View style={[styles.sectionContainer, { backgroundColor: theme.card, borderBottomColor: theme.border, paddingVertical: 14, borderBottomWidth: 1 }]}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitleLabel, { color: theme.textPrimary }]}>Bạn đồng hành đồng bộ</Text>
-            <Pressable>
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#3b82f6' }}>Xem hết</Text>
+        {/* ── CREATE POST TRIGGER ──────────────────────────────────────── */}
+        <View style={[styles.createPostCard, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <Pressable style={styles.createPostRow} onPress={() => setActiveView('createPost')}>
+            <Image source={{ uri: currentUser?.avatar }} style={styles.createPostAvatar} />
+            <View style={[styles.createPostInput, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
+              <Text style={{ color: theme.textMuted, fontSize: 13, fontWeight: '500' }}>
+                Bạn đang nghĩ gì, {currentUser?.name?.split(' ')[0]}?
+              </Text>
+            </View>
+          </Pressable>
+          <View style={[styles.createPostDivider, { backgroundColor: theme.border }]} />
+          <View style={styles.createPostActions}>
+            <Pressable style={styles.createPostActionBtn} onPress={() => setActiveView('createPost')}>
+              <Camera size={16} color="#ef4444" />
+              <Text style={[styles.createPostActionText, { color: theme.textSecondary }]}>Trực tiếp</Text>
+            </Pressable>
+            <Pressable style={styles.createPostActionBtn} onPress={() => setActiveView('createPost')}>
+              <ImageIcon size={16} color="#10b981" />
+              <Text style={[styles.createPostActionText, { color: theme.textSecondary }]}>Ảnh/Video</Text>
+            </Pressable>
+            <Pressable style={styles.createPostActionBtn} onPress={() => setActiveView('createPost')}>
+              <MapPin size={16} color="#f59e0b" />
+              <Text style={[styles.createPostActionText, { color: theme.textSecondary }]}>Check-in</Text>
             </Pressable>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10, marginTop: 12 }}>
-            <Pressable style={styles.addFriendCircle} onPress={() => Alert.alert('Tính năng', 'Tìm bạn đồng hành qua mã QR quét vị trí!')}>
-              <Plus size={20} color={theme.textSecondary} />
-            </Pressable>
-            {acceptedFriends.length > 0 ? acceptedFriends.map((friend) => (
-              <Pressable key={friend.firebaseUid} style={styles.friendAvatarCheck} onPress={() => handleOpenUserProfile(friend)}>
-                <View style={styles.friendAvatarWrap}>
-                  <Image source={{ uri: friend.avatar || getUserAvatarByName(friend.name) }} style={styles.friendAvatarCircle} />
-                </View>
-                <Text style={[styles.friendNameMin, { color: theme.textPrimary }]} numberOfLines={1}>{friend.name.split(' ')[1] || friend.name}</Text>
-              </Pressable>
-            )) : (
-              <View style={{ justifyContent: "center", paddingHorizontal: 12, maxWidth: 260 }}>
-                <Text style={{ color: theme.textSecondary, fontSize: 11.5, fontWeight: "600", lineHeight: 17 }}>
-                  Chưa có bạn đồng hành nào được đồng bộ. Hãy tìm bạn bằng email hoặc số điện thoại.
-                </Text>
-              </View>
-            )}
-          </ScrollView>
         </View>
 
-        <View style={styles.feedSection}>
-            {/* Quick Create Post Card */}
-            <Pressable
-              style={[styles.createPostTriggerCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-              onPress={() => setActiveView('createPost')}
-            >
-              <View style={styles.triggerTopRow}>
-                <Image
-                  source={{ uri: currentUser.avatar }}
-                  style={styles.triggerAvatar}
-                />
-                <View style={[styles.triggerInputContainer, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
-                  <Text style={{ color: theme.textSecondary, fontSize: 12.5, fontWeight: '500' }}>
-                    Bạn vừa đi đâu về thế, {currentUser.name}? Chia sẻ chuyến đi nhé!
-                  </Text>
-                </View>
+        {/* ── POST FEED ────────────────────────────────────────────────── */}
+        {(() => {
+          if (displayListPosts.length === 0) {
+            return (
+              <View style={{ alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24 }}>
+                <Text style={{ fontSize: 40, marginBottom: 12 }}>📭</Text>
+                <Text style={{ color: theme.textSecondary, fontWeight: '700', fontSize: 14, textAlign: 'center' }}>
+                  {posts.length === 0 ? 'Chưa có bài đăng nào. Hãy chia sẻ chuyến đi đầu tiên!' : 'Không tìm thấy bài viết phù hợp.'}
+                </Text>
               </View>
-              <View style={[styles.triggerDivider, { backgroundColor: theme.border }]} />
-              <View style={styles.triggerBottomRow}>
-                <Pressable style={styles.triggerActionItem} onPress={() => setActiveView('createPost')}>
-                  <Camera size={15} color="#ef4444" />
-                  <Text style={[styles.triggerActionText, { color: theme.textSecondary }]}>Trực tiếp</Text>
+            );
+          }
+          return displayListPosts.map((post) => (
+            <View key={post.id} style={[styles.postCard, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+
+              {/* ── Post Header ─────────────────────────────────────── */}
+              <View style={styles.postHeader}>
+                <Pressable onPress={() => handleOpenUserProfile(post.user?.name || post.source)} style={styles.postHeaderLeft}>
+                  <LinearGradient
+                    colors={getUserRankColors(post.user?.name || post.source).colors}
+                    style={styles.postAvatarRing}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <View style={[styles.postAvatarInner, { backgroundColor: theme.card }]}>
+                      <Image
+                        source={{ uri: post.user?.avatar || getUserAvatarByName(post.user?.name || post.source) }}
+                        style={styles.postAvatar}
+                      />
+                    </View>
+                  </LinearGradient>
+                  <View style={{ marginLeft: 10 }}>
+                    <Text style={[styles.postUserName, { color: theme.textPrimary }]}>
+                      {post.user?.name || post.source}
+                    </Text>
+                    <Text style={[styles.postTimeText, { color: theme.textMuted }]}>{post.time}</Text>
+                  </View>
                 </Pressable>
-                <Pressable style={styles.triggerActionItem} onPress={() => setActiveView('createPost')}>
-                  <ImageIcon size={15} color="#10b981" />
-                  <Text style={[styles.triggerActionText, { color: theme.textSecondary }]}>Ảnh/video</Text>
-                </Pressable>
-                <Pressable style={styles.triggerActionItem} onPress={() => setActiveView('createPost')}>
-                  <Smile size={15} color="#f59e0b" />
-                  <Text style={[styles.triggerActionText, { color: theme.textSecondary }]}>Cảm xúc</Text>
+                <Pressable style={styles.postMenuBtn} onPress={() => Alert.alert('Tùy chọn', `Bài viết của ${post.user?.name || post.source}`, [
+                  { text: 'Lưu bài viết' },
+                  { text: 'Báo cáo' },
+                  { text: 'Đóng', style: 'cancel' }
+                ])}>
+                  <View style={styles.postMenuDots}>
+                    <View style={[styles.dot, { backgroundColor: theme.textMuted }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.textMuted }]} />
+                    <View style={[styles.dot, { backgroundColor: theme.textMuted }]} />
+                  </View>
                 </Pressable>
               </View>
-            </Pressable>
 
-            {/* TRIP FEED LISTINGS */}
-            {(() => {
-              const listToRender = displayListPosts;
-              if (listToRender.length === 0) {
-                const emptyMessage = posts.length === 0 && !searchText.trim() && selectedCategory === 'Tất cả'
-                  ? 'Chưa có bài đăng nào. Hãy tạo bài đăng đầu tiên của bạn.'
-                  : 'Không tìm thấy chuyến đi tương ứng.';
-                return (
-                  <View style={{ alignItems: "center", paddingVertical: 60, paddingHorizontal: 24 }}>
-                    <Text style={{ color: theme.textSecondary, fontWeight: "700", fontSize: 13, textAlign: "center", lineHeight: 20 }}>
-                      {emptyMessage}
-                    </Text>
-                  </View>
-                );
-              }
-              return listToRender.map((post) => (
-                <View key={post.id} style={[styles.tripPostCard, { backgroundColor: theme.card, borderColor: theme.border, overflow: 'hidden' }]}>
-                  {/* Large cover image pressable to open details */}
-                  <Pressable style={styles.tripCoverPressable} onPress={() => handleOpenComments(post)}>
-                    <Image source={{ uri: post.image }} style={styles.tripCoverImage} />
-                    <LinearGradient
-                      colors={['rgba(0,0,0,0.15)', 'transparent', 'rgba(0,0,0,0.85)']}
-                      style={StyleSheet.absoluteFillObject}
-                    />
-                    
-                    {/* Floating location tag */}
-                    <View style={styles.tripLocationFloatBadge}>
-                      <MapPin size={10} color="#fff" fill="#ef4444" style={{ marginRight: 2 }} />
-                      <Text style={styles.tripLocationFloatText}>{post.location}</Text>
-                    </View>
+              {/* ── Post Content ─────────────────────────────────────── */}
+              <Pressable onPress={() => handleOpenComments(post)} style={styles.postBody}>
+                <Text style={[styles.postContentText, { color: theme.textPrimary }]} numberOfLines={3}>
+                  {post.content || post.title}
+                  {(post.content || post.title).length > 120 ? (
+                    <Text style={{ color: '#3b82f6', fontWeight: '700' }}> ...xem thêm</Text>
+                  ) : null}
+                </Text>
+              </Pressable>
 
-                    {/* Floating category tag */}
-                    <View style={[
-                      styles.tripCategoryFloatBadge, 
-                      { 
-                        backgroundColor: getCategoryColor(post.category, isDarkMode).bg, 
-                        borderColor: getCategoryColor(post.category, isDarkMode).border 
-                      }
-                    ]}>
-                      <Text style={[
-                        styles.tripCategoryFloatText, 
-                        { color: getCategoryColor(post.category, isDarkMode).text }
-                      ]}>
-                        {post.category}
-                      </Text>
-                    </View>
-
-                    {/* Overlay Title & Duration */}
-                    <View style={styles.tripOverlayContent}>
-                      <Text style={styles.tripDurationText}>🕒 {post.duration || '3 ngày 2 đêm'}</Text>
-                      <Text style={styles.tripOverlayTitle} numberOfLines={2}>{post.title}</Text>
-                    </View>
-                  </Pressable>
-
-                  {/* Trip Card Footer */}
-                  <View style={styles.tripCardFooter}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      {/* Companion avatars list */}
-                      <View style={styles.avatarGroupContainer}>
-                        {(post.companions || []).map((cAvatar, idx) => (
-                          <Image key={idx} source={{ uri: cAvatar }} style={[styles.tripCompanionAvatar, { marginLeft: idx > 0 ? -12 : 0 }]} />
-                        ))}
-                      </View>
-                      <Pressable style={styles.addCompanionMiniBtn} onPress={() => Alert.alert('Bạn đồng hành', 'Thêm bạn đồng hành chia sẻ nhật ký này!')}>
-                        <Plus size={10} color={theme.textSecondary} />
-                      </Pressable>
-                    </View>
-
-                    {/* Actions panel */}
-                    <View style={styles.tripCardActions}>
-                      <Pressable style={styles.tripActionIconBtn} onPress={() => handleLikePost(post.id)}>
-                        <Heart size={16} color={post.likedByUser ? '#ef4444' : theme.textSecondary} fill={post.likedByUser ? '#ef4444' : 'transparent'} />
-                        <Text style={[styles.tripActionText, { color: post.likedByUser ? '#ef4444' : theme.textSecondary }]}>
-                          {post.likes}
-                        </Text>
-                      </Pressable>
-                      <Pressable style={styles.tripActionIconBtn} onPress={() => handleOpenComments(post)}>
-                        <MessageSquare size={16} color={theme.textSecondary} />
-                        <Text style={[styles.tripActionText, { color: theme.textSecondary }]}>
-                          {post.comments?.length || post.commentsCount}
-                        </Text>
-                      </Pressable>
-                      <Pressable style={styles.tripActionIconBtn} onPress={() => handleSharePost(post)}>
-                        <Share2 size={16} color={theme.textSecondary} />
-                      </Pressable>
+              {/* ── Post Media ───────────────────────────────────────── */}
+              {post.image && (
+                <Pressable onPress={() => handleOpenComments(post)} style={styles.postMediaWrap}>
+                  <Image source={{ uri: post.image }} style={styles.postMedia} />
+                  {/* Play button overlay for video-like feel */}
+                  <View style={styles.playOverlay}>
+                    <View style={styles.playBtn}>
+                      <View style={styles.playTriangle} />
                     </View>
                   </View>
+                  {/* Location chip */}
+                  {post.location && (
+                    <View style={styles.mediaLocationChip}>
+                      <MapPin size={9} color="#fff" fill="#ef4444" />
+                      <Text style={styles.mediaLocationText}>{post.location}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              )}
 
-                  {/* Excerpt author name */}
-                  <View style={{ paddingHorizontal: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Image source={{ uri: post.user?.avatar || getUserAvatarByName(post.source) }} style={styles.authorAvatarMini} />
-                    <Text style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '600' }}>
-                      Nhật ký của <Text style={{ color: theme.textPrimary, fontWeight: '700' }}>{post.user?.name || post.source}</Text> • {post.time}
-                    </Text>
+              {/* ── Reaction counts ──────────────────────────────────── */}
+              <View style={[styles.postReactionBar, { borderTopColor: theme.border, borderBottomColor: theme.border }]}>
+                <Pressable style={styles.reactionItem} onPress={() => handleLikePost(post.id)}>
+                  <View style={[styles.reactionIconCircle, { backgroundColor: '#ef4444' }]}>
+                    <Heart size={10} color="#fff" fill="#fff" />
                   </View>
-                </View>
-              ));
-            })()}
-          </View>
+                  <Text style={[styles.reactionCount, { color: post.likedByUser ? '#ef4444' : theme.textSecondary }]}>{post.likes || 105}</Text>
+                </Pressable>
+                <Pressable style={styles.reactionItem} onPress={() => handleOpenComments(post)}>
+                  <View style={[styles.reactionIconCircle, { backgroundColor: '#3b82f6' }]}>
+                    <MessageSquare size={10} color="#fff" />
+                  </View>
+                  <Text style={[styles.reactionCount, { color: theme.textSecondary }]}>{post.commentsCount || post.comments?.length || 15}</Text>
+                </Pressable>
+                <Pressable style={styles.reactionItem} onPress={() => handleSharePost(post)}>
+                  <View style={[styles.reactionIconCircle, { backgroundColor: '#06b6d4' }]}>
+                    <Share2 size={10} color="#fff" />
+                  </View>
+                  <Text style={[styles.reactionCount, { color: theme.textSecondary }]}>50</Text>
+                </Pressable>
+              </View>
+
+              {/* ── Action Buttons ────────────────────────────────────── */}
+              <View style={styles.postActions}>
+                <Pressable style={styles.postActionBtn} onPress={() => handleLikePost(post.id)}>
+                  <Heart
+                    size={18}
+                    color={post.likedByUser ? '#ef4444' : theme.textSecondary}
+                    fill={post.likedByUser ? '#ef4444' : 'transparent'}
+                  />
+                  <Text style={[styles.postActionText, { color: post.likedByUser ? '#ef4444' : theme.textSecondary }]}>Thích</Text>
+                </Pressable>
+                <Pressable style={styles.postActionBtn} onPress={() => handleOpenComments(post)}>
+                  <MessageSquare size={18} color={theme.textSecondary} />
+                  <Text style={[styles.postActionText, { color: theme.textSecondary }]}>Bình luận</Text>
+                </Pressable>
+                <Pressable style={styles.postActionBtn} onPress={() => handleSharePost(post)}>
+                  <Share2 size={18} color={theme.textSecondary} />
+                  <Text style={[styles.postActionText, { color: theme.textSecondary }]}>Chia sẻ</Text>
+                </Pressable>
+              </View>
+
+            </View>
+          ));
+        })()}
       </ScrollView>
+    
 
       {/* ======================================================== */}
       {/* MODALS SECTION */}
@@ -899,6 +873,30 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                   ))}
                 </ScrollView>
 
+                {/* Day-by-Day Itinerary (like screen 3 list in mockup) */}
+                <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textSecondary, marginLeft: 16, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Lịch trình chi tiết</Text>
+                <View style={{ paddingHorizontal: 16, gap: 12, marginBottom: 24 }}>
+                  {selectedPost.itinerary?.length ? selectedPost.itinerary.map((it, idx) => (
+                    <View key={idx} style={[styles.itineraryDayCard, { backgroundColor: theme.searchBg, borderColor: theme.border }]}>
+                      <View style={styles.itineraryDayHeader}>
+                        <LinearGradient
+                          colors={['#3b82f6', '#60a5fa']}
+                          style={styles.itineraryDayBadge}
+                        >
+                          <Text style={styles.itineraryDayBadgeText}>{it.day}</Text>
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.itineraryDayText, { color: theme.textPrimary }]}>{it.text}</Text>
+                    </View>
+                  )) : (
+                    <View style={[styles.itineraryDayCard, { backgroundColor: theme.searchBg, borderColor: theme.border }]}>
+                      <Text style={[styles.itineraryDayText, { color: theme.textSecondary }]}>
+                        B?i vi?t n?y ch?a c? l?ch tr?nh chi ti?t.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
                 {/* Comments section title */}
                 <View style={{ height: 1, backgroundColor: theme.border, marginHorizontal: 16, marginBottom: 16 }} />
                 <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textSecondary, marginLeft: 16, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Ý kiến bạn đọc ({selectedPost.comments ? selectedPost.comments.length : 0})</Text>
@@ -972,154 +970,11 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
         isDarkMode={isDarkMode}
         theme={theme}
         currentUser={currentUser}
-        onMessage={handleStartDirectChat}
+        onStartDirectChat={onStartDirectChat}
       />
 
-      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
-        <View style={styles.menuOverlay}>
-          <Pressable style={styles.menuDismissArea} onPress={() => setMenuVisible(false)} />
-          <View style={[styles.sideMenu, { backgroundColor: theme.card, borderLeftColor: theme.border }]}>
-            <View style={[styles.sideMenuHeader, { borderBottomColor: theme.border }]}>
-              <Image source={{ uri: currentUser.avatar }} style={styles.sideMenuAvatar} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.sideMenuName, { color: theme.textPrimary }]} numberOfLines={1}>{currentUser.name}</Text>
-                <Text style={[styles.sideMenuEmail, { color: theme.textSecondary }]} numberOfLines={1}>{currentUser.email}</Text>
-              </View>
-              <Pressable onPress={() => setMenuVisible(false)} style={styles.sideMenuClose}>
-                <X size={19} color={theme.textSecondary} />
-              </Pressable>
-            </View>
+      {/* Modal Menu Drawer đã được lược bỏ theo yêu cầu */}
 
-            {[
-              { key: 'social', label: 'Trang chủ', Icon: Newspaper },
-              { key: 'explore', label: 'Khám phá', Icon: Compass },
-              { key: 'map', label: 'Bản đồ du lịch', Icon: Map },
-              { key: 'chat', label: 'Tin nhắn', Icon: MessageCircle },
-              { key: 'ticketList', label: 'Vé & chuyến đi', Icon: Ticket },
-              { key: 'profile', label: 'Trang cá nhân', Icon: User },
-            ].map(item => {
-              const Icon = item.Icon;
-              return (
-                <Pressable
-                  key={item.key}
-                  style={({ pressed }) => [styles.sideMenuItem, pressed && { backgroundColor: theme.searchBg }]}
-                  onPress={() => {
-                    setMenuVisible(false);
-                    if (item.key !== 'social' && onNavigateToTab) onNavigateToTab(item.key);
-                  }}
-                >
-                  <View style={[styles.sideMenuIcon, { backgroundColor: theme.searchBg }]}><Icon size={19} color="#3b82f6" /></View>
-                  <Text style={[styles.sideMenuLabel, { color: theme.textPrimary }]}>{item.label}</Text>
-                  <ChevronRight size={17} color={theme.textMuted} />
-                </Pressable>
-              );
-            })}
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.sideMenuItem,
-                {
-                  marginTop: 12,
-                  borderWidth: 1,
-                  borderColor: 'rgba(239, 68, 68, 0.24)',
-                  backgroundColor: pressed ? 'rgba(239, 68, 68, 0.08)' : 'transparent'
-                }
-              ]}
-              onPress={() => {
-                setMenuVisible(false);
-                Alert.alert(
-                  'Đăng xuất tài khoản',
-                  'Bạn có muốn đăng xuất tài khoản không?',
-                  [
-                    { text: 'Không', style: 'cancel' },
-                    {
-                      text: 'Có',
-                      style: 'destructive',
-                      onPress: () => onLogout && onLogout(),
-                    },
-                  ]
-                );
-              }}
-            >
-              <View style={[styles.sideMenuIcon, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}><X size={19} color="#ef4444" /></View>
-              <Text style={[styles.sideMenuLabel, { color: '#ef4444' }]}>Đăng xuất tài khoản</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={notificationVisible} transparent animationType="fade" onRequestClose={() => setNotificationVisible(false)}>
-        <View style={styles.menuOverlay}>
-          <Pressable style={styles.menuDismissArea} onPress={() => setNotificationVisible(false)} />
-          <View style={[styles.sideMenu, { backgroundColor: theme.card, borderLeftColor: theme.border }]}>
-            <View style={[styles.sideMenuHeader, { borderBottomColor: theme.border }]}>
-              <View style={[styles.sideMenuIcon, { backgroundColor: theme.searchBg }]}><BellRing size={19} color="#3b82f6" /></View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.sideMenuName, { color: theme.textPrimary }]}>Thông báo</Text>
-                <Text style={[styles.sideMenuEmail, { color: theme.textSecondary }]} numberOfLines={2}>
-                  Chỉ hiển thị thông báo thật từ hoạt động tài khoản của bạn
-                </Text>
-              </View>
-              <Pressable onPress={() => setNotificationVisible(false)} style={styles.sideMenuClose}>
-                <X size={19} color={theme.textSecondary} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 8 }}>
-              {incomingRequests.map(item => {
-                return (
-                  <View
-                    key={item._id}
-                    style={[styles.notificationItem, { borderBottomColor: theme.border }]}
-                  >
-                    <Image source={{ uri: item.friend?.avatar || getUserAvatarByName(item.friend?.name) }} style={styles.friendSearchAvatar} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>{item.friend?.name || 'Một thành viên'}</Text>
-                      <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>đã gửi cho bạn lời mời kết bạn.</Text>
-                      <View style={styles.requestActions}>
-                        <Pressable disabled={friendActionId === item._id} onPress={() => handleFriendAction('accept', item._id)} style={styles.acceptRequestButton}>
-                          <Text style={styles.requestButtonText}>Đồng ý</Text>
-                        </Pressable>
-                        <Pressable disabled={friendActionId === item._id} onPress={() => handleFriendAction('reject', item._id)} style={[styles.rejectRequestButton, { borderColor: theme.border }]}>
-                          <Text style={[styles.rejectRequestText, { color: theme.textPrimary }]}>Từ chối</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })}
-              {socialNotifications.map(item => {
-                const isLike = item.type === 'post_like';
-                return (
-                  <Pressable key={item._id} style={({ pressed }) => [styles.notificationItem, { borderBottomColor: theme.border }, pressed && { backgroundColor: theme.searchBg }]}
-                    onPress={() => {
-                      const post = posts.find(postItem => postItem.id === item.postId);
-                      if (post) { setNotificationVisible(false); handleOpenComments(post); }
-                    }}>
-                    <Image source={{ uri: item.actor?.avatar || getUserAvatarByName(item.actor?.name) }} style={styles.friendSearchAvatar} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>{item.actor?.name || 'Một thành viên'}</Text>
-                      <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>
-                        {isLike ? 'đã thích bài viết của bạn.' : `đã bình luận: “${item.message}”`}
-                      </Text>
-                      <Text style={[styles.notificationTime, { color: theme.textMuted }]}>{new Date(item.createdAt).toLocaleString('vi-VN')}</Text>
-                    </View>
-                    {isLike ? <Heart size={18} color="#ef4444" fill="#ef4444" /> : <MessageSquare size={18} color="#3b82f6" />}
-                  </Pressable>
-                );
-              })}
-              {incomingRequests.length === 0 && socialNotifications.length === 0 && (
-                <View style={{ paddingHorizontal: 18, paddingVertical: 28 }}>
-                  <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>Chưa có thông báo nào</Text>
-                  <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>
-                    Khi có lời mời kết bạn, lượt thích hoặc bình luận mới, chúng sẽ hiển thị ở đây.
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
       {/* TOAST SHARING FEEDBACK ALERT */}
       {shareAlertVisible && (
@@ -1294,30 +1149,327 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
 const styles = StyleSheet.create({
   tabContainer: { flex: 1, width: '100%' },
 
-  // Header styles
-  socialHeader: { paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 44 },
-  headerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
+  // ── Header ──────────────────────────────────────────────────────────────
+  socialHeader: {
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 52,
+    paddingHorizontal: 0,
+    borderBottomWidth: 1,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  hdrIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  socialTitle: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  socialSubtitle: { fontSize: 12, fontWeight: '500', marginTop: 4, lineHeight: 16 },
+
+  // ── Search ──────────────────────────────────────────────────────────────
+  socialSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    height: 36,
+    borderWidth: 1,
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  socialSearchInput: { flex: 1, fontSize: 13, fontWeight: '500' },
+
+  // ── Stories ─────────────────────────────────────────────────────────────
+  storiesRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 12,
+  },
+  storyItem: {
+    alignItems: 'center',
+    width: 64,
+  },
+  storyAvatarWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  storyRingGrad: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    padding: 2.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  storyRingInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+    padding: 2,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  storyAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+  },
+  storyAddBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  storyAddGrad: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyName: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 5,
+    textAlign: 'center',
+    maxWidth: 60,
+  },
+
+  // ── Create Post trigger ──────────────────────────────────────────────────
+  createPostCard: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 8,
+    marginBottom: 0,
+  },
+  createPostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  createPostAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  createPostInput: {
+    flex: 1,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  createPostDivider: {
+    height: 1,
+    marginHorizontal: -16,
+    marginBottom: 8,
+  },
+  createPostActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  createPostActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  createPostActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  // ── Post Card ────────────────────────────────────────────────────────────
+  postCard: {
+    marginBottom: 8,
+    borderBottomWidth: 1,
+  },
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 10,
+  },
+  postHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  postAvatarRing: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  postAvatarInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    padding: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  postAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  postUserName: { fontSize: 13.5, fontWeight: '800' },
+  postTimeText: { fontSize: 11, fontWeight: '500', marginTop: 1 },
+  postMenuBtn: {
+    padding: 8,
+  },
+  postMenuDots: {
+    flexDirection: 'row',
+    gap: 3,
+    alignItems: 'center',
+  },
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  postBody: {
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+  postContentText: {
+    fontSize: 14,
+    fontWeight: '400',
+    lineHeight: 21,
+  },
+  postMediaWrap: {
+    marginHorizontal: 0,
+    marginBottom: 0,
+    position: 'relative',
+  },
+  postMedia: {
+    width: '100%',
+    height: 220,
+    resizeMode: 'cover',
+  },
+  playOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+  playBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playTriangle: {
+    width: 0,
+    height: 0,
+    borderTopWidth: 9,
+    borderBottomWidth: 9,
+    borderLeftWidth: 16,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: '#1a1a1a',
+    marginLeft: 3,
+  },
+  mediaLocationChip: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  mediaLocationText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  postReactionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginTop: 2,
+  },
+  reactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  reactionIconCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reactionCount: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  postActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  postActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 8,
+  },
+  postActionText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+
+  // Legacy — giữ lại các icon btn cũ dùng trong modal
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   messengerIconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  menuOverlay: { flex: 1, flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.55)' },
-  menuDismissArea: { flex: 1 },
-  sideMenu: { width: '82%', maxWidth: 340, height: '100%', borderLeftWidth: 1, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 48, paddingHorizontal: 14 },
-  sideMenuHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 16, marginBottom: 10, borderBottomWidth: 1 },
-  sideMenuAvatar: { width: 48, height: 48, borderRadius: 24 },
-  sideMenuName: { fontSize: 15, fontWeight: '900' },
-  sideMenuEmail: { fontSize: 10.5, marginTop: 2 },
-  sideMenuClose: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  sideMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 58, paddingHorizontal: 8, borderRadius: 12 },
-  sideMenuIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  sideMenuLabel: { flex: 1, fontSize: 13, fontWeight: '800' },
-  notificationItem: { flexDirection: 'row', gap: 12, paddingVertical: 14, borderBottomWidth: 1 },
-  notificationIconWrap: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  notificationTitle: { fontSize: 12.5, fontWeight: '800' },
-  notificationMessage: { fontSize: 11, lineHeight: 16, marginTop: 4, fontWeight: '500' },
-  notificationTime: { fontSize: 10, marginTop: 6, fontWeight: '600' },
-  messengerBadge: { position: 'absolute', top: 8, right: 8, width: 9, height: 9, borderRadius: 4.5, backgroundColor: '#ef4444', borderWidth: 1.5, borderColor: '#fff' },
-  socialTitle: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
-  socialSubtitle: { fontSize: 12, fontWeight: '500', marginTop: 4, lineHeight: 16, marginLeft: 4 },
+  messengerBadge: { position: 'absolute', top: -3, right: -3, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fff', paddingHorizontal: 3 },
+  messengerBadgeText: { color: '#fff', fontSize: 8.5, fontWeight: '900', textAlign: 'center' },
 
   // Tab Toggle Buttons
   tabBarContainer: {
@@ -1911,23 +2063,7 @@ const styles = StyleSheet.create({
   categorySelectorPillActive: {
     borderColor: '#3b82f6',
   },
-  // Search input on social header
-  socialSearchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    marginTop: 14,
-  },
-  socialSearchInput: {
-    flex: 1,
-    fontSize: 12.5,
-    fontWeight: '600',
-    marginLeft: 8,
-    paddingVertical: 0,
-  },
+
   friendSearchResults: {
     paddingHorizontal: 16,
     paddingTop: 14,
@@ -1942,22 +2078,6 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   friendSearchAvatar: { width: 42, height: 42, borderRadius: 21 },
-  friendActionButton: {
-    minWidth: 112,
-    height: 34,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: '#3b82f6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  friendAcceptedButton: { backgroundColor: '#10b981' },
-  friendActionButtonText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  requestActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  acceptRequestButton: { backgroundColor: '#3b82f6', borderRadius: 9, paddingHorizontal: 14, paddingVertical: 8 },
-  rejectRequestButton: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 14, paddingVertical: 8 },
-  requestButtonText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  rejectRequestText: { fontSize: 11, fontWeight: '800' },
   friendSearchName: { fontSize: 13, fontWeight: '800', marginBottom: 3 },
   friendSearchContact: { fontSize: 11, fontWeight: '500' },
   emptyFriendSearch: { fontSize: 12, paddingVertical: 14, lineHeight: 18 },
@@ -2258,6 +2378,31 @@ const styles = StyleSheet.create({
     width: 140,
     height: 95,
     borderRadius: 12,
+  },
+  itineraryDayCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+  },
+  itineraryDayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  itineraryDayBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  itineraryDayBadgeText: {
+    color: '#fff',
+    fontSize: 9.5,
+    fontWeight: '900',
+  },
+  itineraryDayText: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: '600',
   },
   tripCategoryFloatBadge: {
     position: 'absolute',

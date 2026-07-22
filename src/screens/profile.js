@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import {
-  View, Text, Image, Pressable, ScrollView, Alert, Animated, StyleSheet, Modal, Switch, Platform, Dimensions
+  View, Text, Image, Pressable, ScrollView, Alert, Animated, StyleSheet, Modal, Switch, Platform, Dimensions, TextInput, ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -8,10 +8,10 @@ import {
   Sun, Moon, User, Zap, LogOut, MapPin, Heart,
   Star, Camera, Settings, Shield, Bell, Pencil,
   Info, X, Award as AwardIcon, Trophy, Image as ImageIcon, Play,
-  Users
+  Users, CheckCircle, Search, Send, UserCheck, MessageSquare
 } from 'lucide-react-native';
 import { getRankDetails } from '../data';
-// socialShared đã được thay thế — friends quản lý qua API
+import { searchFriends } from '../services/userService';
 const { width } = Dimensions.get('window');
 
 export function ProfileScreen({
@@ -33,8 +33,35 @@ export function ProfileScreen({
   const [activeTab, setActiveTab] = useState('grid'); // 'grid' | 'reels' | 'settings'
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showFindFriendsModal, setShowFindFriendsModal] = useState(false);
+  const [friendSearchText, setFriendSearchText] = useState('');
+  const [friendSearchResults, setFriendSearchResults] = useState([]);
+  const [isSearchingFriends, setIsSearchingFriends] = useState(false);
   const [selectedBadge, setSelectedBadge] = useState(null);
   const [badgeModalVisible, setBadgeModalVisible] = useState(false);
+
+  useEffect(() => {
+    const query = friendSearchText.trim();
+    if (query.length < 2) {
+      setFriendSearchResults([]);
+      setIsSearchingFriends(false);
+      return;
+    }
+
+    let active = true;
+    setIsSearchingFriends(true);
+    const timer = setTimeout(() => {
+      searchFriends(query, userInfo?.id)
+        .then(users => active && setFriendSearchResults(Array.isArray(users) ? users : []))
+        .catch(() => active && setFriendSearchResults([]))
+        .finally(() => active && setIsSearchingFriends(false));
+    }, 350);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [friendSearchText, userInfo?.id]);
 
   const [notifSettings, setNotifSettings] = useState({
     newFeatures: true,
@@ -63,12 +90,12 @@ export function ProfileScreen({
   });
 
   const userPhotos = [
-    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=300&q=80',
-    'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=300&q=80',
-    'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=300&q=80',
-    'https://images.unsplash.com/photo-1524230507669-e297d477b24d?auto=format&fit=crop&w=300&q=80',
-    'https://images.unsplash.com/photo-1555921015-5532091f6026?auto=format&fit=crop&w=300&q=80',
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=300&q=80',
+    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=400&q=80',
+    'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=400&q=80',
+    'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=400&q=80',
+    'https://images.unsplash.com/photo-1524230507669-e297d477b24d?auto=format&fit=crop&w=400&q=80',
+    'https://images.unsplash.com/photo-1555921015-5532091f6026?auto=format&fit=crop&w=400&q=80',
+    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80',
   ];
 
   const userReels = [
@@ -77,8 +104,8 @@ export function ProfileScreen({
   ];
 
   const gridPhotos = useMemo(() => {
-    return [...new Set(userPhotos)];
-  }, []);
+    return userPhotos;
+  }, [userPhotos]);
 
   const userStats = [
     { label: 'Chuyến đi', val: '12', icon: MapPin, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', action: () => Alert.alert('Hành trình', 'Bạn đã hoàn thành 12 chuyến đi khám phá trên toàn quốc!') },
@@ -105,18 +132,6 @@ export function ProfileScreen({
     {
       icon: User, label: 'Chỉnh sửa thông tin', color: '#3b82f6',
       right: null, onPress: onEditProfile,
-    },
-    {
-      icon: Award, label: 'Hạng thành viên & Đặc quyền', color: '#facc15',
-      right: <Text style={{ fontSize: 10, fontWeight: '850', color: rank.borderColor }}>{rank.rankName}</Text>,
-      onPress: onViewTiers,
-    },
-    {
-      icon: Zap, label: 'Thử thách & Điểm thưởng', color: '#10b981',
-      right: <View style={{ backgroundColor: '#10b981', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1 }}>
-        <Text style={{ color: '#fff', fontSize: 8, fontWeight: '900' }}>HOT</Text>
-      </View>,
-      onPress: onViewChallenges,
     },
     {
       icon: Bell, label: 'Thông báo', color: '#f59e0b',
@@ -159,91 +174,102 @@ export function ProfileScreen({
         </Pressable>
       </View>
 
-      {/* B. PASSPORT AVATAR CARD */}
-      <View style={[profStyles.passportCard, { backgroundColor: isDarkMode ? 'rgba(24, 24, 27, 0.4)' : 'rgba(255, 255, 255, 0.7)', borderColor: theme.border }]}>
-        <View style={profStyles.passportHeader}>
+      {/* B. LUXURY PASSPORT CARD */}
+      <View style={[profStyles.passportCard, { backgroundColor: isDarkMode ? '#13111c' : '#ffffff', borderColor: isDarkMode ? '#2d2742' : '#e2e8f0' }]}>
+        {/* Cover Photo Header */}
+        <View style={profStyles.passportCoverContainer}>
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=80' }}
+            style={profStyles.passportCoverImg}
+          />
           <LinearGradient
-            colors={rank.colors}
-            style={profStyles.avatarRing}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={[profStyles.avatarInner, { backgroundColor: isDarkMode ? '#18181b' : '#fff' }]}>
-              <Image source={{ uri: userInfo.avatar }} style={profStyles.avatarImage} />
-            </View>
-          </LinearGradient>
+            colors={['rgba(0,0,0,0.3)', 'transparent', isDarkMode ? '#13111c' : '#ffffff']}
+            style={profStyles.passportCoverGradient}
+          />
+        </View>
 
-          <View style={profStyles.passportMeta}>
-            <Text style={[profStyles.displayName, { color: theme.textPrimary }]}>{userInfo.name}</Text>
-            {isExperimentMember ? (
-              <Text style={{ fontSize: 10, color: '#bef264', fontWeight: '850', marginTop: 1 }}>
-                Hội viên thử nghiệm 🧪
-              </Text>
-            ) : (
-              <Text style={[profStyles.handleText, { color: theme.textSecondary }]}>
-                @{(userInfo.name || 'traveler').toLowerCase().replace(/\s/g, '.')}
-              </Text>
-            )}
+        {/* Passport Details */}
+        <View style={profStyles.passportBody}>
+          <View style={profStyles.passportHeader}>
+            <LinearGradient
+              colors={rank.colors}
+              style={profStyles.avatarRing}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={[profStyles.avatarInner, { backgroundColor: isDarkMode ? '#18181b' : '#fff' }]}>
+                <Image source={{ uri: userInfo.avatar }} style={profStyles.avatarImage} />
+              </View>
+            </LinearGradient>
 
-            <View style={profStyles.rankRow}>
-              <LinearGradient
-                colors={rank.colors}
-                style={profStyles.rankPill}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <AwardIcon size={10} color="#0f172a" fill="#0f172a" />
-                <Text style={profStyles.rankPillText}>{rank.rankName}</Text>
-              </LinearGradient>
-              <View style={[profStyles.levelBadge, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.04)' }]}>
-                <Text style={[profStyles.levelText, { color: theme.textSecondary }]}>{displayLevel}</Text>
+            <View style={profStyles.passportMeta}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[profStyles.displayName, { color: theme.textPrimary }]}>{userInfo.name}</Text>
+                <CheckCircle size={16} color="#3b82f6" fill="#3b82f6" />
+              </View>
+              {isExperimentMember ? (
+                <Text style={{ fontSize: 10, color: '#bef264', fontWeight: '850', marginTop: 1 }}>
+                  Hội viên thử nghiệm 🧪
+                </Text>
+              ) : (
+                <Text style={[profStyles.handleText, { color: theme.textSecondary }]}>
+                  @{(userInfo.name || 'traveler').toLowerCase().replace(/\s/g, '.')}
+                </Text>
+              )}
+
+              <View style={profStyles.rankRow}>
+                <LinearGradient
+                  colors={rank.colors}
+                  style={profStyles.rankPill}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <AwardIcon size={10} color="#0f172a" fill="#0f172a" />
+                  <Text style={profStyles.rankPillText}>{rank.rankName}</Text>
+                </LinearGradient>
+                <View style={[profStyles.levelBadge, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.04)' }]}>
+                  <Text style={[profStyles.levelText, { color: theme.textSecondary }]}>{displayLevel}</Text>
+                </View>
               </View>
             </View>
+
+            <Pressable onPress={onEditProfile} style={[profStyles.pencilBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.05)' }]}>
+              <Pencil size={13} color={theme.textPrimary} />
+            </Pressable>
           </View>
 
-          <Pressable onPress={onEditProfile} style={[profStyles.pencilBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.05)' }]}>
-            <Pencil size={13} color={theme.textPrimary} />
-          </Pressable>
-        </View>
+          {/* Bio capsule block */}
+          {userInfo.bio && (
+            <View style={[profStyles.bioCapsule, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.03)' : 'rgba(15, 23, 42, 0.03)', borderColor: theme.border }]}>
+              <Text style={[profStyles.bioText, { color: theme.textSecondary }]}>"{userInfo.bio}"</Text>
+            </View>
+          )}
 
-        {/* Bio capsule block */}
-        {userInfo.bio && (
-          <View style={[profStyles.bioCapsule, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.03)' : 'rgba(15, 23, 42, 0.03)', borderColor: theme.border }]}>
-            <Text style={[profStyles.bioText, { color: theme.textSecondary }]}>"{userInfo.bio}"</Text>
+          {/* Followers & Following Stats Bar */}
+          <View style={profStyles.followStatsContainer}>
+            <View style={profStyles.followStatItem}>
+              <Text style={[profStyles.followStatVal, { color: theme.textPrimary }]}>12</Text>
+              <Text style={profStyles.followStatLabel}>Chuyến đi</Text>
+            </View>
+            <View style={[profStyles.followStatDivider, { backgroundColor: theme.border }]} />
+            <View style={profStyles.followStatItem}>
+              <Text style={[profStyles.followStatVal, { color: theme.textPrimary }]}>
+                {userInfo?.followersCount !== undefined ? userInfo.followersCount : 256}
+              </Text>
+              <Text style={profStyles.followStatLabel}>Người theo dõi</Text>
+            </View>
+            <View style={[profStyles.followStatDivider, { backgroundColor: theme.border }]} />
+            <View style={profStyles.followStatItem}>
+              <Text style={[profStyles.followStatVal, { color: theme.textPrimary }]}>
+                {userInfo?.followingCount !== undefined ? userInfo.followingCount : 42}
+              </Text>
+              <Text style={profStyles.followStatLabel}>Đang theo dõi</Text>
+            </View>
           </View>
-        )}
-      </View>
-
-      {/* C. XP PROGRESS BAR */}
-      <View style={[profStyles.xpProgressCard, { backgroundColor: isDarkMode ? 'rgba(24, 24, 27, 0.4)' : 'rgba(255,255,255,0.7)', borderColor: theme.border }]}>
-        <View style={profStyles.xpLabelRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Zap size={14} color="#3b82f6" fill="#3b82f6" />
-            <Text style={[profStyles.xpTitle, { color: theme.textPrimary }]}>Tiến trình điểm thưởng</Text>
-          </View>
-          <Text style={{ fontSize: 11.5, fontWeight: '850', color: '#3b82f6' }}>
-            {points.toLocaleString()} XP
-          </Text>
-        </View>
-
-        <View style={[profStyles.xpTrack, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)' }]}>
-          <Animated.View style={[profStyles.xpThumb, { width: barWidth }]}>
-            <LinearGradient
-              colors={['#3b82f6', '#06b6d4', '#8b5cf6']}
-              style={{ flex: 1, borderRadius: 5 }}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            />
-          </Animated.View>
-        </View>
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-          <Text style={{ fontSize: 10, fontWeight: '750', color: theme.textMuted }}>{displayLevel}</Text>
-          <Text style={{ fontSize: 10, fontWeight: '750', color: theme.textMuted }}>{currentLevelXp}/{nextLevelXp} XP ({Math.round(xpProgress * 100)}%)</Text>
         </View>
       </View>
 
-      {/* INSTAGRAM STYLE TABS FOR PASS PASS PORT SCREEN */}
+      {/* INSTAGRAM STYLE TABS FOR PASS PORT SCREEN */}
       <View style={[profStyles.tabBarContainer, { borderBottomColor: theme.border }]}>
         <Pressable onPress={() => setActiveTab('grid')} style={[profStyles.tabBarItem, activeTab === 'grid' && { borderBottomColor: theme.textPrimary }]}>
           <ImageIcon size={20} color={activeTab === 'grid' ? theme.textPrimary : theme.textMuted} />
@@ -298,11 +324,11 @@ export function ProfileScreen({
             </View>
             <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: '800', marginBottom: 6 }}>Chưa có bạn đồng hành</Text>
             <Text style={{ color: theme.textSecondary, fontSize: 12, textAlign: 'center', lineHeight: 18, paddingHorizontal: 20 }}>
-              Tìm bạn bè qua tab Bảng tin → nhập email hoặc số điện thoại vào ô tìm kiếm.
+              Tìm bạn bè qua tên, email hoặc số điện thoại để cùng tạo nhóm du lịch 360°.
             </Text>
             <Pressable
               style={{ marginTop: 18, backgroundColor: '#3b82f6', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
-              onPress={() => onNavigateToTab && onNavigateToTab('social')}
+              onPress={() => setShowFindFriendsModal(true)}
             >
               <Users size={14} color="#fff" />
               <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>Tìm bạn đồng hành</Text>
@@ -333,30 +359,6 @@ export function ProfileScreen({
                     <Text style={[profStyles.statLabelCellText, { color: theme.textSecondary }]}>{s.label}</Text>
                     <Text style={[profStyles.statValueCellText, { color: theme.textPrimary }]}>{s.val}</Text>
                   </View>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* E. EARNED BADGES DISPLAY */}
-          <View style={profStyles.sectionHeader}>
-            <Text style={[profStyles.sectionTitleText, { color: theme.textPrimary }]}>Huy hiệu đã đạt</Text>
-          </View>
-          <View style={profStyles.badgesContainer}>
-            {badges.map((b) => {
-              const BIcon = b.icon;
-              return (
-                <Pressable
-                  key={b.id}
-                  onPress={() => handleOpenBadge(b)}
-                  style={[
-                    profStyles.badgeCard,
-                    { backgroundColor: theme.card, borderColor: theme.border },
-                    !b.earned && { opacity: 0.4 }
-                  ]}
-                >
-                  <BIcon size={20} color={b.color} />
-                  <Text numberOfLines={1} style={[profStyles.badgeNameText, { color: theme.textPrimary }]}>{b.name}</Text>
                 </Pressable>
               );
             })}
@@ -406,36 +408,7 @@ export function ProfileScreen({
         </View>
       )}
 
-      {/* MODAL: BADGE INFO */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={badgeModalVisible}
-        onRequestClose={() => setBadgeModalVisible(false)}
-      >
-        <View style={profStyles.modalBackdrop}>
-          <View style={[profStyles.modalCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            {selectedBadge && (
-              <View style={{ alignItems: 'center', padding: 20 }}>
-                <View style={[profStyles.modalBadgeIconCircle, { backgroundColor: selectedBadge.color + '22' }]}>
-                  <selectedBadge.icon size={38} color={selectedBadge.color} />
-                </View>
-                <Text style={[profStyles.modalBadgeName, { color: theme.textPrimary }]}>{selectedBadge.name}</Text>
-                <Text style={[profStyles.modalBadgeDesc, { color: theme.textSecondary }]}>{selectedBadge.desc}</Text>
-                
-                <View style={[profStyles.perkBox, { backgroundColor: theme.searchBg, borderColor: theme.border }]}>
-                  <Trophy size={16} color="#bef264" />
-                  <Text style={[profStyles.perkText, { color: theme.textSecondary }]}>Đặc quyền: {selectedBadge.perk}</Text>
-                </View>
 
-                <Pressable style={profStyles.modalCloseBtn} onPress={() => setBadgeModalVisible(false)}>
-                  <Text style={profStyles.modalCloseBtnText}>Đóng</Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
 
       {/* MODAL: NOTIFICATIONS SETTINGS */}
       <Modal
@@ -509,6 +482,96 @@ export function ProfileScreen({
           </View>
         </View>
       </Modal>
+
+      {/* MODAL: DEDICATED FIND FRIENDS SCREEN */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showFindFriendsModal}
+        onRequestClose={() => setShowFindFriendsModal(false)}
+      >
+        <View style={profStyles.modalBackdrop}>
+          <View style={[profStyles.findFriendsModalCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={[profStyles.notifHeader, { borderBottomColor: theme.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Users size={18} color="#3b82f6" />
+                <Text style={[profStyles.notifTitle, { color: theme.textPrimary }]}>Tìm bạn đồng hành Vivu360</Text>
+              </View>
+              <Pressable style={profStyles.notifClose} onPress={() => setShowFindFriendsModal(false)}>
+                <X size={20} color={theme.textPrimary} />
+              </Pressable>
+            </View>
+
+            {/* Search Input Bar */}
+            <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
+              <View style={[profStyles.searchBarBox, { backgroundColor: isDarkMode ? '#1e1b2e' : '#f1f5f9', borderColor: theme.border }]}>
+                <Search size={16} color={theme.textMuted} />
+                <TextInput
+                  style={[profStyles.searchBarInput, { color: theme.textPrimary }]}
+                  placeholder="Nhập tên, email hoặc số điện thoại..."
+                  placeholderTextColor={theme.textMuted}
+                  value={friendSearchText}
+                  onChangeText={setFriendSearchText}
+                />
+                {friendSearchText ? (
+                  <Pressable onPress={() => setFriendSearchText('')}>
+                    <X size={16} color={theme.textMuted} />
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Search Results List */}
+            <ScrollView style={{ paddingHorizontal: 16, paddingTop: 10, maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+              {isSearchingFriends ? (
+                <View style={{ paddingVertical: 30, alignItems: 'center', gap: 8 }}>
+                  <ActivityIndicator size="small" color="#3b82f6" />
+                  <Text style={{ color: theme.textSecondary, fontSize: 12 }}>Đang tìm kiếm bạn đồng hành...</Text>
+                </View>
+              ) : friendSearchResults.length > 0 ? (
+                friendSearchResults.map((friend) => (
+                  <View
+                    key={friend.firebaseUid || friend.id}
+                    style={[profStyles.friendResultCard, { backgroundColor: isDarkMode ? '#1e1b2e' : '#f8fafc', borderColor: theme.border }]}
+                  >
+                    <Image
+                      source={{ uri: friend.avatar || 'https://i.pravatar.cc/150?img=11' }}
+                      style={profStyles.friendResultAvatar}
+                    />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={[profStyles.friendResultName, { color: theme.textPrimary }]}>{friend.name}</Text>
+                      <Text style={[profStyles.friendResultMeta, { color: theme.textSecondary }]}>
+                        {friend.email || 'Hội viên Vivu360'}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={profStyles.chatWithFriendBtn}
+                      onPress={() => {
+                        setShowFindFriendsModal(false);
+                        onNavigateToTab && onNavigateToTab('chat');
+                      }}
+                    >
+                      <MessageSquare size={14} color="#fff" />
+                      <Text style={profStyles.chatWithFriendBtnText}>Chat</Text>
+                    </Pressable>
+                  </View>
+                ))
+              ) : friendSearchText.trim().length >= 2 ? (
+                <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+                  <Text style={{ color: theme.textSecondary, fontSize: 13 }}>Không tìm thấy người dùng phù hợp.</Text>
+                </View>
+              ) : (
+                <View style={{ paddingVertical: 30, alignItems: 'center', gap: 6 }}>
+                  <Users size={32} color={theme.textMuted} />
+                  <Text style={{ color: theme.textSecondary, fontSize: 13, textAlign: 'center' }}>
+                    Nhập tên hoặc email bạn bè để kết nối chuyến đi du lịch 360°!
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -543,18 +606,39 @@ const profStyles = StyleSheet.create({
   passportCard: {
     borderRadius: 24,
     borderWidth: 1,
-    padding: 18,
     marginBottom: 18,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  passportCoverContainer: {
+    height: 110,
+    width: '100%',
+    position: 'relative',
+  },
+  passportCoverImg: {
+    width: '100%',
+    height: '100%',
+  },
+  passportCoverGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  passportBody: {
+    padding: 18,
+    paddingTop: 0,
   },
   passportHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     gap: 14,
+    marginTop: -36,
     position: 'relative',
   },
   avatarRing: {
@@ -638,11 +722,89 @@ const profStyles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 17,
   },
+  followStatsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(148, 163, 184, 0.15)',
+  },
+  followStatItem: {
+    alignItems: 'center',
+  },
+  followStatVal: {
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  followStatLabel: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  followStatDivider: {
+    width: 1,
+    height: 22,
+    backgroundColor: 'rgba(148, 163, 184, 0.2)',
+  },
   xpProgressCard: {
     borderRadius: 24,
     borderWidth: 1,
     padding: 16,
     marginBottom: 10,
+  },
+  tabBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    borderBottomWidth: 1,
+    marginTop: 10,
+    marginBottom: 16,
+  },
+  tabBarItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  gridContainer: {
+    marginTop: 4,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  gridItem: {
+    width: (width - 48) / 3,
+    height: (width - 48) / 3,
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  gridImage: {
+    width: '100%',
+    height: '100%',
+  },
+  playOverlay: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  playOverlayText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
   },
   xpLabelRow: {
     flexDirection: 'row',
@@ -935,5 +1097,60 @@ const profStyles = StyleSheet.create({
     color: '#fff',
     fontSize: 9,
     fontWeight: '900',
+  },
+  findFriendsModalCard: {
+    width: '100%',
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingBottom: 16,
+    maxHeight: '80%',
+  },
+  searchBarBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  searchBarInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 13,
+  },
+  friendResultCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  friendResultAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+  },
+  friendResultName: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  friendResultMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  chatWithFriendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  chatWithFriendBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
   },
 });

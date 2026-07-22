@@ -13,13 +13,20 @@ import {
     Eye,
     ArrowLeft,
     Backpack,
+    Share2,
 } from "lucide-react-native";
+import ShareLocationModal from '../components/ShareLocationModal';
 
 const DiaDiemDetails = ({
     theme,
+    isDarkMode,
     diaDiem,
     onBack,
+    ownerId,
+    currentUser,
+    onNavigateToTab,
 }) => {
+    const [shareModalVisible, setShareModalVisible] = React.useState(false);
     console.log("Dia diem Detail:");
     console.log(JSON.stringify(diaDiem, null, 2));
     if (!diaDiem) return null;
@@ -48,6 +55,16 @@ const DiaDiemDetails = ({
                 >
                     <ArrowLeft
                         size={22}
+                        color="#fff"
+                    />
+                </Pressable>
+
+                <Pressable
+                    onPress={() => setShareModalVisible(true)}
+                    style={styles.shareButton}
+                >
+                    <Share2
+                        size={20}
                         color="#fff"
                     />
                 </Pressable>
@@ -169,6 +186,24 @@ const DiaDiemDetails = ({
 
             </View>
 
+            <ShareLocationModal
+                visible={shareModalVisible}
+                onClose={() => setShareModalVisible(false)}
+                locationData={{
+                    name: diaDiem.ten,
+                    location: diaDiem.viTri,
+                    description: diaDiem.moTa,
+                    image: diaDiem.hinhAnh,
+                }}
+                ownerId={ownerId}
+                currentUser={currentUser}
+                onShareSuccess={() => {
+                    if (onNavigateToTab) onNavigateToTab('chat');
+                }}
+                theme={theme}
+                isDarkMode={isDarkMode}
+            />
+
         </ScrollView>
     )
 }
@@ -189,6 +224,18 @@ const styles = StyleSheet.create({
         height: 42,
         borderRadius: 21,
         backgroundColor: "rgba(0,0,0,0.35)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+
+    shareButton: {
+        position: "absolute",
+        top: 50,
+        right: 18,
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: "rgba(59, 130, 246, 0.85)",
         justifyContent: "center",
         alignItems: "center",
     },

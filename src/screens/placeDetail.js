@@ -177,6 +177,7 @@ export function PlaceDetailScreen({
   const [expandedSpotIndex, setExpandedSpotIndex] = useState(null);
   const [showAllTips, setShowAllTips] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [isFav, setIsFav] = useState(false);
 
   const getMatchedKey = (name) => {
     const lower = String(name || '').toLowerCase();
@@ -417,6 +418,18 @@ export function PlaceDetailScreen({
       <View style={styles.floatingHeader}>
         <Pressable style={styles.circleBtn} onPress={onBack}>
           <ChevronLeft size={20} color="#ffffff" />
+        </Pressable>
+        <Pressable
+          style={styles.circleBtn}
+          onPress={() => {
+            setIsFav((prev) => {
+              const next = !prev;
+              Alert.alert('Địa điểm yêu thích', next ? `Đã thêm "${displayTitle}" vào địa điểm yêu thích!` : `Đã bỏ yêu thích "${displayTitle}"!`);
+              return next;
+            });
+          }}
+        >
+          <Text style={{ fontSize: 16 }}>{isFav ? '❤️' : '🤍'}</Text>
         </Pressable>
       </View>
 

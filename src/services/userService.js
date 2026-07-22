@@ -17,7 +17,7 @@ export async function updateUser(identifier, profile) {
 
 export async function searchFriends(query, excludeFirebaseUid) {
   const response = await api.get('/users/search/friends', {
-    params: { q: query, exclude: excludeFirebaseUid || undefined, viewerId: excludeFirebaseUid || undefined },
+    params: { q: query, exclude: excludeFirebaseUid || undefined },
   });
   return response.data.data;
 }

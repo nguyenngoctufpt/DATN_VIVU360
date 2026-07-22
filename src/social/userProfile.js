@@ -71,8 +71,9 @@ const buildGenericProfile = ({ username, currentUser, isMe }) => {
   };
 };
 
-export function UserProfileModal({ username, visible, onClose, isDarkMode, theme, currentUser, onMessage }) {
+export function UserProfileModal({ username, visible, onClose, isDarkMode, theme, currentUser, onStartDirectChat }) {
   const [isFollowing, setIsFollowing] = useState(false);
+  const [followersCount, setFollowersCount] = useState(128);
 
   const rank = useMemo(() => {
     const isMe = !!(currentUser && username === currentUser.name);
@@ -83,6 +84,16 @@ export function UserProfileModal({ username, visible, onClose, isDarkMode, theme
     const isMe = !!(currentUser && username === currentUser.name);
     return buildGenericProfile({ username, currentUser, isMe });
   }, [username, currentUser]);
+
+  const handleToggleFollow = () => {
+    if (isFollowing) {
+      setIsFollowing(false);
+      setFollowersCount(prev => Math.max(0, prev - 1));
+    } else {
+      setIsFollowing(true);
+      setFollowersCount(prev => prev + 1);
+    }
+  };
 
   return (
     <Modal
@@ -124,15 +135,22 @@ export function UserProfileModal({ username, visible, onClose, isDarkMode, theme
               <View style={styles.actionRow}>
                 <Pressable
                   style={[styles.followBtn, isFollowing ? styles.followBtnActive : null]}
-                  onPress={() => setIsFollowing(!isFollowing)}
+                  onPress={handleToggleFollow}
                 >
                   <Text style={styles.followBtnText}>
-                    {isFollowing ? 'Đang Theo Dõi' : 'Theo Dõi'}
+                    {isFollowing ? '✓ Đang Theo Dõi' : '+ Theo Dõi'}
                   </Text>
                 </Pressable>
                 <Pressable
                   style={styles.msgBtn}
-                  onPress={() => onMessage ? onMessage() : Alert.alert('Trò chuyện', 'Không thể mở cuộc trò chuyện này.')}
+                  onPress={() => {
+                    if (username === currentUser?.name) {
+                      Alert.alert('Trò chuyện', 'Bạn không thể tự nhắn tin cho chính mình!');
+                      return;
+                    }
+                    onClose();
+                    onStartDirectChat && onStartDirectChat({ name: profile.name, avatar: profile.avatar });
+                  }}
                 >
                   <MessageCircle size={18} color="#fff" />
                 </Pressable>
@@ -159,7 +177,7 @@ export function UserProfileModal({ username, visible, onClose, isDarkMode, theme
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statBox}>
-                <Text style={[styles.statVal, { color: theme.textPrimary }]}>{profile.followers}</Text>
+                <Text style={[styles.statVal, { color: theme.textPrimary }]}>{followersCount}</Text>
                 <Text style={styles.statLabel}>Người theo dõi</Text>
               </View>
               <View style={styles.statDivider} />
