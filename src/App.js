@@ -20,7 +20,7 @@ import {
 } from './screens';
 import AllDiaDiem from './screens/AllDiaDiem';
 import DiaDiemDetails from './screens/DiaDiemDetails';
-import { MapScreen, VirtualTourScreen, ProvinceGalleryScreen, TicketDetailScreen, TicketListScreen } from './map';
+import { VietnamTravelWebScreen, VirtualTourScreen, ProvinceGalleryScreen } from './map';
 import { SocialScreen } from './social';
 import { ChatScreen } from './chat';
 import { EditProfileScreen, MembershipTiersScreen, TravelChallengesScreen } from './settings';
@@ -379,22 +379,23 @@ export default function App() {
         );
       case 'map':
         return (
-          <MapScreen
-            isDarkMode={isDarkMode}
-            setIsDarkMode={setIsDarkMode}
+          <VietnamTravelWebScreen
             theme={theme}
-            userInfo={userInfo}
+            isDarkMode={isDarkMode}
+            planSlug="ha-noi-nghe-an-ninh-binh-ha-long-ha-noi"
+            onBack={() => setActiveNav('social')}
             ownerId={dataOwnerId}
-            onCheckIn={handleCheckIn}
-            onNavigateToTour={(tourId, spotIdx) => {
-              setSelectedTourId(tourId);
-              setSelectedSpotIdx(spotIdx !== undefined ? spotIdx : 0);
+            currentUser={userInfo}
+            onOpenVR={(tourId) => {
+              setSelectedTourId(tourId || 1);
+              setSelectedSpotIdx(0);
               setActiveNav('virtualTour');
             }}
             onNavigateToProvince={(provName) => {
               setSelectedProvinceName(provName);
               setActiveNav('provinceGallery');
             }}
+            onNavigateToTab={(tab) => setActiveNav(tab)}
           />
         );
       case 'virtualTour':
@@ -556,7 +557,7 @@ export default function App() {
       )}
 
       {/* FLOATING BOTTOM NAV BAR */}
-      {activeNav !== 'editProfile' && activeNav !== 'membershipTiers' && activeNav !== 'travelChallenges' && activeNav !== 'virtualTour' && activeNav !== 'provinceGallery' && activeNav !== 'ticketDetail' && activeNav !== 'ticketList' && activeNav !== 'chat' && (
+      {activeNav !== 'editProfile' && activeNav !== 'membershipTiers' && activeNav !== 'travelChallenges' && activeNav !== 'virtualTour' && activeNav !== 'provinceGallery' && activeNav !== 'ticketDetail' && activeNav !== 'ticketList' && activeNav !== 'chat' && activeNav !== 'map' && (
         <Animated.View style={[
           styles.bottomNav, 
           { 

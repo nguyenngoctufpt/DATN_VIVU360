@@ -73,6 +73,9 @@ export function VietnamTravelWebScreen({ theme, isDarkMode, onBack, onOpenVR, on
     if (Platform.OS === 'web') {
       return typeof window !== 'undefined' ? window.location.hostname : 'localhost';
     }
+    // Android emulators connect to the host services through adb reverse.
+    // Using the LAN address here is unreliable with Genymotion host-only networking.
+    if (Platform.OS === 'android') return '127.0.0.1';
     let host = Constants.expoConfig?.hostUri;
     if (!host && Constants.manifest) {
       host = Constants.manifest.debuggerHost;
@@ -84,7 +87,7 @@ export function VietnamTravelWebScreen({ theme, isDarkMode, onBack, onOpenVR, on
       const ip = host.split(':')[0];
       if (ip && ip !== '127.0.0.1' && ip !== 'localhost') return ip;
     }
-    return '192.168.100.101';
+    return '127.0.0.1';
   }, []);
 
   const [currentHostIp, setCurrentHostIp] = useState(initialHostIp);
@@ -122,16 +125,16 @@ export function VietnamTravelWebScreen({ theme, isDarkMode, onBack, onOpenVR, on
 
     if (ipRetryCount === 0) {
       setIpRetryCount(1);
-      if (currentHostIp === '192.168.100.101') {
-        setCurrentHostIp('10.0.2.2');
-      } else if (currentHostIp === '10.0.2.2') {
-        setCurrentHostIp('localhost');
+      if (currentHostIp === '127.0.0.1') {
+        setCurrentHostIp('10.0.3.2');
+      } else if (currentHostIp === '10.0.3.2') {
+        setCurrentHostIp('192.168.56.1');
       } else {
-        setCurrentHostIp('192.168.100.101');
+        setCurrentHostIp('127.0.0.1');
       }
     } else if (ipRetryCount === 1) {
       setIpRetryCount(2);
-      setCurrentHostIp('localhost');
+      setCurrentHostIp('192.168.56.1');
     }
   };
 

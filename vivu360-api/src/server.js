@@ -1,4 +1,10 @@
-require("dotenv").config({ quiet: true });
+const fs = require("fs");
+const path = require("path");
+
+const localEnvPath = path.resolve(__dirname, "../../.env");
+const legacyEnvPath = path.resolve(__dirname, "../../../Vivu360_API/.env");
+const envPath = fs.existsSync(localEnvPath) ? localEnvPath : legacyEnvPath;
+require("dotenv").config({ path: envPath, quiet: true });
 
 const express = require("express");
 const cors = require("cors");
