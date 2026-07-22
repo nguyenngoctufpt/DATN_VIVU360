@@ -15,11 +15,11 @@ import {
   ArrowLeft, 
   Award, 
   Sparkles, 
-  CheckCircle2, 
+  CircleCheck, 
   ChevronRight,
   TrendingUp,
   Circle,
-  HelpCircle,
+  CircleHelp,
   Trophy,
   Navigation
 } from 'lucide-react-native';
@@ -266,7 +266,7 @@ export function TravelChallengesScreen({ theme, isDarkMode, userInfo, onBack, on
                   {isCompleted ? (
                     isClaimed ? (
                       <View style={styles.claimedBadge}>
-                        <CheckCircle2 size={13} color="#94a3b8" />
+                        <CircleCheck size={13} color="#94a3b8" />
                         <Text style={styles.claimedText}>ĐÃ NHẬN THƯỞNG</Text>
                       </View>
                     ) : (
@@ -311,7 +311,7 @@ export function TravelChallengesScreen({ theme, isDarkMode, userInfo, onBack, on
           })
         ) : (
           <View style={styles.emptyContainer}>
-            <HelpCircle size={44} color={theme.textMuted} />
+            <CircleHelp size={44} color={theme.textMuted} />
             <Text style={[styles.emptyText, { color: theme.textMuted }]}>
               Không có thử thách nào phù hợp bộ lọc.
             </Text>

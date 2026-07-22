@@ -108,6 +108,16 @@ const PROVINCE_IMAGES = {
   'Hải Phòng': [
     'https://images.unsplash.com/photo-1509060464153-4466739f78ad?auto=format&fit=crop&w=800&q=80',
     'https://images.unsplash.com/photo-1552084117-56a987666449?auto=format&fit=crop&w=800&q=80'
+  ],
+  'Ninh Bình': [
+    'https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1616394334641-8e0cb2f11f44?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80'
+  ],
+  'Nghệ An': [
+    'https://images.unsplash.com/photo-1605538032432-a9f0c8d9ba5e?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80'
   ]
 };
 
@@ -179,6 +189,18 @@ const PROVINCE_DETAILS = {
     attractions: ['Chùa Phật Tích', 'Đền Đô (Đền Lý Bát Đế)', 'Chùa Dâu & Chùa Bút Tháp', 'Làng tranh Đông Hồ'],
     specialties: ['Bánh phu thê Đình Bảng', 'Rượu làng Vân', 'Nem Bùi', 'Bánh đa kế'],
     bestTime: 'Tháng Giêng - tháng Ba âm lịch (Mùa lễ hội truyền thống Kinh Bắc).'
+  },
+  'Ninh Bình': {
+    description: 'Ninh Bình được mệnh danh là Vịnh Hạ Long trên cạn, sở hữu Quần thể danh thắng Tràng An - Di sản Văn hóa và Thiên nhiên thế giới, Cố đô Hoa Lư lịch sử và danh thắng Chùa Bái Đính nguy nga.',
+    attractions: ['Quần thể danh thắng Tràng An', 'Chùa Bái Đính cổ kính', 'Tuyệt Tình Cốc', 'Tam Cốc - Bích Động', 'Cố đô Hoa Lư'],
+    specialties: ['Cơm cháy Ninh Bình', 'Dê núi tái chanh', 'Rượu Kim Sơn', 'Nem Yên Mạc'],
+    bestTime: 'Tháng 1 - tháng 3 (Mùa xuân trẩy hội) hoặc tháng 5 - tháng 6 (Mùa lúa chín vàng Tam Cốc).'
+  },
+  'Nghệ An': {
+    description: 'Quê hương của Chủ tịch Hồ Chí Minh vĩ đại, Nghệ An thu hút du khách bởi khu di tích lịch sử Kim Liên ý nghĩa, bãi biển Cửa Lò lộng gió và vẻ đẹp hoang sơ của vườn quốc gia Pù Mát.',
+    attractions: ['Khu di tích Kim Liên', 'Bãi biển Cửa Lò', 'Đảo Chè Thanh Chương', 'Vườn quốc gia Pù Mát'],
+    specialties: ['Súp lươn Nghệ An', 'Cháo lươn xứ Nghệ', 'Nhút Thanh Chương', 'Kẹo cu đơ'],
+    bestTime: 'Tháng 4 - tháng 8 (Mùa du lịch biển Cửa Lò) hoặc tháng 11 - 12 (Mùa hoa hướng dương Nghĩa Đàn).'
   }
 };
 

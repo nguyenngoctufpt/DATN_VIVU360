@@ -27,18 +27,9 @@ export async function registerForPushNotificationsAsync() {
     return null;
   }
 
-  try {
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-    token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    console.log('Firebase/Expo Push Token:', token);
-  } catch (error) {
-    console.log('Không lấy được Push Token (Lưu ý: iOS simulator không hỗ trợ thông báo đẩy trực tiếp):', error.message);
-  }
-
-  return token;
+  return null;
 }
 
-// Hàm kích hoạt một thông báo cục bộ ngay lập tức (Local Notification)
 export async function sendLocalNotification(title, body, data = {}) {
   try {
     await Notifications.scheduleNotificationAsync({
@@ -46,8 +37,9 @@ export async function sendLocalNotification(title, body, data = {}) {
         title: title,
         body: body,
         data: data,
-        sound: true,
-        priority: Notifications.AndroidNotificationPriority.HIGH,
+        sound: 'default',
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        channelId: 'default',
       },
       trigger: null, // trigger = null nghĩa là gửi ngay lập tức
     });

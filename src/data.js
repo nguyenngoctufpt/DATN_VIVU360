@@ -27,7 +27,7 @@ export const allCategories = [
   { key: 'map', label: 'Bản đồ 360°', Icon: MapIcon, colors: ['#3b82f6', '#1d4ed8'] },
   { key: 'explore', label: 'Khám phá', Icon: Globe, colors: ['#10b981', '#047857'] },
   { key: 'social', label: 'Bảng tin', Icon: Newspaper, colors: ['#f59e0b', '#b45309'] },
-  { key: 'chat', label: 'Nhóm chat', Icon: MessageSquare, colors: ['#8b5cf6', '#6d28d9'] },
+  { key: 'chat', label: 'Nhóm du lịch', Icon: MessageSquare, colors: ['#8b5cf6', '#6d28d9'] },
   { key: 'camera', label: 'Quét AR', Icon: Scan, colors: ['#ef4444', '#b91c1c'] },
   { key: 'ticketList', label: 'Vé của tôi', Icon: Ticket, colors: ['#d946ef', '#a21caf'] },
   { key: 'profile', label: 'Cá nhân', Icon: User, colors: ['#0ea5e9', '#0369a1'] },

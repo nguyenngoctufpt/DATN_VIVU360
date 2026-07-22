@@ -15,6 +15,8 @@ import {
   ActivityIndicator,
   Platform
 } from 'react-native';
+import { WebView } from 'react-native-webview';
+import Constants from 'expo-constants';
 import {
   ArrowLeft,
   Info,
@@ -238,6 +240,75 @@ export function VirtualTourScreen({ theme, isDarkMode, tourId, startSpotIdx, onB
     
     return TOUR_DATA[1];
   }, [tourId]);
+
+  const hostIp = useMemo(() => {
+    if (Platform.OS === 'web') {
+      return typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    }
+    let host = Constants.expoConfig?.hostUri;
+    if (!host && Constants.manifest) {
+      host = Constants.manifest.debuggerHost;
+    }
+    if (!host && Constants.manifest2?.extra?.expoGo) {
+      host = Constants.manifest2.extra.expoGo.debuggerHost;
+    }
+    if (host) {
+      const ip = host.split(':')[0];
+      if (ip && ip !== '127.0.0.1' && ip !== 'localhost') return ip;
+    }
+    return Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+  }, []);
+
+  const webVrUrl = useMemo(() => {
+    const title = tour.title || 'Văn Miếu - Quốc Tử Giám';
+    return `http://${hostIp}:3005?view=vr&tourId=${encodeURIComponent(title)}&isApp=1`;
+  }, [hostIp, tour.title]);
+
+  const [useWebVrEngine, setUseWebVrEngine] = useState(true);
+
+  if (useWebVrEngine) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <WebView
+          source={{ uri: webVrUrl }}
+          style={{ flex: 1 }}
+          cacheEnabled={false}
+          incognito={true}
+          startInLoadingState={true}
+          renderLoading={() => (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#09090b', alignItems: 'center', justifyContent: 'center' }]}>
+              <ActivityIndicator size="large" color="#3b82f6" />
+              <Text style={{ color: '#fff', marginTop: 12, fontSize: 12, fontWeight: '700' }}>Đang khởi tạo không gian 360° VR...</Text>
+            </View>
+          )}
+          onError={() => setUseWebVrEngine(false)}
+        />
+        {/* Floating Back Button */}
+        <Pressable
+          onPress={onBack}
+          style={{
+            position: 'absolute',
+            top: 40,
+            left: 16,
+            zIndex: 999,
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.2)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#000',
+            shadowRadius: 6,
+            elevation: 5
+          }}
+        >
+          <ArrowLeft size={20} color="#fff" />
+        </Pressable>
+      </View>
+    );
+  }
 
   const [activeSpotIdx, setActiveSpotIdx] = useState(startSpotIdx !== undefined ? startSpotIdx : 0);
 

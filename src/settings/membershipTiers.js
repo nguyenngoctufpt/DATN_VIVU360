@@ -17,7 +17,7 @@ import {
   ArrowLeft, 
   Award, 
   Sparkles, 
-  CheckCircle2, 
+  CircleCheck, 
   Shield, 
   Flame, 
   Compass, 
@@ -454,7 +454,7 @@ export function MembershipTiersScreen({ theme, isDarkMode, userInfo, onBack }) {
 
           <View style={styles.earnList}>
             <View style={styles.earnItem}>
-              <CheckCircle2 size={13} color="#10b981" style={{ marginTop: 2 }} />
+              <CircleCheck size={13} color="#10b981" style={{ marginTop: 2 }} />
               <View style={{ flex: 1, marginLeft: 8 }}>
                 <Text style={[styles.earnItemTitle, { color: theme.textPrimary }]}>Đặt Tour ảo 360° VR thành công</Text>
                 <Text style={[styles.earnItemPoints, { color: '#10b981' }]}>+500 XP mỗi lượt đặt</Text>
@@ -462,7 +462,7 @@ export function MembershipTiersScreen({ theme, isDarkMode, userInfo, onBack }) {
             </View>
 
             <View style={styles.earnItem}>
-              <CheckCircle2 size={13} color="#10b981" style={{ marginTop: 2 }} />
+              <CircleCheck size={13} color="#10b981" style={{ marginTop: 2 }} />
               <View style={{ flex: 1, marginLeft: 8 }}>
                 <Text style={[styles.earnItemTitle, { color: theme.textPrimary }]}>Khám phá 1 địa điểm ảo mới</Text>
                 <Text style={[styles.earnItemPoints, { color: '#10b981' }]}>+100 XP mỗi địa điểm</Text>
@@ -470,7 +470,7 @@ export function MembershipTiersScreen({ theme, isDarkMode, userInfo, onBack }) {
             </View>
 
             <View style={styles.earnItem}>
-              <CheckCircle2 size={13} color="#10b981" style={{ marginTop: 2 }} />
+              <CircleCheck size={13} color="#10b981" style={{ marginTop: 2 }} />
               <View style={{ flex: 1, marginLeft: 8 }}>
                 <Text style={[styles.earnItemTitle, { color: theme.textPrimary }]}>Đăng nhật ký chuyến đi trên Bảng tin</Text>
                 <Text style={[styles.earnItemPoints, { color: '#10b981' }]}>+50 XP mỗi bài chia sẻ</Text>
@@ -478,7 +478,7 @@ export function MembershipTiersScreen({ theme, isDarkMode, userInfo, onBack }) {
             </View>
 
             <View style={styles.earnItem}>
-              <CheckCircle2 size={13} color="#10b981" style={{ marginTop: 2 }} />
+              <CircleCheck size={13} color="#10b981" style={{ marginTop: 2 }} />
               <View style={{ flex: 1, marginLeft: 8 }}>
                 <Text style={[styles.earnItemTitle, { color: theme.textPrimary }]}>Tham gia nhóm chat du lịch cộng đồng</Text>
                 <Text style={[styles.earnItemPoints, { color: '#10b981' }]}>+10 XP mỗi tin nhắn có ích</Text>

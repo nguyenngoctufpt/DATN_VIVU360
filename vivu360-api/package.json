@@ -1,0 +1,21 @@
+{
+  "name": "vivu360-api",
+  "version": "2.0.0",
+  "private": true,
+  "description": "MongoDB API for the Vivu360 mobile application",
+  "main": "app.js",
+  "scripts": {
+    "start": "node --use-system-ca app.js",
+    "dev": "nodemon --exec \"node --use-system-ca\" app.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongoose": "^9.7.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

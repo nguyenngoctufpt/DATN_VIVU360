@@ -17,7 +17,7 @@ import {
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, User, Mail, Phone, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react-native';
+import { ChevronLeft, User, Mail, Phone, Lock, Eye, EyeOff, CircleCheck } from 'lucide-react-native';
 import { auth } from './firebaseConfig';
 import { createUserWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
 import { sendLocalNotification } from './notificationHelper';
@@ -37,16 +37,19 @@ export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSucce
 
   const handleRegister = () => {
     if (!name.trim() || !email.trim() || !password.trim()) {
+      Alert.alert('Lỗi ⚠️', 'Vui lòng nhập đầy đủ các thông tin đăng ký.');
       sendLocalNotification('Lỗi ⚠️', 'Vui lòng nhập đầy đủ các thông tin đăng ký.');
       return;
     }
     
-    if (password !== confirmPassword) {
+    if (password.trim() !== confirmPassword.trim()) {
+      Alert.alert('Lỗi ⚠️', 'Mật khẩu xác nhận không khớp.');
       sendLocalNotification('Lỗi ⚠️', 'Mật khẩu xác nhận không khớp.');
       return;
     }
 
     if (!agreeTerms) {
+      Alert.alert('Lỗi ⚠️', 'Vui lòng đồng ý với Điều khoản dịch vụ của Vivu360.');
       sendLocalNotification('Lỗi ⚠️', 'Vui lòng đồng ý với Điều khoản dịch vụ của Vivu360.');
       return;
     }
@@ -63,6 +66,7 @@ export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSucce
           signOut(auth)
             .then(() => {
               setIsLoading(false);
+              Alert.alert('Đăng ký thành công! 🎉', `Chào mừng ${name.trim()} trở thành hội viên Vivu360. Vui lòng đăng nhập lại.`);
               sendLocalNotification(
                 'Đăng ký thành công! 🎉',
                 `Chào mừng ${name.trim()} trở thành hội viên Vivu360.`
@@ -84,6 +88,7 @@ export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSucce
           signOut(auth)
             .then(() => {
               setIsLoading(false);
+              Alert.alert('Đăng ký thành công! 🎉', `Chào mừng ${name.trim()} trở thành hội viên Vivu360. Vui lòng đăng nhập lại.`);
               sendLocalNotification(
                 'Đăng ký thành công! 🎉',
                 `Chào mừng ${name.trim()} trở thành hội viên Vivu360.`
@@ -102,6 +107,9 @@ export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSucce
       })
       .catch((error) => {
         setIsLoading(false);
+
+
+
         let errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
         if (error.code === 'auth/email-already-in-use') {
           errorMessage = 'Địa chỉ email này đã được đăng ký sử dụng.';
@@ -112,31 +120,32 @@ export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSucce
         } else {
           errorMessage = error.message;
         }
+        Alert.alert('Lỗi đăng ký ⚠️', errorMessage);
         sendLocalNotification('Lỗi đăng ký ⚠️', errorMessage);
       });
   };
 
   const getBorderColor = (fieldName) => {
-    if (focusedField === fieldName) return '#bef264';
+    if (focusedField === fieldName) return '#3b82f6';
     return theme.border;
   };
 
   const getIconColor = (fieldName) => {
-    if (focusedField === fieldName) return '#bef264';
+    if (focusedField === fieldName) return '#3b82f6';
     return theme.textMuted;
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: isDarkMode ? '#000000' : theme.background }]}>
       {/* Travel Background Image */}
       <Image
         source={{ uri: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1000&q=80' }}
-        style={StyleSheet.absoluteFillObject}
+        style={[StyleSheet.absoluteFillObject, isDarkMode && { opacity: 0.18 }]}
         resizeMode="cover"
       />
       {/* Gradient Overlay (Sunset Violet & Purple Tinted) */}
       <LinearGradient
-        colors={isDarkMode ? ['rgba(88, 28, 135, 0.45)', 'rgba(15, 10, 28, 0.96)'] : ['rgba(243, 232, 255, 0.45)', 'rgba(243, 232, 255, 0.98)']}
+        colors={isDarkMode ? ['rgba(15, 23, 42, 0.65)', 'rgba(0, 0, 0, 0.98)'] : ['rgba(243, 232, 255, 0.45)', 'rgba(243, 232, 255, 0.98)']}
         style={StyleSheet.absoluteFillObject}
       />
 
@@ -145,11 +154,11 @@ export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSucce
         style={styles.container}
       >
         {/* Header Back Button (Transparent/Glass style) */}
-        <View style={[styles.header, { backgroundColor: isDarkMode ? 'rgba(23, 15, 38, 0.85)' : 'rgba(243, 232, 255, 0.85)', borderBottomColor: isDarkMode ? 'rgba(168, 85, 247, 0.15)' : 'rgba(168, 85, 247, 0.08)' }]}>
+        <View style={[styles.header, { backgroundColor: isDarkMode ? 'rgba(24, 24, 27, 0.85)' : 'rgba(243, 232, 255, 0.85)', borderBottomColor: isDarkMode ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.08)' }]}>
           <TouchableOpacity
             style={[
               styles.backBtn,
-              { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: isDarkMode ? 'rgba(168, 85, 247, 0.2)' : 'rgba(168, 85, 247, 0.1)' },
+              { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)' },
             ]}
             onPress={() => {
               if (onBackPress) {
@@ -168,11 +177,11 @@ export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSucce
         <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.innerContent}>
             {/* Form Credentials Section (Glassmorphic Violet/Purple) */}
-            <View style={[styles.glassCard, { backgroundColor: isDarkMode ? 'rgba(23, 15, 38, 0.72)' : 'rgba(255, 255, 255, 0.78)', borderColor: isDarkMode ? 'rgba(168, 85, 247, 0.22)' : 'rgba(168, 85, 247, 0.12)' }]}>
+            <View style={[styles.glassCard, { backgroundColor: isDarkMode ? 'rgba(24, 24, 27, 0.45)' : 'rgba(255, 255, 255, 0.78)', borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.22)' : 'rgba(59, 130, 246, 0.12)' }]}>
               {/* Greeting */}
               <Text style={[styles.welcomeText, { color: theme.textPrimary }]}>Trở thành Hội Viên Vivu360</Text>
               <Text style={[styles.subWelcomeText, { color: theme.textSecondary }]}>
-                Khởi hành chuyến phiêu lưu du ngoạn 3D, tích lũy điểm và khám phá danh lam thắng cảnh ngay hôm nay
+                Khởi hành chuyến phiêu lưu du ngoạn VR 360°, tích lũy điểm và khám phá danh lam thắng cảnh ngay hôm nay
               </Text>
 
             {/* Name Input */}
@@ -294,8 +303,8 @@ export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSucce
 
             {/* Terms of Service Checkbox Toggle */}
             <Pressable style={styles.termsRow} onPress={() => setAgreeTerms(!agreeTerms)}>
-              <View style={[styles.checkbox, { borderColor: isDarkMode ? 'rgba(168, 85, 247, 0.3)' : theme.border }]}>
-                {agreeTerms && <View style={[styles.checkboxInner, { backgroundColor: '#bef264' }]} />}
+              <View style={[styles.checkbox, { borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.3)' : theme.border }]}>
+                {agreeTerms && <View style={[styles.checkboxInner, { backgroundColor: '#3b82f6' }]} />}
               </View>
               <Text style={[styles.termsText, { color: theme.textSecondary }]}>
                 Tôi đồng ý với các <Text style={styles.linkAccent}>Điều khoản sử dụng</Text> và{' '}
@@ -306,13 +315,13 @@ export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSucce
             {/* Register Action Button */}
             <Pressable style={styles.registerBtn} onPress={handleRegister} disabled={isLoading}>
               <LinearGradient
-                colors={['#d4fc34', '#bef264']}
+                colors={['#3b82f6', '#06b6d4']}
                 style={styles.registerGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
                 {isLoading ? (
-                  <ActivityIndicator size="small" color="#0f172a" />
+                  <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
                   <Text style={styles.registerBtnText}>Đăng ký tài khoản</Text>
                 )}
@@ -448,7 +457,7 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#bef264',
+    shadowColor: '#3b82f6',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
@@ -460,7 +469,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   registerBtnText: {
-    color: '#0f172a',
+    color: '#ffffff',
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.3,
@@ -478,7 +487,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   loginLinkText: {
-    color: '#bef264',
+    color: '#3b82f6',
     fontSize: 12,
     fontWeight: '800',
   },
