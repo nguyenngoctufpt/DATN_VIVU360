@@ -28,11 +28,16 @@ export async function registerForPushNotificationsAsync() {
   }
 
   try {
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-    token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    console.log('Firebase/Expo Push Token:', token);
+    const projectId = 
+      Constants.expoConfig?.extra?.eas?.projectId ?? 
+      Constants.easConfig?.projectId ?? 
+      Constants.expoConfig?.projectId;
+
+    if (projectId && projectId !== 'vivu360-project-id') {
+      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    }
   } catch (error) {
-    console.log('Không lấy được Push Token (Lưu ý: iOS simulator không hỗ trợ thông báo đẩy trực tiếp):', error.message);
+    // Gracefully handle dev environment push token initialization
   }
 
   return token;

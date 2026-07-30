@@ -17,3 +17,9 @@ node_modules/
 
 # local env files
 .env*.local
+
+# Local build verification and databases
+.expo-*-check/
+travel.db
+travel.db-shm
+travel.db-wal

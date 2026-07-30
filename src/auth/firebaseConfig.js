@@ -14,17 +14,23 @@ const firebaseConfig = {
   measurementId: "G-BJVQM6FYQN"
 };
 
-// Khởi tạo Firebase App (Tránh lỗi duplicate app khi Hot Reload)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+// Khởi tạo Firebase App & Auth với AsyncStorage persistence
+const isNewApp = getApps().length === 0;
+const app = isNewApp ? initializeApp(firebaseConfig) : getApp();
 
-// Khởi tạo Firebase Auth (Tránh lỗi auth/already-initialized khi Hot Reload)
 let auth;
-if (getApps().length === 0) {
+if (isNewApp) {
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage)
   });
 } else {
-  auth = getAuth(app);
+  try {
+    auth = getAuth(app);
+  } catch (e) {
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage)
+    });
+  }
 }
 
 export { auth };
