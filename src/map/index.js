@@ -1,4 +1,4 @@
-export { MapScreen } from './map';
+export { VietnamTravelWebScreen as MapScreen } from './vietnamTravelWeb';
 export { VirtualTourScreen } from './virtualTour';
 export { ProvinceGalleryScreen } from './provinceGallery';
 export { TicketDetailScreen } from './ticketDetail';

@@ -384,6 +384,7 @@ export default function App() {
             setIsDarkMode={setIsDarkMode}
             theme={theme}
             userInfo={userInfo}
+            currentUser={userInfo}
             ownerId={dataOwnerId}
             onCheckIn={handleCheckIn}
             onNavigateToTour={(tourId, spotIdx) => {
@@ -394,6 +395,10 @@ export default function App() {
             onNavigateToProvince={(provName) => {
               setSelectedProvinceName(provName);
               setActiveNav('provinceGallery');
+            }}
+            onNavigateToTab={(tab, groupId) => {
+              if (tab === 'chat' && groupId) setDirectChatGroupId(groupId);
+              setActiveNav(tab);
             }}
           />
         );
