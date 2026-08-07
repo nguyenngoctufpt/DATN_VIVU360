@@ -39,6 +39,7 @@ import {
 } from 'lucide-react-native';
 
 import { UserProfileModal } from './userProfile';
+import { getSafeAvatarSource, getSafeImageSource, hasImageUri } from '../utils/image';
 
 const getUserRankColors = (name) => {
   const lvl = getUserLevelByName(name);
@@ -633,7 +634,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
               const isBusy = friendActionId === friend.firebaseUid;
               return (
               <View key={friend.firebaseUid} style={[styles.friendSearchItem, { borderTopColor: theme.border }]}>
-                <Image source={{ uri: friend.avatar || getUserAvatarByName(friend.name) }} style={styles.friendSearchAvatar} />
+                <Image source={getSafeAvatarSource(friend.avatar || getUserAvatarByName(friend.name))} style={styles.friendSearchAvatar} />
                 <Pressable style={{ flex: 1 }} onPress={() => handleOpenUserProfile(friend)}>
                   <Text style={[styles.friendSearchName, { color: theme.textPrimary }]}>{friend.name}</Text>
                   <Text style={[styles.friendSearchContact, { color: theme.textSecondary }]} numberOfLines={1}>
@@ -673,7 +674,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             {acceptedFriends.length > 0 ? acceptedFriends.map((friend) => (
               <Pressable key={friend.firebaseUid} style={styles.friendAvatarCheck} onPress={() => handleOpenUserProfile(friend)}>
                 <View style={styles.friendAvatarWrap}>
-                  <Image source={{ uri: friend.avatar || getUserAvatarByName(friend.name) }} style={styles.friendAvatarCircle} />
+                  <Image source={getSafeAvatarSource(friend.avatar || getUserAvatarByName(friend.name))} style={styles.friendAvatarCircle} />
                 </View>
                 <Text style={[styles.friendNameMin, { color: theme.textPrimary }]} numberOfLines={1}>{friend.name.split(' ')[1] || friend.name}</Text>
               </Pressable>
@@ -695,7 +696,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             >
               <View style={styles.triggerTopRow}>
                 <Image
-                  source={{ uri: currentUser.avatar }}
+                  source={getSafeAvatarSource(currentUser.avatar)}
                   style={styles.triggerAvatar}
                 />
                 <View style={[styles.triggerInputContainer, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
@@ -740,7 +741,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                 <View key={post.id} style={[styles.tripPostCard, { backgroundColor: theme.card, borderColor: theme.border, overflow: 'hidden' }]}>
                   {/* Large cover image pressable to open details */}
                   <Pressable style={styles.tripCoverPressable} onPress={() => handleOpenComments(post)}>
-                    <Image source={{ uri: post.image }} style={styles.tripCoverImage} />
+                    <Image source={getSafeImageSource(post.image)} style={styles.tripCoverImage} />
                     <LinearGradient
                       colors={['rgba(0,0,0,0.15)', 'transparent', 'rgba(0,0,0,0.85)']}
                       style={StyleSheet.absoluteFillObject}
@@ -781,7 +782,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                       {/* Companion avatars list */}
                       <View style={styles.avatarGroupContainer}>
                         {(post.companions || []).map((cAvatar, idx) => (
-                          <Image key={idx} source={{ uri: cAvatar }} style={[styles.tripCompanionAvatar, { marginLeft: idx > 0 ? -12 : 0 }]} />
+                          <Image key={idx} source={getSafeAvatarSource(cAvatar)} style={[styles.tripCompanionAvatar, { marginLeft: idx > 0 ? -12 : 0 }]} />
                         ))}
                       </View>
                       <Pressable style={styles.addCompanionMiniBtn} onPress={() => Alert.alert('Bạn đồng hành', 'Thêm bạn đồng hành chia sẻ nhật ký này!')}>
@@ -811,7 +812,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
 
                   {/* Excerpt author name */}
                   <View style={{ paddingHorizontal: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Image source={{ uri: post.user?.avatar || getUserAvatarByName(post.source) }} style={styles.authorAvatarMini} />
+                    <Image source={getSafeAvatarSource(post.user?.avatar || getUserAvatarByName(post.source))} style={styles.authorAvatarMini} />
                     <Text style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '600' }}>
                       Nhật ký của <Text style={{ color: theme.textPrimary, fontWeight: '700' }}>{post.user?.name || post.source}</Text> • {post.time}
                     </Text>
@@ -842,7 +843,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
               
               {/* Header Cover Photo */}
               <View style={styles.tripDetailCoverWrapper}>
-                <Image source={{ uri: selectedPost.image }} style={styles.tripDetailCoverImage} />
+                <Image source={getSafeImageSource(selectedPost.image)} style={styles.tripDetailCoverImage} />
                 <LinearGradient
                   colors={['rgba(0,0,0,0.4)', 'transparent', 'rgba(0,0,0,0.85)']}
                   style={StyleSheet.absoluteFillObject}
@@ -872,14 +873,14 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
               >
                 {/* Author Info */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 10, borderBottomWidth: 1, borderBottomColor: theme.border }}>
-                  <Image source={{ uri: selectedPost.user?.avatar || getUserAvatarByName(selectedPost.source) }} style={styles.postAvatar} />
+                  <Image source={getSafeAvatarSource(selectedPost.user?.avatar || getUserAvatarByName(selectedPost.source))} style={styles.postAvatar} />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.postUserName, { color: theme.textPrimary }]}>{selectedPost.user?.name || selectedPost.source}</Text>
                     <Text style={{ fontSize: 10.5, color: theme.textMuted }}>{selectedPost.time} • Tác giả ký sự</Text>
                   </View>
                   <View style={styles.tripDetailCompanionGroup}>
                     {(selectedPost.companions || []).map((cAv, idx) => (
-                      <Image key={idx} source={{ uri: cAv }} style={[styles.detailCompanionAvatarCircle, { marginLeft: idx > 0 ? -8 : 0 }]} />
+                      <Image key={idx} source={getSafeAvatarSource(cAv)} style={[styles.detailCompanionAvatarCircle, { marginLeft: idx > 0 ? -8 : 0 }]} />
                     ))}
                   </View>
                 </View>
@@ -894,8 +895,8 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                 {/* Photo Carousel (Scroll deck of secondary images like screen 3 in mockup) */}
                 <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textSecondary, marginLeft: 16, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Bộ ảnh hành trình</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10, marginBottom: 20 }}>
-                  {((selectedPost.images && selectedPost.images.length ? selectedPost.images : [selectedPost.image].filter(Boolean))).map((imgUrl, index) => (
-                    <Image key={index} source={{ uri: imgUrl }} style={styles.itineraryCarouselImage} />
+                  {((selectedPost.images && selectedPost.images.length ? selectedPost.images : [selectedPost.image].filter(hasImageUri))).map((imgUrl, index) => (
+                    <Image key={index} source={getSafeImageSource(imgUrl)} style={styles.itineraryCarouselImage} />
                   ))}
                 </ScrollView>
 
@@ -914,9 +915,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                       <View key={comment.id} style={{ flexDirection: 'row', gap: 10 }}>
                         <Pressable onPress={() => { setCommentModalVisible(false); handleOpenUserProfile(comment.user); }}>
                           <Image
-                            source={{
-                              uri: comment.user === currentUser.name ? currentUser.avatar : getUserAvatarByName(comment.user)
-                            }}
+                            source={getSafeAvatarSource(comment.user === currentUser.name ? currentUser.avatar : getUserAvatarByName(comment.user))}
                             style={styles.authorAvatarMini}
                           />
                         </Pressable>
@@ -980,7 +979,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
           <Pressable style={styles.menuDismissArea} onPress={() => setMenuVisible(false)} />
           <View style={[styles.sideMenu, { backgroundColor: theme.card, borderLeftColor: theme.border }]}>
             <View style={[styles.sideMenuHeader, { borderBottomColor: theme.border }]}>
-              <Image source={{ uri: currentUser.avatar }} style={styles.sideMenuAvatar} />
+              <Image source={getSafeAvatarSource(currentUser.avatar)} style={styles.sideMenuAvatar} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.sideMenuName, { color: theme.textPrimary }]} numberOfLines={1}>{currentUser.name}</Text>
                 <Text style={[styles.sideMenuEmail, { color: theme.textSecondary }]} numberOfLines={1}>{currentUser.email}</Text>
@@ -1072,7 +1071,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                     key={item._id}
                     style={[styles.notificationItem, { borderBottomColor: theme.border }]}
                   >
-                    <Image source={{ uri: item.friend?.avatar || getUserAvatarByName(item.friend?.name) }} style={styles.friendSearchAvatar} />
+                    <Image source={getSafeAvatarSource(item.friend?.avatar || getUserAvatarByName(item.friend?.name))} style={styles.friendSearchAvatar} />
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>{item.friend?.name || 'Một thành viên'}</Text>
                       <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>đã gửi cho bạn lời mời kết bạn.</Text>
@@ -1096,7 +1095,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                       const post = posts.find(postItem => postItem.id === item.postId);
                       if (post) { setNotificationVisible(false); handleOpenComments(post); }
                     }}>
-                    <Image source={{ uri: item.actor?.avatar || getUserAvatarByName(item.actor?.name) }} style={styles.friendSearchAvatar} />
+                    <Image source={getSafeAvatarSource(item.actor?.avatar || getUserAvatarByName(item.actor?.name))} style={styles.friendSearchAvatar} />
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>{item.actor?.name || 'Một thành viên'}</Text>
                       <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>
@@ -1175,7 +1174,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
           <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
             {/* User Identity info */}
             <View style={[styles.modalUserRow, { marginBottom: 20 }]}>
-              <Image source={{ uri: currentUser.avatar }} style={styles.postAvatar} />
+              <Image source={getSafeAvatarSource(currentUser.avatar)} style={styles.postAvatar} />
               <View>
                 <Text style={[styles.postUserName, { color: theme.textPrimary }]}>{currentUser.name}</Text>
                 <Text style={[styles.postTimeText, { color: theme.textMuted }]}>Người đóng góp tin bài</Text>
@@ -2274,3 +2273,20 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

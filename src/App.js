@@ -25,6 +25,9 @@ import { SocialScreen } from './social';
 import { ChatScreen } from './chat';
 import { EditProfileScreen, MembershipTiersScreen, TravelChallengesScreen } from './settings';
 import { LoginScreen, RegisterScreen } from './auth';
+import { AITripPlannerScreen } from './screens/ai/AITripPlannerScreen';
+import { AIItineraryPreviewScreen } from './screens/ai/AIItineraryPreviewScreen';
+import { ReplaceActivityScreen } from './screens/ai/ReplaceActivityScreen';
 import { auth } from './auth/firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import * as Notifications from 'expo-notifications';
@@ -52,6 +55,10 @@ export default function App() {
   const [activeNav, setActiveNav] = useState('social');
   const [prevNav, setPrevNav] = useState('social');
   const [directChatGroupId, setDirectChatGroupId] = useState(null);
+  const [mapGuideRequest, setMapGuideRequest] = useState(null);
+  const [aiPlannerContext, setAiPlannerContext] = useState(null);
+  const [aiPreviewContext, setAiPreviewContext] = useState(null);
+  const [replaceActivityContext, setReplaceActivityContext] = useState(null);
   const [ticketFlowSource, setTicketFlowSource] = useState('profile');
   const activeNavRef = React.useRef(activeNav);
 
@@ -314,6 +321,43 @@ export default function App() {
 
   const banner = banners[currentBanner];
 
+  const handleGlobalNavigation = (tab, payload) => {
+    if (tab === 'map' && payload?.placeName) {
+      setMapGuideRequest({ ...payload, requestId: payload.requestId || Date.now() });
+      setActiveNav('map');
+      return;
+    }
+
+    if (tab === 'chat' && payload) {
+      setDirectChatGroupId(payload || null);
+      setActiveNav('chat');
+      return;
+    }
+
+    if (tab === 'aiTripPlanner') {
+      setDirectChatGroupId(payload?.groupId || directChatGroupId || null);
+      setAiPlannerContext(payload || null);
+      setActiveNav('aiTripPlanner');
+      return;
+    }
+
+    if (tab === 'aiItineraryPreview') {
+      setDirectChatGroupId(payload?.groupId || directChatGroupId || null);
+      setAiPreviewContext(payload || null);
+      setActiveNav('aiItineraryPreview');
+      return;
+    }
+
+    if (tab === 'replaceActivity') {
+      setDirectChatGroupId(payload?.groupId || directChatGroupId || null);
+      setReplaceActivityContext(payload || null);
+      setActiveNav('replaceActivity');
+      return;
+    }
+
+    setActiveNav(tab);
+  };
+
   // Helper render active tab screen
   const renderScreenContent = () => {
     switch (activeNav) {
@@ -356,7 +400,51 @@ export default function App() {
       case 'social':
         return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab, groupId) => { if (tab === 'chat') setDirectChatGroupId(groupId || null); setActiveNav(tab); }} onLogout={handleLogout} />;
       case 'chat':
-        return <ChatScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab) => setActiveNav(tab)} prevScreen={prevNav} initialGroupId={directChatGroupId} />;
+        return <ChatScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={handleGlobalNavigation} prevScreen={['aiTripPlanner', 'aiItineraryPreview', 'replaceActivity'].includes(prevNav) ? 'social' : prevNav} initialGroupId={directChatGroupId} />;
+      case 'aiTripPlanner':
+        return (
+          <AITripPlannerScreen
+            theme={theme}
+            isDarkMode={isDarkMode}
+            ownerId={dataOwnerId}
+            currentUser={userInfo}
+            context={aiPlannerContext}
+            onBack={() => setActiveNav('chat')}
+            onNavigateToPreview={(payload) => {
+              setAiPreviewContext(payload);
+              setActiveNav('aiItineraryPreview');
+            }}
+          />
+        );
+      case 'aiItineraryPreview':
+        return (
+          <AIItineraryPreviewScreen
+            theme={theme}
+            isDarkMode={isDarkMode}
+            ownerId={dataOwnerId}
+            context={aiPreviewContext}
+            onBack={() => setActiveNav(aiPreviewContext?.origin === 'aiTripPlanner' ? 'aiTripPlanner' : 'chat')}
+            onOpenReplaceActivity={(payload) => {
+              setReplaceActivityContext(payload);
+              setActiveNav('replaceActivity');
+            }}
+            onNavigateToTab={handleGlobalNavigation}
+            onUpdateContext={(payload) => setAiPreviewContext(payload)}
+          />
+        );
+      case 'replaceActivity':
+        return (
+          <ReplaceActivityScreen
+            theme={theme}
+            ownerId={dataOwnerId}
+            context={replaceActivityContext}
+            onBack={() => setActiveNav('aiItineraryPreview')}
+            onCompleted={(payload) => {
+              setAiPreviewContext(payload);
+              setActiveNav('aiItineraryPreview');
+            }}
+          />
+        );
       case 'camera':
         return (
           <CameraScreen
@@ -387,6 +475,8 @@ export default function App() {
             currentUser={userInfo}
             ownerId={dataOwnerId}
             onCheckIn={handleCheckIn}
+            selectedPlaceRequest={mapGuideRequest}
+            onSelectedPlaceRequestHandled={(requestId) => { if (mapGuideRequest?.requestId === requestId) setMapGuideRequest(null); }}
             onNavigateToTour={(tourId, spotIdx) => {
               setSelectedTourId(tourId);
               setSelectedSpotIdx(spotIdx !== undefined ? spotIdx : 0);
@@ -547,7 +637,7 @@ export default function App() {
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      {activeNav === 'editProfile' || activeNav === 'membershipTiers' || activeNav === 'travelChallenges' || activeNav === 'virtualTour' || activeNav === 'provinceGallery' || activeNav === 'ticketDetail' || activeNav === 'ticketList' || activeNav === 'map' || activeNav === 'social' || activeNav === 'chat' ? (
+      {activeNav === 'editProfile' || activeNav === 'membershipTiers' || activeNav === 'travelChallenges' || activeNav === 'virtualTour' || activeNav === 'provinceGallery' || activeNav === 'ticketDetail' || activeNav === 'ticketList' || activeNav === 'map' || activeNav === 'social' || activeNav === 'chat' || activeNav === 'aiTripPlanner' || activeNav === 'aiItineraryPreview' || activeNav === 'replaceActivity' ? (
         renderScreenContent()
       ) : (
         <ScrollView
@@ -561,7 +651,7 @@ export default function App() {
       )}
 
       {/* FLOATING BOTTOM NAV BAR */}
-      {activeNav !== 'editProfile' && activeNav !== 'membershipTiers' && activeNav !== 'travelChallenges' && activeNav !== 'virtualTour' && activeNav !== 'provinceGallery' && activeNav !== 'ticketDetail' && activeNav !== 'ticketList' && activeNav !== 'chat' && (
+      {activeNav !== 'editProfile' && activeNav !== 'membershipTiers' && activeNav !== 'travelChallenges' && activeNav !== 'virtualTour' && activeNav !== 'provinceGallery' && activeNav !== 'ticketDetail' && activeNav !== 'ticketList' && activeNav !== 'chat' && activeNav !== 'aiTripPlanner' && activeNav !== 'aiItineraryPreview' && activeNav !== 'replaceActivity' && (
         <Animated.View style={[
           styles.bottomNav, 
           { 

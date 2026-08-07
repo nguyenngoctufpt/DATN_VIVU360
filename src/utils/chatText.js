@@ -1,3 +1,5 @@
+import { parseLocationShareMessage, stripLocationShareMetadata } from './sharedLocation';
+
 const SYSTEM_USER_ALIASES = new Set(['H\u1ec7 th\u1ed1ng', 'H? th?ng', 'He thong']);
 
 const KNOWN_REPLACEMENTS = [
@@ -15,7 +17,9 @@ const ACTION_PATTERNS = [
   /da cap nhat/i,
   /c.p nh.t/i,
   /\u0111\u00f3ng g\u00f3p/i,
+  /\bg\u00f3p\b/i,
   /dong gop/i,
+  /\bgop\b/i,
   /kho\u1ea3n chi/i,
   /khoan chi/i,
 ];
@@ -54,8 +58,8 @@ const extractAmountText = (value) => {
 const extractDates = (value) => applyKnownReplacements(value).match(/\d{1,2}\/\d{1,2}/g) || [];
 
 const normalizeDestinationName = (value) => {
-  const cleaned = applyKnownReplacements(value).replace(/[?.!:;,]+$/g, "").trim();
-  if (/^H\?+\s*Long$/i.test(cleaned) || /^Ha\s*Long$/i.test(cleaned)) return "H\u1ea1 Long";
+  const cleaned = applyKnownReplacements(value).replace(/[?.!:;,]+$/g, '').trim();
+  if (/^H\?+\s*Long$/i.test(cleaned) || /^Ha\s*Long$/i.test(cleaned)) return 'H\u1ea1 Long';
   return cleaned;
 };
 
@@ -83,7 +87,7 @@ const extractExpenseTitle = (value) => {
 
   for (const pattern of patterns) {
     const match = normalized.match(pattern);
-    if (match?.[1]) return normalizeSpaces(match[1]).replace(/[?.!:;,]+$/g, "").trim();
+    if (match?.[1]) return normalizeSpaces(match[1]).replace(/[?.!:;,]+$/g, '').trim();
   }
 
   return '';
@@ -98,7 +102,7 @@ const isItineraryAnnouncement = (value) =>
   hasAnyPattern(value, [/l\u1ecbch tr\u00ecnh/i, /lich trinh/i, /l.ch tr.nh/i]);
 
 const isContributionAnnouncement = (value) =>
-  hasAnyPattern(value, [/\u0111\u00f3ng g\u00f3p/i, /dong gop/i, /.?ng g?p/i]);
+  hasAnyPattern(value, [/\u0111\u00f3ng g\u00f3p/i, /\bg\u00f3p\b/i, /dong gop/i, /\bgop\b/i, /.?ng g?p/i]);
 
 const isExpenseAnnouncement = (value) =>
   hasAnyPattern(value, [/kho\u1ea3n chi/i, /khoan chi/i]);
@@ -136,7 +140,7 @@ export const normalizeSystemAnnouncementText = (value, fallbackActorName = 'Th\u
   }
 
   if (isContributionAnnouncement(normalized) && amountText) {
-    return `${actorName} \u0111\u00e3 \u0111\u00f3ng g\u00f3p ${amountText} v\u00e0o qu\u1ef9 nh\u00f3m.`;
+    return `${actorName} g\u00f3p ${amountText} cho qu\u1ef9.`;
   }
 
   if (isExpenseAnnouncement(normalized) && amountText) {
@@ -149,7 +153,12 @@ export const normalizeSystemAnnouncementText = (value, fallbackActorName = 'Th\u
 };
 
 export const normalizeGroupPreviewText = (value) => {
-  const normalized = applyKnownReplacements(value);
+  const sharedLocation = parseLocationShareMessage(value);
+  if (sharedLocation) {
+    return `Địa điểm đã chia sẻ: ${sharedLocation.placeName}`;
+  }
+
+  const normalized = applyKnownReplacements(stripLocationShareMetadata(value));
   if (!normalized) return '';
 
   const prefixedMatch = normalized.match(/^(H\u1ec7 th\u1ed1ng|H\? th\?ng|He thong)\s*:\s*(.+)$/i);

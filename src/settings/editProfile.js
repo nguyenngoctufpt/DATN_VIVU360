@@ -19,6 +19,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronLeft, Camera, Save, User, Mail, Phone, Sparkles, X, Award } from 'lucide-react-native';
 import { getRankDetails } from '../data';
+import { getSafeAvatarSource } from '../utils/image';
 
 const { width } = Dimensions.get('window');
 
@@ -123,7 +124,7 @@ export function EditProfileScreen({ theme, isDarkMode, onBack, onSave, currentUs
               end={{ x: 1, y: 1 }}
             >
               <View style={[styles.avatarInnerContainer, { backgroundColor: theme.background }]}>
-                <Image source={{ uri: avatar }} style={styles.avatarImage} />
+                <Image source={getSafeAvatarSource(avatar)} style={styles.avatarImage} />
               </View>
             </LinearGradient>
             
@@ -154,7 +155,7 @@ export function EditProfileScreen({ theme, isDarkMode, onBack, onSave, currentUs
                     },
                   ]}
                 >
-                  <Image source={{ uri: url }} style={styles.presetThumb} />
+                  <Image source={getSafeAvatarSource(url)} style={styles.presetThumb} />
                 </Pressable>
               ))}
             </View>
@@ -495,3 +496,6 @@ const styles = StyleSheet.create({
   submitGradient: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   submitText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 });
+
+
+

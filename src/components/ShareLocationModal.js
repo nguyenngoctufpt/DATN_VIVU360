@@ -13,11 +13,31 @@ import {
 } from 'react-native';
 import { Send, X, Search, Users, MapPin, CheckCircle2 } from 'lucide-react-native';
 import { getChatGroups, sendChatMessage } from '../services/chatService';
+import { getSafeAvatarSource } from '../utils/image';
+import { buildLocationShareMessage, normalizeLocationShareData } from '../utils/sharedLocation';
 
 const MOCK_GROUPS = [
-  { id: 'group_1', _id: 'group_1', name: 'Nhóm Du Lịch Việt Nam 🇻🇳', memberProfiles: [1, 2, 3, 4, 5], avatar: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=100&q=80' },
-  { id: 'group_2', _id: 'group_2', name: 'Hội Săn Mây Đà Lạt ☁️', memberProfiles: [1, 2, 3], avatar: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=100&q=80' },
-  { id: 'group_3', _id: 'group_3', name: 'Khám Phá Vịnh Hạ Long 🚢', memberProfiles: [1, 2, 3, 4], avatar: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=100&q=80' },
+  {
+    id: 'group_1',
+    _id: 'group_1',
+    name: 'Nhóm Du lịch Việt Nam',
+    memberProfiles: [1, 2, 3, 4, 5],
+    avatar: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=100&q=80',
+  },
+  {
+    id: 'group_2',
+    _id: 'group_2',
+    name: 'Hội Săn Mây Đà Lạt',
+    memberProfiles: [1, 2, 3],
+    avatar: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=100&q=80',
+  },
+  {
+    id: 'group_3',
+    _id: 'group_3',
+    name: 'Khám phá Vịnh Hạ Long',
+    memberProfiles: [1, 2, 3, 4],
+    avatar: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=100&q=80',
+  },
 ];
 
 export default function ShareLocationModal({
@@ -37,59 +57,53 @@ export default function ShareLocationModal({
   const [sentGroupIds, setSentGroupIds] = useState(new Set());
 
   useEffect(() => {
-    if (visible) {
-      setLoading(true);
-      if (ownerId) {
-        getChatGroups(ownerId)
-          .then((apiGroups) => {
-            if (Array.isArray(apiGroups) && apiGroups.length > 0) {
-              setGroups(apiGroups);
-            } else {
-              setGroups(MOCK_GROUPS);
-            }
-          })
-          .catch((err) => {
-            console.warn('Lỗi lấy danh sách nhóm:', err.message);
+    if (!visible) return;
+
+    setLoading(true);
+    if (ownerId) {
+      getChatGroups(ownerId)
+        .then((apiGroups) => {
+          if (Array.isArray(apiGroups) && apiGroups.length > 0) {
+            setGroups(apiGroups);
+          } else {
             setGroups(MOCK_GROUPS);
-          })
-          .finally(() => setLoading(false));
-      } else {
-        setGroups(MOCK_GROUPS);
-        setLoading(false);
-      }
+          }
+        })
+        .catch((error) => {
+          console.warn('Lỗi lấy danh sách nhóm:', error.message);
+          setGroups(MOCK_GROUPS);
+        })
+        .finally(() => setLoading(false));
+    } else {
+      setGroups(MOCK_GROUPS);
+      setLoading(false);
     }
   }, [visible, ownerId]);
 
   if (!visible) return null;
 
-  const filteredGroups = groups.filter((g) =>
-    (g.name || '').toLowerCase().includes(searchText.trim().toLowerCase())
+  const normalizedLocation = normalizeLocationShareData(locationData);
+  const filteredGroups = groups.filter((group) =>
+    (group.name || '').toLowerCase().includes(searchText.trim().toLowerCase())
   );
 
   const handleShareToGroup = async (group) => {
     if (!group || sendingGroupId) return;
 
-    const locName = locationData?.name || locationData?.ten || 'Địa điểm du lịch';
-    const locAddress = locationData?.location || locationData?.viTri || locationData?.address || 'Việt Nam';
-    const locDesc = locationData?.description || locationData?.moTa || 'Khám phá vĩ tuyến và danh thắng tuyệt đẹp cùng Vivu360!';
-    const mapsLink = locationData?.mapsLink || '';
-
-    const mapsLine = mapsLink ? `\n🗺️ Xem trên Google Maps: ${mapsLink}` : '';
-    const shareContent = `📍 [CHIA SẺ VỊ TRÍ BẢN ĐỒ VIVU360]\n🚩 ${locName}\n📌 Vị trí: ${locAddress}\n📝 ${locDesc.slice(0, 120)}${locDesc.length > 120 ? '...' : ''}${mapsLine}\n🌐 Mở ứng dụng Vivu360 để xem bản đồ du lịch 3D!`;
-
-    const targetGId = group._id || group.id;
-    setSendingGroupId(targetGId);
+    const shareContent = buildLocationShareMessage(locationData);
+    const targetGroupId = group._id || group.id;
+    setSendingGroupId(targetGroupId);
 
     const finishShare = () => {
-      setSentGroupIds((prev) => new Set([...prev, targetGId]));
+      setSentGroupIds((prev) => new Set([...prev, targetGroupId]));
       Alert.alert(
-        'Chia sẻ thành công! 🎉',
-        `Đã chia sẻ vị trí "${locName}" vào nhóm "${group.name}".`,
+        'Chia sẻ thành công',
+        `Đã chia sẻ địa điểm "${normalizedLocation.placeName}" vào nhóm "${group.name}".`,
         [
           {
-            text: '💬 Đến nhóm Chat',
+            text: 'Đến nhóm chat',
             onPress: () => {
-              if (onShareSuccess) onShareSuccess(targetGId);
+              if (onShareSuccess) onShareSuccess(targetGroupId);
             },
           },
           {
@@ -106,7 +120,7 @@ export default function ShareLocationModal({
         await sendChatMessage(group._id, ownerId, shareContent);
       }
       finishShare();
-    } catch (error) {
+    } catch (_error) {
       finishShare();
     } finally {
       setSendingGroupId(null);
@@ -123,8 +137,6 @@ export default function ShareLocationModal({
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={[styles.modalCard, { backgroundColor: isDarkMode ? '#1e1b2e' : '#ffffff', borderColor: isDarkMode ? '#332d4a' : '#e2e8f0' }]}>
-          
-          {/* Modal Header */}
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>
               <Send size={20} color="#3b82f6" />
@@ -135,27 +147,25 @@ export default function ShareLocationModal({
             </Pressable>
           </View>
 
-          {/* Location Preview Card */}
-          {locationData && (
+          {locationData ? (
             <View style={[styles.locPreview, { backgroundColor: isDarkMode ? '#28233d' : '#f8fafc', borderColor: isDarkMode ? '#3b3356' : '#e2e8f0' }]}>
               <MapPin size={18} color="#0ea5e9" />
               <View style={{ flex: 1, marginLeft: 8 }}>
                 <Text style={[styles.locName, { color: isDarkMode ? '#f8fafc' : '#1e293b' }]} numberOfLines={1}>
-                  {locationData.name || locationData.ten}
+                  {normalizedLocation.placeName}
                 </Text>
                 <Text style={[styles.locAddr, { color: isDarkMode ? '#94a3b8' : '#64748b' }]} numberOfLines={1}>
-                  {locationData.location || locationData.viTri || locationData.address || 'Việt Nam'}
+                  {normalizedLocation.address}
                 </Text>
-                {locationData.mapsLink ? (
+                {normalizedLocation.mapsLink ? (
                   <Text style={[styles.locMapsLink, { color: '#0ea5e9' }]} numberOfLines={1}>
-                    🗺️ {locationData.mapsLink}
+                    Google Maps: {normalizedLocation.mapsLink}
                   </Text>
                 ) : null}
               </View>
             </View>
-          )}
+          ) : null}
 
-          {/* Search Bar */}
           <View style={[styles.searchBox, { backgroundColor: isDarkMode ? '#28233d' : '#f1f5f9', borderColor: isDarkMode ? '#3b3356' : '#cbd5e1' }]}>
             <Search size={16} color={isDarkMode ? '#94a3b8' : '#64748b'} />
             <TextInput
@@ -172,7 +182,6 @@ export default function ShareLocationModal({
             ) : null}
           </View>
 
-          {/* Groups List */}
           {loading ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="small" color="#3b82f6" />
@@ -188,13 +197,13 @@ export default function ShareLocationModal({
           ) : (
             <ScrollView style={styles.groupList} showsVerticalScrollIndicator={false}>
               {filteredGroups.map((group) => {
-                const gId = group._id || group.id;
-                const isSent = sentGroupIds.has(gId);
-                const isSending = sendingGroupId === gId;
+                const groupId = group._id || group.id;
+                const isSent = sentGroupIds.has(groupId);
+                const isSending = sendingGroupId === groupId;
 
                 return (
                   <Pressable
-                    key={gId}
+                    key={groupId}
                     style={({ pressed }) => [
                       styles.groupItem,
                       {
@@ -208,7 +217,7 @@ export default function ShareLocationModal({
                     disabled={isSending}
                   >
                     <Image
-                      source={{ uri: group.avatar || group.image || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=100&q=80' }}
+                      source={getSafeAvatarSource(group.avatar || group.image, 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=100&q=80')}
                       style={styles.groupAvatar}
                     />
                     <View style={styles.groupInfo}>
@@ -238,7 +247,6 @@ export default function ShareLocationModal({
               })}
             </ScrollView>
           )}
-
         </View>
       </View>
     </Modal>

@@ -28,6 +28,7 @@ import {
   X
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getSafeImageSource } from '../utils/image';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -401,7 +402,7 @@ export function MembershipTiersScreen({ theme, isDarkMode, userInfo, onBack }) {
                   { backgroundColor: theme.card, borderColor: theme.border }
                 ]}
               >
-                <Image source={{ uri: partner.image }} style={styles.partnerLogo} />
+                <Image source={getSafeImageSource(partner.image)} style={styles.partnerLogo} />
                 <View style={styles.partnerInfo}>
                   <Text style={[styles.partnerName, { color: theme.textPrimary }]}>{partner.name}</Text>
                   <Text style={[styles.partnerDesc, { color: theme.textMuted }]}>{partner.desc}</Text>
@@ -1238,3 +1239,5 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 });
+
+

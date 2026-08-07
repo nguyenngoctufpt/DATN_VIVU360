@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Asset } from 'expo-asset';
 import {
   View,
   Text,
@@ -16,11 +17,13 @@ import {
   Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import { loadAppData, saveAppData } from '../services/appDataService';
 import { searchFriends } from '../services/userService';
 import { addChatMembers, createChatGroup, getChatGroups, getChatMessages, getGroupNotifications, removeChatMember, renameChatGroup, sendChatMessage, updateChatGroupWorkspace } from '../services/chatService';
-import { fetchGoogleWeatherForecast } from '../services/googleWeatherService';
 import { isSystemChatEntry, looksLikeSystemAnnouncement, normalizeGroupPreviewText, normalizeSystemAnnouncementText } from '../utils/chatText';
+import { getSafeAvatarSource, getSafeImageSource } from '../utils/image';
+import { parseLocationShareMessage, stripLocationShareMetadata } from '../utils/sharedLocation';
 import {
   X,
   Plus,
@@ -42,14 +45,13 @@ import {
   ShieldCheck,
   UserPlus,
   Trash2,
+  ImagePlus,
   Route,
-  CloudSun,
   Coins,
   ArrowLeftRight,
   Search,
   MapPinned,
   LogOut,
-  RefreshCw,
 } from 'lucide-react-native';
 
 import { UserProfileModal } from '../social';
@@ -76,6 +78,37 @@ const WORKSPACE_TABS = [
   { key: 'chat', label: 'Chat', Icon: MessageCircle },
   { key: 'planner', label: 'Lịch trình', Icon: CalendarDays },
   { key: 'fund', label: 'Quỹ du lịch', Icon: Wallet },
+];
+
+const CONTRIBUTION_PROOF_SAMPLES = [
+  {
+    id: 'sample-1',
+    label: 'Mẫu 1',
+    fileName: 'proof-mau-1.jpg',
+    mimeType: 'image/jpeg',
+    source: require('../../assets/proof-samples/proof-mau-1.jpg'),
+  },
+  {
+    id: 'sample-2',
+    label: 'Mẫu 2',
+    fileName: 'proof-mau-2.jpg',
+    mimeType: 'image/jpeg',
+    source: require('../../assets/proof-samples/proof-mau-2.jpg'),
+  },
+  {
+    id: 'sample-3',
+    label: 'Mẫu 3',
+    fileName: 'proof-mau-3.jpg',
+    mimeType: 'image/jpeg',
+    source: require('../../assets/proof-samples/proof-mau-3.jpg'),
+  },
+  {
+    id: 'sample-4',
+    label: 'Mẫu 4',
+    fileName: 'proof-mau-4.jpg',
+    mimeType: 'image/jpeg',
+    source: require('../../assets/proof-samples/proof-mau-4.jpg'),
+  },
 ];
 
 const TRAVEL_DESTINATIONS = [
@@ -360,28 +393,6 @@ const getInclusiveDayCount = (startDate, endDate) => {
   return Math.floor(diff / (24 * 60 * 60 * 1000)) + 1;
 };
 
-const buildDateList = (startDate, endDate) => {
-  const start = parseIsoDate(startDate);
-  const end = parseIsoDate(endDate);
-  if (!start || !end || end < start) return [];
-
-  const dates = [];
-  const cursor = new Date(start);
-
-  while (cursor <= end) {
-    dates.push(formatDateToIso(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  return dates;
-};
-
-const formatShortDate = (isoDate) => {
-  const date = parseIsoDate(isoDate);
-  if (!date) return isoDate || '--';
-  return `${padNumber(date.getDate())}/${padNumber(date.getMonth() + 1)}`;
-};
-
 const normalizeText = (value) =>
   String(value || '')
     .normalize('NFD')
@@ -456,147 +467,6 @@ const scoreDestinationMatch = (group, destination) => {
 const getSortedDestinations = (group) =>
   [...TRAVEL_DESTINATIONS].sort((left, right) => scoreDestinationMatch(group, right) - scoreDestinationMatch(group, left));
 
-const getWeatherBucket = (weatherType) => {
-  const normalizedType = String(weatherType || '').toUpperCase();
-
-  if (normalizedType.includes('RAIN') || normalizedType.includes('SHOWER') || normalizedType.includes('THUNDER')) {
-    return 'rainy';
-  }
-
-  if (normalizedType.includes('CLOUD')) {
-    return 'cloudy';
-  }
-
-  return 'sunny';
-};
-
-const buildGoogleMapsDirectionsUrl = (destinationQuery) =>
-  `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationQuery)}`;
-
-const buildGoogleWeatherUrl = (destination) =>
-  `https://www.google.com/search?q=${encodeURIComponent(`thời tiết ${destination.name} ${destination.region}`)}`;
-
-const getClimatePattern = (climateKey) => {
-  switch (climateKey) {
-    case 'mountain':
-      return [
-        { weatherType: 'PARTLY_CLOUDY', iconText: '⛅', description: 'Mây gián đoạn, trời mát', minTemp: 17, maxTemp: 24, humidity: 78, rainChance: 24, uvIndex: 5, windKph: 9 },
-        { weatherType: 'SCATTERED_SHOWERS', iconText: '🌦️', description: 'Có mưa rải rác vào chiều', minTemp: 16, maxTemp: 22, humidity: 84, rainChance: 58, uvIndex: 4, windKph: 11 },
-        { weatherType: 'MOSTLY_CLEAR', iconText: '🌤️', description: 'Trời quang khá đẹp', minTemp: 18, maxTemp: 25, humidity: 73, rainChance: 15, uvIndex: 6, windKph: 8 },
-      ];
-    case 'heritage':
-      return [
-        { weatherType: 'PARTLY_CLOUDY', iconText: '⛅', description: 'Nắng nhẹ, dễ đi bộ', minTemp: 26, maxTemp: 33, humidity: 70, rainChance: 18, uvIndex: 7, windKph: 12 },
-        { weatherType: 'LIGHT_RAIN_SHOWERS', iconText: '🌦️', description: 'Mưa ngắn trong ngày', minTemp: 25, maxTemp: 31, humidity: 82, rainChance: 49, uvIndex: 5, windKph: 10 },
-        { weatherType: 'CLOUDY', iconText: '☁️', description: 'Trời nhiều mây, mát hơn', minTemp: 25, maxTemp: 30, humidity: 75, rainChance: 26, uvIndex: 4, windKph: 9 },
-      ];
-    case 'island':
-      return [
-        { weatherType: 'CLEAR', iconText: '☀️', description: 'Nắng đẹp, biển êm', minTemp: 27, maxTemp: 33, humidity: 74, rainChance: 12, uvIndex: 8, windKph: 16 },
-        { weatherType: 'PARTLY_CLOUDY', iconText: '🌤️', description: 'Nắng xen mây, khá dễ chịu', minTemp: 27, maxTemp: 32, humidity: 76, rainChance: 20, uvIndex: 7, windKph: 14 },
-        { weatherType: 'RAIN_SHOWERS', iconText: '🌧️', description: 'Mưa rào cục bộ ven biển', minTemp: 26, maxTemp: 30, humidity: 85, rainChance: 62, uvIndex: 4, windKph: 18 },
-      ];
-    case 'highland':
-      return [
-        { weatherType: 'MOSTLY_CLOUDY', iconText: '🌥️', description: 'Mây dày, trời se lạnh', minTemp: 18, maxTemp: 25, humidity: 79, rainChance: 28, uvIndex: 5, windKph: 10 },
-        { weatherType: 'LIGHT_RAIN_SHOWERS', iconText: '🌦️', description: 'Chiều có thể có mưa nhẹ', minTemp: 17, maxTemp: 23, humidity: 86, rainChance: 54, uvIndex: 4, windKph: 9 },
-        { weatherType: 'MOSTLY_CLEAR', iconText: '🌤️', description: 'Sáng khô ráo, chiều dịu mát', minTemp: 18, maxTemp: 26, humidity: 72, rainChance: 16, uvIndex: 6, windKph: 8 },
-      ];
-    case 'coastal':
-    default:
-      return [
-        { weatherType: 'CLEAR', iconText: '☀️', description: 'Nắng đẹp, thuận tiện di chuyển', minTemp: 27, maxTemp: 33, humidity: 69, rainChance: 14, uvIndex: 8, windKph: 15 },
-        { weatherType: 'PARTLY_CLOUDY', iconText: '⛅', description: 'Nắng gián đoạn, khá thoáng', minTemp: 26, maxTemp: 31, humidity: 71, rainChance: 22, uvIndex: 6, windKph: 13 },
-        { weatherType: 'SCATTERED_SHOWERS', iconText: '🌦️', description: 'Có mưa rải rác vào chiều', minTemp: 26, maxTemp: 30, humidity: 82, rainChance: 57, uvIndex: 4, windKph: 12 },
-      ];
-  }
-};
-
-const buildFallbackForecast = (destination, dateList) => {
-  const pattern = getClimatePattern(destination.climateKey);
-
-  return dateList.map((date, index) => ({
-    date,
-    ...pattern[index % pattern.length],
-  }));
-};
-
-const buildPackingList = (destination, forecastItem) => {
-  const packingList = [...destination.packingCore];
-  const weatherBucket = getWeatherBucket(forecastItem?.weatherType);
-
-  if (weatherBucket === 'rainy') {
-    packingList.push(...destination.packingRainy);
-  } else {
-    packingList.push(...destination.packingSunny);
-  }
-
-  if ((forecastItem?.maxTemp || 0) >= 32) {
-    packingList.push('nước điện giải', 'khăn thấm mồ hôi');
-  }
-
-  if ((forecastItem?.minTemp || 99) <= 19) {
-    packingList.push('áo khoác giữ ấm');
-  }
-
-  return Array.from(new Set(packingList));
-};
-
-const buildItinerarySuggestion = ({ destination, startDate, endDate, forecast, source }) => {
-  const dateList = buildDateList(startDate, endDate);
-  const normalizedForecast = dateList.map((date, index) => forecast[index] || buildFallbackForecast(destination, [date])[0]);
-
-  const days = dateList.map((date, index) => {
-    const forecastItem = normalizedForecast[index];
-    const weatherBucket = getWeatherBucket(forecastItem?.weatherType);
-    const bucketActivities = destination.activities[weatherBucket] || destination.activities.sunny;
-    const morning = bucketActivities[index % bucketActivities.length];
-    const afternoon = bucketActivities[(index + 1) % bucketActivities.length];
-    const evening = destination.activities.evening[index % destination.activities.evening.length];
-    const mapStop = destination.mapStops[index % destination.mapStops.length];
-
-    return {
-      id: `${destination.id}-${date}-${index}`,
-      date,
-      label: `Ngày ${index + 1}`,
-      weather: forecastItem,
-      routeLabel: mapStop,
-      mapUrl: buildGoogleMapsDirectionsUrl(mapStop),
-      packing: buildPackingList(destination, forecastItem).slice(0, 8),
-      note:
-        weatherBucket === 'rainy'
-          ? 'Dự báo có mưa, nên ưu tiên quãng đường ngắn và thêm đồ chống nước.'
-          : weatherBucket === 'cloudy'
-            ? 'Trời nhiều mây, thích hợp đi bộ tham quan và chụp ảnh cả ngày.'
-            : 'Thời tiết đẹp, có thể ưu tiên hoạt động ngoài trời và điểm mở.',
-      slots: [
-        { title: 'Buổi sáng', text: morning },
-        { title: 'Buổi chiều', text: afternoon },
-        { title: 'Buổi tối', text: evening },
-      ],
-    };
-  });
-
-  return {
-    destinationId: destination.id,
-    destinationName: destination.name,
-    region: destination.region,
-    destinationImage: destination.image,
-    startDate,
-    endDate,
-    daysCount: dateList.length,
-    forecastSource: source,
-    generatedAt: Date.now(),
-    weatherUrl: buildGoogleWeatherUrl(destination),
-    destinationMapUrl: buildGoogleMapsDirectionsUrl(`${destination.name}, ${destination.region}`),
-    highlights: destination.highlights,
-    summary: destination.intro,
-    packingList: Array.from(new Set(days.flatMap((day) => day.packing))).slice(0, 12),
-    forecast: normalizedForecast,
-    days,
-  };
-};
-
 const normalizeFund = (fund) => ({
   goal: parseMoneyInput(fund?.goal),
   contributions: Array.isArray(fund?.contributions) ? fund.contributions : [],
@@ -610,6 +480,8 @@ const normalizeItinerary = (itinerary, fallbackDestinationId) => {
   const inferredDays = getInclusiveDayCount(startDate, endDate) || clampTripDays(itinerary?.daysCount || 3) || 3;
 
   return {
+    source: itinerary?.source || '',
+    tripId: itinerary?.tripId || '',
     destinationId: itinerary?.destinationId || fallbackDestinationId,
     destinationName: itinerary?.destinationName || '',
     region: itinerary?.region || '',
@@ -623,6 +495,12 @@ const normalizeItinerary = (itinerary, fallbackDestinationId) => {
     destinationMapUrl: itinerary?.destinationMapUrl || '',
     highlights: Array.isArray(itinerary?.highlights) ? itinerary.highlights : [],
     summary: itinerary?.summary || '',
+    estimatedTotalCost: Number(itinerary?.estimatedTotalCost || 0),
+    warnings: Array.isArray(itinerary?.warnings) ? itinerary.warnings : [],
+    recommendations: Array.isArray(itinerary?.recommendations) ? itinerary.recommendations : [],
+    aiItinerary: itinerary?.aiItinerary && typeof itinerary.aiItinerary === 'object' ? itinerary.aiItinerary : null,
+    input: itinerary?.input && typeof itinerary.input === 'object' ? itinerary.input : null,
+    savedAt: itinerary?.savedAt || null,
     packingList: Array.isArray(itinerary?.packingList) ? itinerary.packingList : [],
     forecast: Array.isArray(itinerary?.forecast) ? itinerary.forecast : [],
     days: Array.isArray(itinerary?.days) ? itinerary.days : [],
@@ -916,26 +794,31 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
 
-  const [planDaysInput, setPlanDaysInput] = useState('3');
-  const [planStartDate, setPlanStartDate] = useState(getTodayIso());
-  const [planEndDate, setPlanEndDate] = useState(shiftIsoDate(getTodayIso(), 2));
-  const [selectedDestinationId, setSelectedDestinationId] = useState(TRAVEL_DESTINATIONS[0].id);
-  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
-  const [planStatusMessage, setPlanStatusMessage] = useState('');
-
   const [fundGoalInput, setFundGoalInput] = useState('');
   const [selectedFundMemberId, setSelectedFundMemberId] = useState(getCurrentUserMemberId(currentUser, ownerId));
   const [fundContributionInput, setFundContributionInput] = useState('');
   const [fundContributionNote, setFundContributionNote] = useState('');
+  const [fundContributionProof, setFundContributionProof] = useState('');
+  const [fundContributionProofFile, setFundContributionProofFile] = useState(null);
   const [fundExpenseTitle, setFundExpenseTitle] = useState('');
   const [fundExpenseInput, setFundExpenseInput] = useState('');
 
   const messageStreamRef = useRef(null);
   const currentUserId = getCurrentUserMemberId(currentUser, ownerId);
   const currentUserMember = selectedGroup?.membersList.find((member) => member.id === currentUserId) || createMember({ id: currentUserId, name: currentUser?.name, avatar: currentUser?.avatar, email: currentUser?.email });
+  const itinerary = selectedGroup?.itinerary || null;
   const sortedDestinations = getSortedDestinations(selectedGroup || {});
-  const activeDestination = sortedDestinations.find((destination) => destination.id === selectedDestinationId) || sortedDestinations[0] || TRAVEL_DESTINATIONS[0];
+  const activeDestinationId = itinerary?.destinationId || sortedDestinations[0]?.id || TRAVEL_DESTINATIONS[0].id;
+  const activeDestination = sortedDestinations.find((destination) => destination.id === activeDestinationId) || sortedDestinations[0] || TRAVEL_DESTINATIONS[0];
   const fundTotals = getFundTotals(selectedGroup?.fund);
+
+  useEffect(() => {
+    if (chatModalVisible) return;
+    setFundContributionInput('');
+    setFundContributionNote('');
+    setFundContributionProof('');
+    setFundContributionProofFile(null);
+  }, [chatModalVisible]);
 
   useEffect(() => {
     if (!ownerId) return undefined;
@@ -1054,17 +937,12 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   useEffect(() => {
     if (!selectedGroup) return;
 
-    const itinerary = selectedGroup.itinerary || normalizeItinerary({}, activeDestination.id);
-    const inferredDays = getInclusiveDayCount(itinerary.startDate, itinerary.endDate) || itinerary.daysCount || 3;
+    const fallbackDestination = getSortedDestinations(selectedGroup)[0] || TRAVEL_DESTINATIONS[0];
+    const itinerary = selectedGroup.itinerary || normalizeItinerary({}, fallbackDestination.id);
 
     setRenameGroupName(selectedGroup.name);
-    setPlanDaysInput(String(inferredDays));
-    setPlanStartDate(itinerary.startDate || getTodayIso());
-    setPlanEndDate(itinerary.endDate || shiftIsoDate(getTodayIso(), 2));
-    setSelectedDestinationId(itinerary.destinationId || (getSortedDestinations(selectedGroup)[0] || TRAVEL_DESTINATIONS[0]).id);
     setFundGoalInput(selectedGroup.fund?.goal ? String(selectedGroup.fund.goal) : '');
     setSelectedFundMemberId(currentUserId);
-    setPlanStatusMessage('');
     setMemberSearchText('');
     setMemberSearchResults([]);
     setMemberSearchError('');
@@ -1206,6 +1084,58 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const handleOpenUserProfile = (username) => {
     setTargetUsername(username);
     setProfileModalVisible(true);
+  };
+
+  const handleOpenSharedLocation = (sharedLocation) => {
+    if (!sharedLocation?.placeName) return;
+
+    setChatModalVisible(false);
+    if (onNavigateToTab) {
+      onNavigateToTab('map', {
+        requestId: Date.now(),
+        placeName: sharedLocation.placeName,
+        address: sharedLocation.address,
+        mapsLink: sharedLocation.mapsLink,
+        openGuide: sharedLocation.openGuide !== false,
+      });
+      return;
+    }
+
+    if (sharedLocation.mapsLink) {
+      Linking.openURL(sharedLocation.mapsLink).catch(() => {
+        Alert.alert('Không thể mở liên kết', 'Vui lòng thử lại sau.');
+      });
+    }
+  };
+
+  const renderSharedLocationCard = (sharedLocation, isMe = false) => {
+    const cardBackground = isMe
+      ? 'rgba(255,255,255,0.16)'
+      : (isDarkMode ? 'rgba(15, 23, 42, 0.72)' : '#f8fafc');
+    const cardBorder = isMe ? 'rgba(255,255,255,0.18)' : (isDarkMode ? 'rgba(148, 163, 184, 0.18)' : '#dbeafe');
+    const titleColor = isMe ? '#ffffff' : theme.textPrimary;
+    const bodyColor = isMe ? 'rgba(255,255,255,0.88)' : theme.textSecondary;
+    const ctaColor = isMe ? '#ffffff' : '#2563eb';
+
+    return (
+      <Pressable
+        onPress={() => handleOpenSharedLocation(sharedLocation)}
+        style={[styles.sharedLocationCard, { backgroundColor: cardBackground, borderColor: cardBorder }]}
+      >
+        <View style={styles.sharedLocationHeader}>
+          <MapPinned size={15} color={isMe ? '#bfdbfe' : '#2563eb'} />
+          <Text style={[styles.sharedLocationBadge, { color: isMe ? '#dbeafe' : '#2563eb' }]}>Địa điểm được chia sẻ</Text>
+        </View>
+        <Text style={[styles.sharedLocationTitle, { color: titleColor }]}>{sharedLocation.placeName}</Text>
+        <Text style={[styles.sharedLocationMeta, { color: bodyColor }]}>{sharedLocation.address || 'Việt Nam'}</Text>
+        {!!sharedLocation.description && (
+          <Text style={[styles.sharedLocationDescription, { color: bodyColor }]} numberOfLines={3}>
+            {sharedLocation.description}
+          </Text>
+        )}
+        <Text style={[styles.sharedLocationCta, { color: ctaColor }]}>Mở bản đồ và cẩm nang</Text>
+      </Pressable>
+    );
   };
 
   const handleRenameGroup = async () => {
@@ -1389,7 +1319,14 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     if (!selectedGroup) return;
 
     const amount = parseMoneyInput(fundContributionInput);
-    if (!amount) return;
+    if (!amount) {
+      Alert.alert('Thiếu số tiền', 'Vui lòng nhập số tiền đóng góp hợp lệ.');
+      return;
+    }
+    if (!fundContributionProofFile) {
+      Alert.alert('Thiếu ảnh minh chứng', 'Bạn cần chọn ảnh chuyển khoản hoặc biên nhận từ điện thoại trước khi lưu.');
+      return;
+    }
 
     const contributor = selectedGroup.membersList.find((member) => member.id === selectedFundMemberId) || currentUserMember;
     const contribution = {
@@ -1404,14 +1341,94 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     try {
       const { group: updatedGroup, notification } = await updateChatGroupWorkspace(selectedGroup.id, ownerId, {
         contribution,
-        announcement: `${contributor.name} \u0111\u00e3 \u0111\u00f3ng g\u00f3p ${formatMoney(amount)} v\u00e0o qu\u1ef9 nh\u00f3m.`,
-      });
+        announcement: `${contributor.name} g\u00f3p ${formatMoney(amount)} cho qu\u1ef9.`,
+      }, { proofImageFile: fundContributionProofFile });
 
       applyWorkspaceUpdate(selectedGroup.id, updatedGroup, notification);
       setFundContributionInput('');
       setFundContributionNote('');
+      setFundContributionProof('');
+      setFundContributionProofFile(null);
     } catch (error) {
       Alert.alert('Kh\u00f4ng th\u1ec3 th\u00eam \u0111\u00f3ng g\u00f3p', error.response?.data?.message || 'Vui l\u00f2ng th\u1eed l\u1ea1i.');
+    }
+  };
+
+  const setContributionProofFromUri = (uri, fileName, mimeType = 'image/jpeg') => {
+    if (!uri) return;
+    setFundContributionProof(uri);
+    setFundContributionProofFile({
+      uri,
+      name: fileName,
+      type: mimeType,
+    });
+  };
+
+  const handlePickContributionProofFromLibrary = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Cần quyền truy cập', 'Vui lòng cho phép ứng dụng truy cập thư viện ảnh.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.65,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType || 'image/jpeg';
+    const extension = (mimeType.split('/')[1] || 'jpg').replace(/[^a-z0-9]/gi, '') || 'jpg';
+    const proofFileName = asset.fileName || `proof-${Date.now()}.${extension}`;
+    if (asset.fileSize && asset.fileSize > 2 * 1024 * 1024) {
+      Alert.alert('Ảnh quá lớn', 'Vui lòng chọn ảnh bằng chứng nhỏ hơn 2 MB.');
+      return;
+    }
+    setContributionProofFromUri(asset.uri, proofFileName, mimeType);
+  };
+
+  const handleCaptureContributionProof = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Cần quyền camera', 'Vui lòng cho phép ứng dụng dùng camera để chụp ảnh bằng chứng.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      quality: 0.65,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType || 'image/jpeg';
+    const extension = (mimeType.split('/')[1] || 'jpg').replace(/[^a-z0-9]/gi, '') || 'jpg';
+    const proofFileName = asset.fileName || `proof-camera-${Date.now()}.${extension}`;
+    setContributionProofFromUri(asset.uri, proofFileName, mimeType);
+  };
+
+  const handlePickContributionProof = () => {
+    Alert.alert(
+      'Chọn ảnh bằng chứng',
+      'Bạn có thể chọn từ thư viện, chụp ảnh mới, hoặc dùng ảnh mẫu trong app.',
+      [
+        { text: 'Thư viện ảnh', onPress: handlePickContributionProofFromLibrary },
+        { text: 'Chụp ảnh', onPress: handleCaptureContributionProof },
+        { text: 'Hủy', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handlePickContributionProofSample = async (sample) => {
+    try {
+      const asset = Asset.fromModule(sample.source);
+      await asset.downloadAsync();
+      const sampleUri = asset.localUri || asset.uri;
+      setContributionProofFromUri(sampleUri, sample.fileName, sample.mimeType);
+    } catch (error) {
+      Alert.alert('Không thể mở ảnh mẫu', 'Vui lòng thử lại.');
     }
   };
 
@@ -1443,79 +1460,6 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     }
   };
 
-  const handleGenerateItinerary = async () => {
-    if (!selectedGroup || !activeDestination) return;
-
-    const parsedDays = clampTripDays(planDaysInput);
-    const startDate = parseIsoDate(planStartDate) ? planStartDate : getTodayIso();
-    const endDateCandidate = parseIsoDate(planEndDate) ? planEndDate : shiftIsoDate(startDate, Math.max(parsedDays, 1) - 1);
-    let daysCount = parsedDays || getInclusiveDayCount(startDate, endDateCandidate);
-    let endDate = endDateCandidate;
-
-    if (!daysCount) daysCount = 3;
-
-    const inclusiveCount = getInclusiveDayCount(startDate, endDate);
-    if (!inclusiveCount || inclusiveCount !== daysCount) {
-      endDate = shiftIsoDate(startDate, daysCount - 1);
-    } else {
-      daysCount = inclusiveCount;
-    }
-
-    if (getInclusiveDayCount(startDate, endDate) <= 0) {
-      Alert.alert('Ng\u00e0y ch\u01b0a h\u1ee3p l\u1ec7', 'Ng\u00e0y k\u1ebft th\u00fac c\u1ea7n c\u00f9ng ng\u00e0y ho\u1eb7c sau ng\u00e0y b\u1eaft \u0111\u1ea7u.');
-      return;
-    }
-
-    setIsGeneratingPlan(true);
-    setPlanStatusMessage('');
-
-    try {
-      let forecastSource = 'Google Weather API';
-      let forecast = [];
-
-      try {
-        forecast = await fetchGoogleWeatherForecast({
-          latitude: activeDestination.coordinates.latitude,
-          longitude: activeDestination.coordinates.longitude,
-          days: daysCount,
-          languageCode: 'vi',
-        });
-      } catch (error) {
-        forecastSource = 'D\u1ef1 ph\u00f2ng n\u1ed9i b\u1ed9';
-        forecast = buildFallbackForecast(activeDestination, buildDateList(startDate, endDate));
-        setPlanStatusMessage(
-          error.message === 'MISSING_GOOGLE_WEATHER_API_KEY'
-            ? 'Ch\u01b0a c\u00f3 EXPO_PUBLIC_GOOGLE_WEATHER_API_KEY n\u00ean l\u1ecbch tr\u00ecnh \u0111ang d\u00f9ng d\u1ef1 b\u00e1o d\u1ef1 ph\u00f2ng. N\u00fat Google b\u00ean d\u01b0\u1edbi v\u1eabn m\u1edf th\u1eddi ti\u1ebft th\u1ef1c t\u1ebf.'
-            : 'Kh\u00f4ng l\u1ea5y \u0111\u01b0\u1ee3c Google Weather API \u1edf l\u1ea7n n\u00e0y, m\u00ecnh \u0111\u00e3 t\u1ea1o l\u1ecbch tr\u00ecnh b\u1eb1ng d\u1ef1 b\u00e1o d\u1ef1 ph\u00f2ng \u0111\u1ec3 b\u1ea1n ti\u1ebfp t\u1ee5c thao t\u00e1c.'
-        );
-      }
-
-      const itinerary = buildItinerarySuggestion({
-        destination: activeDestination,
-        startDate,
-        endDate,
-        forecast,
-        source: forecastSource,
-      });
-      const destinationName = itinerary.destinationName || activeDestination.name;
-      const { group: updatedGroup, notification } = await updateChatGroupWorkspace(selectedGroup.id, ownerId, {
-        itinerary,
-        announcement: `${currentUserMember.name} \u0111\u00e3 c\u1eadp nh\u1eadt l\u1ecbch tr\u00ecnh ${destinationName} t\u1eeb ${formatShortDate(itinerary.startDate)} \u0111\u1ebfn ${formatShortDate(itinerary.endDate)}.`,
-      });
-
-      applyWorkspaceUpdate(selectedGroup.id, updatedGroup, notification);
-      setPlanDaysInput(String(itinerary.daysCount));
-      setPlanStartDate(itinerary.startDate);
-      setPlanEndDate(itinerary.endDate);
-      setWorkspaceTab('planner');
-    } catch (error) {
-      Alert.alert('Kh\u00f4ng th\u1ec3 c\u1eadp nh\u1eadt l\u1ecbch tr\u00ecnh', error.response?.data?.message || 'Vui l\u00f2ng th\u1eed l\u1ea1i.');
-    } finally {
-      setIsGeneratingPlan(false);
-    }
-  };
-
-  const itinerary = selectedGroup?.itinerary || null;
   const currentRole = selectedGroup ? getMemberRole(selectedGroup, currentUserId) : 'member';
 
   return (
@@ -1551,7 +1495,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
               style={[styles.groupCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
               onPress={() => handleOpenChat(group)}
             >
-              <Image source={{ uri: group.image }} style={styles.groupCoverImage} />
+              <Image source={getSafeImageSource(group.image)} style={styles.groupCoverImage} />
               <View style={styles.groupCardInfo}>
                 <View style={styles.groupTitleRow}>
                   <Text numberOfLines={1} style={[styles.groupCardName, { color: theme.textPrimary }]}>{group.name}</Text>
@@ -1644,7 +1588,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                   <X size={18} color={theme.textPrimary} />
                 </Pressable>
                 <View style={styles.chatHeaderAvatarWrapper}>
-                  <Image source={{ uri: selectedGroup.image }} style={styles.chatHeaderAvatar} />
+                  <Image source={getSafeImageSource(selectedGroup.image)} style={styles.chatHeaderAvatar} />
                   <View style={styles.statusActiveDot} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
@@ -1712,13 +1656,15 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
                       const isMe = String(message.senderId) === String(ownerId);
                       const messageTime = getFormattedMsgTime(message.createdAt || message.id);
+                      const sharedLocation = parseLocationShareMessage(message.text);
+                      const displayMessageText = stripLocationShareMetadata(message.text);
 
                       return (
                         <View key={message.id} style={[styles.msgWrapper, isMe ? styles.msgWrapperMe : null]}>
                           {isMe ? (
                             <View style={{ alignItems: 'flex-end' }}>
                               <LinearGradient colors={['#06b6d4', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.msgBubble, styles.msgBubbleMe]}>
-                                <Text style={styles.msgTextMe}>{message.text}</Text>
+                                {sharedLocation ? renderSharedLocationCard(sharedLocation, true) : <Text style={styles.msgTextMe}>{displayMessageText}</Text>}
                               </LinearGradient>
                               <View style={styles.msgMetaMe}>
                                 <Text style={[styles.msgTimeTextMe, { color: theme.textMuted }]}>{messageTime}</Text>
@@ -1728,7 +1674,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                           ) : (
                             <View style={styles.otherMsgRow}>
                               <Pressable onPress={() => { setChatModalVisible(false); handleOpenUserProfile(message.user); }}>
-                                <Image source={{ uri: message.avatar || getUserAvatarByName(message.user) }} style={styles.otherMsgAvatar} />
+                                <Image source={getSafeAvatarSource(message.avatar || getUserAvatarByName(message.user))} style={styles.otherMsgAvatar} />
                               </Pressable>
 
                               <View style={styles.otherMsgCol}>
@@ -1759,7 +1705,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                                     },
                                   ]}
                                 >
-                                  <Text style={[styles.msgTextContent, { color: theme.textPrimary }]}>{message.text}</Text>
+                                  {sharedLocation ? renderSharedLocationCard(sharedLocation, false) : <Text style={[styles.msgTextContent, { color: theme.textPrimary }]}>{displayMessageText}</Text>}
                                 </View>
                                 <Text style={[styles.msgTimeTextOther, { color: theme.textMuted }]}>{messageTime}</Text>
                               </View>
@@ -1825,184 +1771,75 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                   <View style={[styles.workspaceCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
                     <View style={styles.workspaceSectionHeader}>
                       <View>
-                        <Text style={[styles.workspaceTitle, { color: theme.textPrimary }]}>Khởi tạo lịch trình theo ngày</Text>
+                        <Text style={[styles.workspaceTitle, { color: theme.textPrimary }]}>AI hỗ trợ tạo lịch trình theo giờ</Text>
                         <Text style={[styles.workspaceSubtitle, { color: theme.textSecondary }]}>
-                          Chọn số ngày, ngày đi và ngày về. Hệ thống sẽ gợi ý theo forecast thực tế nếu có Google Weather API.
+                          Tạo preview lịch trình AI, thay riêng hoạt động, tối ưu thời gian rồi mới lưu vào chuyến đi của nhóm.
                         </Text>
                       </View>
-                      <CloudSun size={18} color="#3b82f6" />
+                      <Sparkles size={18} color="#3b82f6" />
                     </View>
 
-                    <View style={styles.formTripleRow}>
-                      <View style={[styles.miniField, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
-                        <Text style={[styles.miniFieldLabel, { color: theme.textSecondary }]}>Số ngày</Text>
-                        <TextInput
-                          value={planDaysInput}
-                          onChangeText={setPlanDaysInput}
-                          keyboardType="numeric"
-                          maxLength={2}
-                          style={[styles.miniFieldInput, { color: theme.textPrimary }]}
-                          placeholder="3"
-                          placeholderTextColor={theme.textMuted}
-                        />
-                      </View>
-                      <View style={[styles.miniField, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
-                        <Text style={[styles.miniFieldLabel, { color: theme.textSecondary }]}>Ngày bắt đầu</Text>
-                        <TextInput
-                          value={planStartDate}
-                          onChangeText={setPlanStartDate}
-                          style={[styles.miniFieldInput, { color: theme.textPrimary }]}
-                          placeholder="2026-07-18"
-                          placeholderTextColor={theme.textMuted}
-                        />
-                      </View>
-                    </View>
-
-                    <View style={[styles.singleField, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
-                      <Text style={[styles.miniFieldLabel, { color: theme.textSecondary }]}>Ngày kết thúc</Text>
-                      <TextInput
-                        value={planEndDate}
-                        onChangeText={setPlanEndDate}
-                        style={[styles.miniFieldInput, { color: theme.textPrimary }]}
-                        placeholder="2026-07-20"
-                        placeholderTextColor={theme.textMuted}
-                      />
-                    </View>
-
-                    <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 14 }]}>Điểm đến gợi ý cho nhóm</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 10 }}>
-                      {sortedDestinations.map((destination) => {
-                        const isSelected = selectedDestinationId === destination.id;
-                        return (
-                          <Pressable
-                            key={destination.id}
-                            style={[
-                              styles.destinationChip,
-                              {
-                                backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.16)' : theme.searchBg,
-                                borderColor: isSelected ? 'rgba(59, 130, 246, 0.32)' : theme.searchBorder,
-                              },
-                            ]}
-                            onPress={() => setSelectedDestinationId(destination.id)}
-                          >
-                            <MapPinned size={14} color={isSelected ? '#3b82f6' : theme.textSecondary} />
-                            <Text style={[styles.destinationChipText, { color: isSelected ? '#3b82f6' : theme.textSecondary }]}>{destination.name}</Text>
-                          </Pressable>
-                        );
+                    <Pressable
+                      style={styles.primaryActionBtn}
+                      onPress={() => onNavigateToTab && onNavigateToTab('aiTripPlanner', {
+                        groupId: selectedGroup?.id,
+                        groupName: selectedGroup?.name,
+                        savedSnapshot: itinerary,
+                        activeDestination,
                       })}
-                    </ScrollView>
-
-                    <View style={[styles.destinationPreviewCard, { backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.55)' : 'rgba(255,255,255,0.7)', borderColor: theme.border }]}>
-                      <Image source={{ uri: activeDestination.image }} style={styles.destinationPreviewImage} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.destinationPreviewTitle, { color: theme.textPrimary }]}>{activeDestination.name}</Text>
-                        <Text style={[styles.destinationPreviewRegion, { color: theme.textSecondary }]}>{activeDestination.region}</Text>
-                        <Text style={[styles.destinationPreviewIntro, { color: theme.textMuted }]}>{activeDestination.intro}</Text>
-                      </View>
-                    </View>
-
-                    <Pressable style={styles.primaryActionBtn} onPress={handleGenerateItinerary} disabled={isGeneratingPlan}>
+                    >
                       <LinearGradient colors={['#06b6d4', '#3b82f6']} style={styles.primaryActionGradient}>
-                        {isGeneratingPlan ? <ActivityIndicator color="#fff" /> : <RefreshCw size={16} color="#fff" />}
-                        <Text style={styles.primaryActionText}>{isGeneratingPlan ? 'Đang tạo lịch trình...' : 'Tạo lịch trình gợi ý'}</Text>
+                        <Sparkles size={16} color="#fff" />
+                        <Text style={styles.primaryActionText}>{itinerary?.aiItinerary ? 'Tạo lại lịch trình gợi ý' : 'Tạo lịch trình gợi ý'}</Text>
                       </LinearGradient>
                     </Pressable>
 
-                    {!!planStatusMessage && <Text style={[styles.helperAlertText, { color: '#f59e0b' }]}>{planStatusMessage}</Text>}
+                    {itinerary?.aiItinerary ? (
+                      <Pressable
+                        style={[styles.secondaryActionBtn, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder, marginTop: 12 }]}
+                        onPress={() => onNavigateToTab && onNavigateToTab('aiItineraryPreview', {
+                          groupId: selectedGroup?.id,
+                          groupName: selectedGroup?.name,
+                          itinerary: itinerary.aiItinerary,
+                          input: itinerary.input,
+                          candidatePlaces: [],
+                          warnings: itinerary.warnings || [],
+                        })}
+                      >
+                        <Route size={15} color="#3b82f6" />
+                        <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Xem lịch trình AI đã lưu</Text>
+                      </Pressable>
+                    ) : null}
+
+                    {!!itinerary?.estimatedTotalCost && (
+                      <Text style={[styles.helperAlertText, { color: theme.textMuted, marginTop: 12 }]}>
+                        Bản AI đã lưu gần nhất: {Number(itinerary.estimatedTotalCost || 0).toLocaleString('vi-VN')}đ
+                      </Text>
+                    )}
                   </View>
 
-                  {itinerary?.days?.length ? (
-                    <>
-                      <View style={styles.metricsRow}>
-                        <MetricCard title="Nguồn forecast" value={itinerary.forecastSource || 'Đang cập nhật'} subtitle={`${formatShortDate(itinerary.startDate)} - ${formatShortDate(itinerary.endDate)}`} icon={<CloudSun size={16} color="#3b82f6" />} theme={theme} isDarkMode={isDarkMode} />
-                        <MetricCard title="Điểm đến" value={itinerary.destinationName || activeDestination.name} subtitle={itinerary.region || activeDestination.region} icon={<MapPinned size={16} color="#3b82f6" />} theme={theme} isDarkMode={isDarkMode} />
+                  <View style={[styles.workspaceCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
+                    <View style={styles.workspaceSectionHeader}>
+                      <View>
+                        <Text style={[styles.workspaceTitle, { color: theme.textPrimary }]}>Luồng lịch trình hiện tại</Text>
+                        <Text style={[styles.workspaceSubtitle, { color: theme.textSecondary }]}>
+                          Nhóm đang dùng luồng lịch trình gợi ý bằng AI. Bạn có thể nhập thông tin chuyến đi, xem bản nháp theo giờ, chỉnh sửa từng hoạt động rồi mới lưu vào chuyến đi chung.
+                        </Text>
                       </View>
+                      <Route size={18} color="#10b981" />
+                    </View>
 
-                      <View style={[styles.workspaceCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
-                        <View style={styles.workspaceSectionHeader}>
-                          <View>
-                            <Text style={[styles.workspaceTitle, { color: theme.textPrimary }]}>Tóm tắt lịch trình</Text>
-                            <Text style={[styles.workspaceSubtitle, { color: theme.textSecondary }]}>{itinerary.summary}</Text>
-                          </View>
-                          <Route size={18} color="#10b981" />
-                        </View>
-
-                        <View style={styles.highlightsWrap}>
-                          {itinerary.highlights.map((item) => (
-                            <View key={item} style={[styles.highlightChip, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
-                              <Text style={[styles.highlightChipText, { color: theme.textSecondary }]}>{item}</Text>
-                            </View>
-                          ))}
-                        </View>
-
-                        <View style={styles.inlineActionRow}>
-                          <Pressable
-                            style={[styles.secondaryActionBtn, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}
-                            onPress={() => openExternalUrl(itinerary.destinationMapUrl, 'Không mở được Google Maps cho điểm đến này.')}
-                          >
-                            <Route size={15} color="#3b82f6" />
-                            <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Mở chỉ đường</Text>
-                          </Pressable>
-                          <Pressable
-                            style={[styles.secondaryActionBtn, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}
-                            onPress={() => openExternalUrl(itinerary.weatherUrl, 'Không mở được Google Weather cho điểm đến này.')}
-                          >
-                            <CloudSun size={15} color="#f59e0b" />
-                            <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Xem thời tiết Google</Text>
-                          </Pressable>
-                        </View>
+                    <View style={[styles.destinationPreviewCard, { backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.55)' : 'rgba(255,255,255,0.7)', borderColor: theme.border }]}>
+                      <Image source={getSafeImageSource(activeDestination.image)} style={styles.destinationPreviewImage} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.destinationPreviewTitle, { color: theme.textPrimary }]}>{activeDestination.name}</Text>
+                        <Text style={[styles.destinationPreviewRegion, { color: theme.textSecondary }]}>{activeDestination.region}</Text>
+                        <Text style={[styles.destinationPreviewIntro, { color: theme.textMuted }]}>
+                          Điểm đến này đang được gợi ý mặc định cho nhóm. Bạn vẫn có thể đổi lại trực tiếp trong màn tạo lịch trình gợi ý.
+                        </Text>
                       </View>
-
-                      <View style={[styles.workspaceCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
-                        <Text style={[styles.workspaceTitle, { color: theme.textPrimary }]}>Đồ dùng cần thiết mang theo</Text>
-                        <View style={styles.highlightsWrap}>
-                          {itinerary.packingList.map((item) => (
-                            <View key={item} style={[styles.highlightChip, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
-                              <Text style={[styles.highlightChipText, { color: theme.textSecondary }]}>{item}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-
-                      {itinerary.days.map((dayPlan) => (
-                        <View key={dayPlan.id} style={[styles.dayCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
-                          <View style={styles.dayHeaderRow}>
-                            <View>
-                              <Text style={[styles.dayTitle, { color: theme.textPrimary }]}>{dayPlan.label}</Text>
-                              <Text style={[styles.daySubTitle, { color: theme.textSecondary }]}>Ngày {formatShortDate(dayPlan.date)}</Text>
-                            </View>
-                            <View style={[styles.weatherBadge, { backgroundColor: isDarkMode ? 'rgba(6, 182, 212, 0.12)' : 'rgba(6, 182, 212, 0.08)' }]}>
-                              <Text style={styles.weatherBadgeText}>
-                                {dayPlan.weather.iconText} {dayPlan.weather.minTemp}° - {dayPlan.weather.maxTemp}°
-                              </Text>
-                            </View>
-                          </View>
-
-                          <Text style={[styles.dayWeatherText, { color: theme.textSecondary }]}>
-                            {dayPlan.weather.description} · Mưa {dayPlan.weather.rainChance ?? 0}% · Gió {dayPlan.weather.windKph ?? 0} km/h
-                          </Text>
-                          <Text style={[styles.dayNoteText, { color: theme.textMuted }]}>{dayPlan.note}</Text>
-
-                          {dayPlan.slots.map((slot) => (
-                            <View key={`${dayPlan.id}-${slot.title}`} style={[styles.daySlotRow, { borderColor: theme.border }]}>
-                              <Text style={[styles.daySlotTitle, { color: theme.textPrimary }]}>{slot.title}</Text>
-                              <Text style={[styles.daySlotText, { color: theme.textSecondary }]}>{slot.text}</Text>
-                            </View>
-                          ))}
-
-                          <Text style={[styles.dayRouteText, { color: theme.textSecondary }]}>Điểm đến gợi ý: {dayPlan.routeLabel}</Text>
-
-                          <Pressable
-                            style={[styles.secondaryActionBtn, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder, marginTop: 12 }]}
-                            onPress={() => openExternalUrl(dayPlan.mapUrl, 'Không mở được chỉ đường cho chặng này.')}
-                          >
-                            <Route size={15} color="#3b82f6" />
-                            <Text style={[styles.secondaryActionText, { color: theme.textPrimary }]}>Chỉ đường bằng map</Text>
-                          </Pressable>
-                        </View>
-                      ))}
-                    </>
-                  ) : null}
+                    </View>
+                  </View>
                 </ScrollView>
               ) : (
                 <ScrollView style={styles.workspaceScroll} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
@@ -2058,7 +1895,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                             ]}
                             onPress={() => setSelectedFundMemberId(member.id)}
                           >
-                            <Image source={{ uri: member.avatar }} style={styles.memberChipAvatar} />
+                            <Image source={getSafeAvatarSource(member.avatar)} style={styles.memberChipAvatar} />
                             <Text style={[styles.memberChipText, { color: isSelected ? '#3b82f6' : theme.textSecondary }]}>{member.name}</Text>
                           </Pressable>
                         );
@@ -2088,8 +1925,59 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                       />
                     </View>
 
-                    <Pressable style={styles.primaryActionBtn} onPress={handleAddContribution}>
-                      <LinearGradient colors={['#06b6d4', '#3b82f6']} style={styles.primaryActionGradient}>
+                    <View style={[styles.proofSection, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}>
+                      <View style={styles.proofHeader}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.miniFieldLabel, { color: theme.textSecondary }]}>Ảnh bằng chứng nhận tiền</Text>
+                          <Text style={[styles.proofHint, { color: theme.textMuted }]}>Ảnh chuyển khoản, biên nhận hoặc ảnh mẫu để test</Text>
+                        </View>
+                        {!!fundContributionProof && (
+                          <Pressable style={styles.removeProofBtn} onPress={() => {
+                            setFundContributionProof('');
+                            setFundContributionProofFile(null);
+                          }}>
+                            <Trash2 size={15} color="#ef4444" />
+                          </Pressable>
+                        )}
+                      </View>
+                      {fundContributionProof ? (
+                        <Pressable onPress={handlePickContributionProof}>
+                          <Image source={{ uri: fundContributionProof }} style={styles.proofPreview} />
+                          <View style={styles.changeProofBadge}>
+                            <ImagePlus size={13} color="#fff" />
+                            <Text style={styles.changeProofText}>Đổi ảnh</Text>
+                          </View>
+                        </Pressable>
+                      ) : (
+                        <Pressable style={[styles.pickProofBtn, { borderColor: theme.searchBorder }]} onPress={handlePickContributionProof}>
+                          <ImagePlus size={22} color="#3b82f6" />
+                        <Text style={[styles.pickProofText, { color: theme.textPrimary }]}>Thêm hình ảnh bằng chứng</Text>
+                      </Pressable>
+                    )}
+                  </View>
+
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={[styles.sampleProofLabel, { color: theme.textSecondary }]}>Ảnh mẫu để test trên emulator</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sampleProofRow}>
+                      {CONTRIBUTION_PROOF_SAMPLES.map((sample) => (
+                        <Pressable
+                          key={sample.id}
+                          onPress={() => handlePickContributionProofSample(sample)}
+                          style={[styles.sampleProofCard, { backgroundColor: theme.background, borderColor: theme.searchBorder }]}
+                        >
+                          <Image source={sample.source} style={styles.sampleProofImage} resizeMode="cover" />
+                          <Text style={[styles.sampleProofText, { color: theme.textPrimary }]}>{sample.label}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                    <Pressable
+                      style={[styles.primaryActionBtn, !fundContributionProof && { opacity: 0.55 }]}
+                      onPress={handleAddContribution}
+                      accessibilityState={{ disabled: !fundContributionProof }}
+                    >
+                      <LinearGradient colors={fundContributionProof ? ['#06b6d4', '#3b82f6'] : ['#94a3b8', '#64748b']} style={styles.primaryActionGradient}>
                         <ArrowLeftRight size={16} color="#fff" />
                         <Text style={styles.primaryActionText}>Ghi nhận đóng góp</Text>
                       </LinearGradient>
@@ -2141,6 +2029,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                             <View style={{ flex: 1 }}>
                               <Text style={[styles.financeTitle, { color: theme.textPrimary }]}>{item.memberName}</Text>
                               <Text style={[styles.financeSubtitle, { color: theme.textSecondary }]}>{item.note}</Text>
+                              {!!item.proofImage && <Image source={{ uri: item.proofImage }} style={styles.financeProofImage} />}
                             </View>
                             <Text style={[styles.financeAmountPositive]}>{formatMoney(item.amount)}</Text>
                           </View>
@@ -2223,7 +2112,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                       style={[styles.memberSearchRow, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
                       onPress={() => handleAddMember(member)}
                     >
-                      <Image source={{ uri: member.avatar }} style={styles.memberSearchAvatar} />
+                      <Image source={getSafeAvatarSource(member.avatar)} style={styles.memberSearchAvatar} />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.memberSearchName, { color: theme.textPrimary }]}>{member.name}</Text>
                         <Text style={[styles.memberSearchMeta, { color: theme.textSecondary }]} numberOfLines={1}>
@@ -2244,7 +2133,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
                     return (
                       <View key={member.id} style={[styles.memberManagerRow, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
-                        <Image source={{ uri: member.avatar }} style={styles.memberSearchAvatar} />
+                        <Image source={getSafeAvatarSource(member.avatar)} style={styles.memberSearchAvatar} />
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.memberSearchName, { color: theme.textPrimary }]}>
                             {member.name}
@@ -2580,6 +2469,47 @@ const styles = StyleSheet.create({
   },
   msgTextContent: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
   msgTimeTextOther: { fontSize: 9.5, fontWeight: '600', marginTop: 4, marginLeft: 4 },
+  sharedLocationCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minWidth: 220,
+    maxWidth: 280,
+  },
+  sharedLocationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  sharedLocationBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  sharedLocationTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  sharedLocationMeta: {
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  sharedLocationDescription: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  sharedLocationCta: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 10,
+  },
   quickSuggestionsWrapper: {
     borderTopWidth: 1,
     paddingVertical: 8,
@@ -2682,6 +2612,26 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingVertical: 0,
   },
+  proofSection: { borderWidth: 1, borderRadius: 14, padding: 12, marginTop: 12 },
+  proofHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  proofHint: { fontSize: 10, lineHeight: 14, fontWeight: '600', marginTop: 3 },
+  removeProofBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(239, 68, 68, 0.12)', alignItems: 'center', justifyContent: 'center' },
+  pickProofBtn: { height: 88, borderWidth: 1, borderStyle: 'dashed', borderRadius: 12, marginTop: 10, alignItems: 'center', justifyContent: 'center', gap: 7 },
+  pickProofText: { fontSize: 11.5, fontWeight: '800' },
+  proofPreview: { width: '100%', height: 170, borderRadius: 12, marginTop: 10 },
+  changeProofBadge: { position: 'absolute', right: 8, bottom: 8, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(15, 23, 42, 0.78)', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 9 },
+  changeProofText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  sampleProofLabel: { fontSize: 11, fontWeight: '800', marginBottom: 8 },
+  sampleProofRow: { gap: 10, paddingBottom: 2 },
+  sampleProofCard: {
+    width: 92,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 8,
+    gap: 6,
+  },
+  sampleProofImage: { width: '100%', height: 96, borderRadius: 10 },
+  sampleProofText: { fontSize: 10.5, fontWeight: '800', textAlign: 'center' },
   destinationChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2825,6 +2775,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
+  financeProofImage: { width: 112, height: 72, borderRadius: 10, marginTop: 8 },
   financeIconBadge: {
     width: 34,
     height: 34,
@@ -2900,4 +2851,11 @@ const styles = StyleSheet.create({
   },
   leaveGroupText: { color: '#ef4444', fontSize: 12.5, fontWeight: '900' },
 });
+
+
+
+
+
+
+
 

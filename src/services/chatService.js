@@ -45,7 +45,44 @@ export async function sendChatMessage(groupId, senderId, content) {
   return response.data.data;
 }
 
-export async function updateChatGroupWorkspace(groupId, requesterId, updates) {
+export async function updateChatGroupWorkspace(groupId, requesterId, updates, options = {}) {
+  const proofImageFile = options.proofImageFile || null;
+  if (proofImageFile) {
+    const formData = new FormData();
+    formData.append('requesterId', requesterId);
+
+    if (typeof updates.announcement === 'string') {
+      formData.append('announcement', updates.announcement);
+    }
+    if (typeof updates.skipAnnouncement !== 'undefined') {
+      formData.append('skipAnnouncement', updates.skipAnnouncement ? 'true' : 'false');
+    }
+    if (typeof updates.fundGoal !== 'undefined') {
+      formData.append('fundGoal', String(updates.fundGoal));
+    }
+    if (typeof updates.itinerary !== 'undefined') {
+      formData.append('itinerary', JSON.stringify(updates.itinerary));
+    }
+    if (typeof updates.fund !== 'undefined') {
+      formData.append('fund', JSON.stringify(updates.fund));
+    }
+    if (typeof updates.contribution !== 'undefined') {
+      const { proofImage, ...contribution } = updates.contribution;
+      formData.append('contribution', JSON.stringify(contribution));
+    }
+    if (typeof updates.expense !== 'undefined') {
+      formData.append('expense', JSON.stringify(updates.expense));
+    }
+
+    formData.append('proofImage', proofImageFile);
+
+    const response = await api.patch(`/chat/groups/${encodeURIComponent(groupId)}/workspace`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 15000,
+    });
+    return response.data.data;
+  }
+
   const response = await api.patch(`/chat/groups/${encodeURIComponent(groupId)}/workspace`, {
     requesterId,
     ...updates,

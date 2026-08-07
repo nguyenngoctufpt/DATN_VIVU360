@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View, FlatList, ActivityIndicator, Image } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { getDiaDiem } from '../services/diaDiemService'
+import { getSafeImageSource } from '../utils/image'
 
 const Home = () => {
     const [data, setData] = useState([]);
@@ -35,7 +36,7 @@ const Home = () => {
                 <View style={styles.card}>
 
                     <Image
-                        source={{ uri: item.hinhAnh }}
+                        source={getSafeImageSource(item.hinhAnh)}
                         style={styles.image}
                         resizeMode="cover"
                     />
@@ -84,4 +85,6 @@ title: {
 },
 
 });
+
+
 

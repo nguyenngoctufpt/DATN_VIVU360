@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal, Dimensions, Alert, Platform, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { loadAppData, saveAppData } from '../services/appDataService';
+import { getSafeAvatarSource, getSafeImageSource } from '../utils/image';
 import {
   X,
   Plus,
@@ -39,7 +40,7 @@ const getUserLevelByName = (name) => {
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return `C?p ${Math.abs(hash % 12) + 3}`;
+  return `Cấp ${Math.abs(hash % 12) + 3}`;
 };
 
 const getFormattedMsgTime = (msgId) => {
@@ -292,7 +293,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
               style={[styles.groupCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
               onPress={() => handleOpenChat(group)}
             >
-              <Image source={{ uri: group.image }} style={styles.groupCoverImage} />
+              <Image source={getSafeImageSource(group.image)} style={styles.groupCoverImage} />
               <View style={styles.groupCardInfo}>
                 <View style={styles.groupTitleRow}>
                   <Text numberOfLines={1} style={[styles.groupCardName, { color: theme.textPrimary }]}>{group.name}</Text>
@@ -416,7 +417,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                   <X size={18} color={theme.textPrimary} />
                 </Pressable>
                 <View style={styles.chatHeaderAvatarWrapper}>
-                  <Image source={{ uri: selectedGroup.image }} style={styles.chatHeaderAvatar} />
+                  <Image source={getSafeImageSource(selectedGroup.image)} style={styles.chatHeaderAvatar} />
                   <View style={styles.statusActiveDot} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
@@ -472,7 +473,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                       ) : (
                         <View style={styles.otherMsgRow}>
                           <Pressable onPress={() => { setChatModalVisible(false); handleOpenUserProfile(msg.user); }}>
-                            <Image source={{ uri: getUserAvatarByName(msg.user) }} style={styles.otherMsgAvatar} />
+                            <Image source={getSafeAvatarSource(getUserAvatarByName(msg.user))} style={styles.otherMsgAvatar} />
                           </Pressable>
                           
                           <View style={styles.otherMsgCol}>
@@ -922,3 +923,7 @@ const styles = StyleSheet.create({
   },
   sendMsgGradient: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });
+
+
+
+

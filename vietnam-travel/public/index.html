@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Viet Roadtrips - Kế hoạch xuyên tỉnh của bạn</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/travel-map/assets/favicon-CWGgODGg.svg">
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -20,45 +20,50 @@
             --font-display: 'Space Grotesk', sans-serif;
             --font-serif: 'Playfair Display', serif;
         }
-
+        
         body {
             font-family: var(--font-sans);
             background-color: #0f172a;
             color: #f8fafc;
             overflow-x: hidden;
         }
-
+        
         body.theme-light {
             background-color: #f8fafc;
             color: #0f172a;
         }
-
+        
         .font-display { font-family: var(--font-display); }
+        
         .font-serif { font-family: var(--font-serif); }
-
+        
         /* Custom Scrollbar */
+        
         ::-webkit-scrollbar { width: 4px; }
+        
         ::-webkit-scrollbar-track { background: transparent; }
+        
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        
         ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
-
+        
         .glass {
             background: rgba(15, 23, 42, 0.7);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
-
+        
         .calendar-event-glass {
             backdrop-filter: blur(14px) saturate(1.35);
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 10px 24px rgba(2,6,23,0.18);
             color: #f8fafc;
         }
-
+        
         .calendar-event-glass .text-slate-600,
         .calendar-event-glass .text-slate-700 {
             color: rgba(226,232,240,0.78) !important;
         }
-
+        
         .event-cost-chip {
             display: inline-flex;
             max-width: 100%;
@@ -73,25 +78,34 @@
             line-height: 1;
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
         }
-
+        
         .calendar-event-food { background: rgba(239,68,68,0.28); border-color: rgba(248,113,113,0.42); }
+        
         .calendar-event-transport { background: rgba(100,116,139,0.30); border-color: rgba(148,163,184,0.42); }
+        
         .calendar-event-sightseeing { background: rgba(59,130,246,0.28); border-color: rgba(96,165,250,0.42); }
+        
         .calendar-event-stay { background: rgba(71,85,105,0.30); border-color: rgba(148,163,184,0.38); }
+        
         .calendar-event-other { background: rgba(139,92,246,0.24); border-color: rgba(167,139,250,0.36); }
-
+        
         .calendar-event-food:hover { background: rgba(239,68,68,0.36); }
+        
         .calendar-event-transport:hover { background: rgba(100,116,139,0.40); }
+        
         .calendar-event-sightseeing:hover { background: rgba(59,130,246,0.36); }
+        
         .calendar-event-stay:hover { background: rgba(71,85,105,0.40); }
+        
         .calendar-event-other:hover { background: rgba(139,92,246,0.32); }
-
+        
         .calendar-shell {
             background: rgba(15, 23, 42, 0.56);
             border-color: rgba(226, 232, 240, 0.08);
         }
-
+        
         /* Minimal Leaflet Popup */
+        
         .leaflet-popup-content-wrapper {
             background: rgba(15, 23, 42, 0.92) !important;
             backdrop-filter: blur(12px) !important;
@@ -102,109 +116,121 @@
             padding: 0 !important;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4) !important;
         }
+        
         .leaflet-popup-content {
             margin: 5px 12px !important;
             line-height: 1.2 !important;
         }
+        
         .leaflet-popup-tip-container {
             height: 6px !important;
         }
+        
         .leaflet-popup-tip {
             background: rgba(15, 23, 42, 0.92) !important;
             border: 1px solid rgba(255, 255, 255, 0.2) !important;
             box-shadow: none !important;
         }
+        
         .leaflet-popup-close-button {
             display: none !important;
         }
-
+        
         body.theme-light .glass {
             background: rgba(255, 255, 255, 0.84);
             border-color: rgba(15, 23, 42, 0.12);
             box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
         }
-
+        
         body.theme-light .text-white,
         body.theme-light .text-slate-100,
         body.theme-light .text-slate-200,
         body.theme-light .text-slate-300 {
             color: #0f172a !important;
         }
-
+        
         body.theme-light .text-slate-400,
         body.theme-light .text-slate-500 {
             color: #64748b !important;
         }
-
+        
         body.theme-light .border-white\/10,
         body.theme-light .border-white\/5 {
             border-color: rgba(15, 23, 42, 0.12) !important;
         }
-
+        
         /* Web VR modal overrides to prevent light-theme text color pollution */
+        
         .web-vr-viewer-modal .text-white {
             color: #ffffff !important;
         }
+        
         .web-vr-viewer-modal .text-slate-400 {
             color: #94a3b8 !important;
         }
+        
         .web-vr-viewer-modal .border-white\/10 {
             border-color: rgba(255, 255, 255, 0.1) !important;
         }
+        
         .web-vr-viewer-modal .border-white\/5 {
             border-color: rgba(255, 255, 255, 0.05) !important;
         }
-
+        
         body.theme-light .bg-white\/5,
         body.theme-light .bg-white\/\[0\.025\] {
             background-color: rgba(255, 255, 255, 0.55) !important;
         }
-
+        
         body.theme-light header.fixed {
             background: rgba(248, 250, 252, 0.9);
             backdrop-filter: blur(18px);
         }
-
+        
         body.theme-light .calendar-view button {
             color: #0f172a !important;
         }
-
+        
         body.theme-light .calendar-event-glass {
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 10px 24px rgba(15,23,42,0.10);
         }
-
+        
         body.theme-light .calendar-event-glass .text-slate-600,
         body.theme-light .calendar-event-glass .text-slate-700 {
             color: rgba(51,65,85,0.76) !important;
         }
-
+        
         body.theme-light .event-cost-chip {
             border-color: rgba(15,23,42,0.12);
             background: rgba(255,255,255,0.72);
             color: #0f172a;
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
         }
-
+        
         body.theme-light .calendar-event-food { background: rgba(239,68,68,0.16); border-color: rgba(239,68,68,0.30); }
+        
         body.theme-light .calendar-event-transport { background: rgba(100,116,139,0.16); border-color: rgba(100,116,139,0.28); }
+        
         body.theme-light .calendar-event-sightseeing { background: rgba(59,130,246,0.16); border-color: rgba(59,130,246,0.30); }
+        
         body.theme-light .calendar-event-stay { background: rgba(71,85,105,0.15); border-color: rgba(71,85,105,0.26); }
+        
         body.theme-light .calendar-event-other { background: rgba(139,92,246,0.14); border-color: rgba(139,92,246,0.26); }
-
+        
         body.theme-light .calendar-shell {
             background: rgba(248, 250, 252, 0.78);
             border-color: rgba(15, 23, 42, 0.08) !important;
         }
-
+        
         body.theme-light .calendar-view article,
         body.theme-light .calendar-view .rounded-md {
             color: #0f172a;
         }
-
+        
         body.theme-light .leaflet-container {
             background: #f8fafc !important;
         }
-
+        
         #map {
             position: fixed;
             top: 0;
@@ -213,38 +239,41 @@
             height: 100%;
             z-index: 1;
         }
-
+        
         .leaflet-container {
             background: #0f172a !important;
         }
-
+        
         .timeline-item::after { display: none; }
-
+        
         @keyframes route-flow {
             0%   { stroke-dashoffset: 0; }
             100% { stroke-dashoffset: -30; }
         }
-
+        
         @keyframes map-scan {
             0%   { transform: translateY(-100%); opacity: 0; }
             8%   { opacity: 1; }
             92%  { opacity: 1; }
             100% { transform: translateY(110vh); opacity: 0; }
         }
+        
         @keyframes dot-pulse {
             0%, 100% { opacity: 0.25; transform: scale(0.75); }
             50%       { opacity: 1;    transform: scale(1); }
         }
-
+        
         [x-cloak] { display: none !important; }
-
+        
         /* Animations */
+        
         .slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+        
         @keyframes slideUp {
             from { transform: translateY(20px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
-
+        
         @media (max-width: 1024px) {
             body { overflow-y: auto; height: auto; }
             #map { height: 250px; position: sticky; top: 0; z-index: 10; transition: height 0.4s ease-in-out; }
@@ -274,9 +303,11 @@
         }
         
         .no-scrollbar::-webkit-scrollbar { display: none; }
+        
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
+        
         /* Ẩn hoàn toàn các thành phần UI thừa để giữ bản đồ toàn màn hình */
+        
         header,
         .timeline-rail,
         .mobile-timeline,
@@ -286,6 +317,7 @@
         section {
             display: none !important;
         }
+        
         #map {
             position: fixed !important;
             inset: 0 !important;
@@ -359,7 +391,7 @@
                         <button @click.stop="toggleFavorite(item)" class="text-sm p-1 hover:scale-110 transition-transform">
                             <span x-text="isFavorite(item.name) ? '❤️' : '🤍'"></span>
                         </button>
-                    </div>
+        </div>
                 </template>
             </div>
         </div>
@@ -371,7 +403,7 @@
             <span class="hidden sm:inline">Yêu thích</span>
             <span class="bg-white/25 px-1.5 py-0.5 rounded-full text-[10px]" x-text="favoritePlaces.length"></span>
         </button>
-    </div>
+        </div>
 
 
 
@@ -419,7 +451,7 @@
                     <button @click="clearAllFavorites()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 text-xs font-bold transition flex items-center justify-center gap-1">
                         <span>🗑️ Xóa tất cả</span>
                     </button>
-                </div>
+        </div>
             </div>
 
             <!-- Empty State -->
@@ -439,7 +471,7 @@
                         <button @click="favoritesModalOpen = false" class="w-full py-2.5 px-4 rounded-xl bg-slate-200 text-slate-800 text-xs font-bold transition hover:bg-slate-300">
                             <span>Khám phá bản đồ ngay ➔</span>
                         </button>
-                    </div>
+        </div>
                 </div>
             </template>
 
@@ -456,12 +488,12 @@
                             <button @click="toggleFavorite(item)" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition" title="Xóa khỏi danh sách">
                                 <i data-lucide="trash-2" class="w-4 h-4"></i>
                             </button>
-                        </div>
+        </div>
                         <button @click="selectMapSearchResult(item); favoritesModalOpen = false;" class="w-full py-2.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white border border-rose-200/80 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs">
                             <span>Khám phá trên bản đồ 360°</span>
                             <i data-lucide="compass" class="w-3.5 h-3.5"></i>
                         </button>
-                    </div>
+        </div>
                 </template>
             </div>
         </div>
@@ -495,7 +527,7 @@
                         title="Đóng thông tin">
                     ✕
                 </button>
-            </div>
+        </div>
         </div>
 
         <!-- Address -->
@@ -517,19 +549,19 @@
 
         <!-- Action Buttons -->
         <div class="flex gap-1.5 mt-2">
-            <button @click="if (window.ReactNativeWebView && activeSubLocation) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'openPlaceDetail', placeName: activeSubLocation.name })); } else if (activeSubLocation) { openWebDetail(activeSubLocation.name); }"
+            <button @click="if (window.ReactNativeWebView && activeSubLocation) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'openPlaceDetail', placeName: activeSubLocation.name, address: activeSubLocation.address || activeSubLocation.province || '', mapsLink: (activeSubLocation.lat && activeSubLocation.lng) ? ('https://maps.google.com/?q=' + activeSubLocation.lat + ',' + activeSubLocation.lng) : '' })); } else if (activeSubLocation) { openWebDetail(activeSubLocation.name, activeSubLocation.address || activeSubLocation.province || ''); }"
                     class="flex-1 flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 shadow-sm">
                 <span>📖</span>
                 <span>Cẩm nang</span>
             </button>
             <button @click="if (window.ReactNativeWebView && activeSubLocation) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'openVR', tourId: 'attraction-' + (activeSubLocation?.name || '') })); } else if (activeSubLocation) { openWebVR(activeSubLocation.name); }"
                     class="flex-1 flex items-center justify-center gap-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 shadow-sm">
-                <span>🌐</span>
+                <span>📖</span>
                 <span>Xem VR 360</span>
             </button>
-            <button @click="if (window.ReactNativeWebView && activeSubLocation) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'shareLocation', locationName: activeSubLocation?.name || '', address: activeSubLocation?.address || '', description: activeSubLocation?.description || '', unitPrice: activeSubLocation?.unit_price || '' })); }"
+            <button @click="if (window.ReactNativeWebView && activeSubLocation) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'shareLocation', locationName: activeSubLocation?.name || '', address: activeSubLocation?.address || '', description: activeSubLocation?.description || '', unitPrice: activeSubLocation?.unit_price || '', lat: activeSubLocation?.lat || '', lng: activeSubLocation?.lng || '', mapsLink: (activeSubLocation?.lat && activeSubLocation?.lng) ? ('https://maps.google.com/?q=' + activeSubLocation.lat + ',' + activeSubLocation.lng) : '' })); }"
                     class="flex-1 flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-[10px] font-bold transition-all active:scale-95 shadow-sm">
-                <span>📤</span>
+                <span>📖</span>
                 <span>Chia sẻ</span>
             </button>
         </div>
@@ -552,7 +584,7 @@
                 class="w-10 h-10 flex items-center justify-center text-slate-800 hover:text-blue-600 hover:bg-blue-50/80 active:scale-90 transition-all text-lg font-extrabold outline-none select-none">
             －
         </button>
-    </div>
+        </div>
 
     <!-- Map Loading Screen -->
     <div x-show="viewMode === 'map' && !mapReady"
@@ -701,7 +733,7 @@
                                 <i data-lucide="trash-2" class="h-4 w-4"></i>
                                 Xoá event này
                             </button>
-                        </div>
+        </div>
                     </section>
                 </div>
             </article>
@@ -712,7 +744,7 @@
                     <i data-lucide="calendar-x" class="mx-auto mb-4 h-10 w-10 text-slate-500"></i>
                     <p class="text-sm font-bold text-slate-200">Không tìm thấy event</p>
                     <button type="button" @click="closeEventDetail()" class="mt-4 rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-900">Đóng</button>
-                </div>
+        </div>
             </div>
             </template>
         </aside>
@@ -774,7 +806,7 @@
                         Đang xoá
                     </span>
                 </button>
-            </div>
+        </div>
         </section>
     </div>
 
@@ -1157,7 +1189,7 @@
                             :disabled="!calendarScheduleDirty || calendarScheduleSaving"
                             class="rounded-md bg-blue-600 px-3.5 py-1.5 font-bold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-45"
                             x-text="calendarScheduleSaving ? 'Đang lưu...' : 'Save lịch'"></button>
-                </div>
+        </div>
             </div>
         </div>
     </section>
@@ -1419,7 +1451,7 @@
                             :disabled="!calendarScheduleDirty || calendarScheduleSaving"
                             class="rounded-md bg-blue-600 px-3.5 py-1.5 font-bold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-45"
                             x-text="calendarScheduleSaving ? 'Đang lưu...' : 'Save lịch'"></button>
-                </div>
+        </div>
             </div>
         </div>
     </section>
@@ -1459,7 +1491,7 @@
                     class="px-4 py-2.5 text-[11px] font-bold transition-colors border-b-2 -mb-px"
                     :class="detailMode === 'detail' ? 'text-white border-emerald-400' : 'text-slate-500 border-transparent hover:text-slate-300'"
                 >Lịch trình</button>
-            </div>
+        </div>
 
             <!-- Calendar/Admin CRUD controls -->
             <div x-show="canCrudPlan()" class="border-b border-white/10 px-4 py-3 flex-none space-y-3">
@@ -1481,7 +1513,7 @@
                             <i data-lucide="plus" class="h-3 w-3"></i>
                             Activity
                         </button>
-                    </div>
+        </div>
                 </div>
 
                 <form x-show="showLocationForm" @submit.prevent="saveLocationDraft()" class="rounded-2xl border border-white/10 bg-white/[0.03] p-3 space-y-2">
@@ -1510,7 +1542,7 @@
                     <div class="flex justify-end gap-1.5">
                         <button type="button" @click="cancelLocationForm()" class="rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold text-slate-300">Huỷ</button>
                         <button type="submit" :disabled="crudSaving" class="rounded-md bg-blue-600 px-3 py-1 text-[10px] font-bold text-white disabled:opacity-50" x-text="crudSaving ? 'Đang lưu...' : 'Tạo địa điểm'"></button>
-                    </div>
+        </div>
                 </form>
 
                 <form x-show="showActivityForm" @submit.prevent="saveActivityDraft()" class="rounded-2xl border border-white/10 bg-white/[0.03] p-3 space-y-2">
@@ -1603,7 +1635,7 @@
                         <div class="ml-auto flex gap-1.5">
                             <button type="button" @click="cancelActivityForm()" class="rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold text-slate-300">Huỷ</button>
                             <button type="submit" :disabled="crudSaving" class="rounded-md bg-emerald-600 px-3 py-1 text-[10px] font-bold text-white disabled:opacity-50" x-text="crudSaving ? 'Đang lưu...' : (editingActivityId ? 'Lưu activity' : 'Tạo activity')"></button>
-                        </div>
+        </div>
                     </div>
                 </form>
             </div>
@@ -1620,7 +1652,7 @@
                             <div class="flex items-center justify-between rounded-xl border border-emerald-400/15 bg-emerald-400/5 px-3 py-2">
                                 <span class="text-[10px] font-bold text-emerald-200">Đang xem chi tiết event đã chọn</span>
                                 <button type="button" @click="selectedActivityId = null" class="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-white/10">Xem tất cả</button>
-                            </div>
+        </div>
                         </template>
                         <template x-for="(sub, idx) in visibleDetailActivities(activeLocation)" :key="sub.id">
                             <div class="flex items-start gap-3 rounded-2xl p-4 border transition-all"
@@ -1663,7 +1695,7 @@
                                             title="Xoá event">
                                         <i data-lucide="trash-2" class="h-3 w-3"></i>
                                     </button>
-                                </div>
+        </div>
                             </div>
                         </template>
                     </div>
@@ -1867,13 +1899,13 @@
                 </button>
                 <button @click="saveAndShare()" class="relative w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all"
                         :class="mySessionId ? 'text-blue-400' : (sessionSourceId ? 'text-amber-400' : '')"
-                        :title="mySessionId ? 'Lịch trình của bạn đã lưu — Chia sẻ' : (sessionSourceId ? 'Lưu bản của bạn & chia sẻ' : 'Lưu & chia sẻ lịch trình')">
+                        :title="mySessionId ? 'Lịch trình của bạn đã lưu - Chia sẻ' : (sessionSourceId ? 'Lưu bản của bạn và chia sẻ' : 'Lưu và chia sẻ lịch trình')">
                     <i data-lucide="share-2" class="w-3 h-3 lg:w-4 lg:h-4"></i>
                     <!-- Dot xanh khi đã có session riêng, amber khi đang xem session người khác -->
                     <span x-show="mySessionId" class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full ring-1 ring-slate-900"></span>
                     <span x-show="!mySessionId && sessionSourceId" class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-500 rounded-full ring-1 ring-slate-900"></span>
                 </button>
-            </div>
+        </div>
         </div>
     </footer>
 
@@ -1898,7 +1930,7 @@
         <button @click="copyCurrentUrl()" class="flex-none text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors px-2">
             Copy
         </button>
-    </div>
+        </div>
 
     <!-- Marker popup -->
     <div x-show="markerPopup" x-cloak class="fixed inset-0 z-[1000]" @click="markerPopup = null"></div>
@@ -1928,13 +1960,13 @@
                         title="Đóng popup">
                     ✕
                 </button>
-            </div>
+        </div>
         </div>
 
         <!-- Included sub-location -->
         <template x-if="markerPopup?.type === 'sub' && !markerPopup?.isExcluded">
             <div class="p-2.5 flex flex-col gap-2">
-                <button @click="if (window.ReactNativeWebView && markerPopup) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'openPlaceDetail', placeName: markerPopup.name })); } else if (markerPopup) { openWebDetail(markerPopup.name); }; markerPopup = null"
+                <button @click="if (window.ReactNativeWebView && markerPopup) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'openPlaceDetail', placeName: markerPopup.name, address: markerPopup.address || markerPopup.province || '', mapsLink: (markerPopup.lat && markerPopup.lng) ? ('https://maps.google.com/?q=' + markerPopup.lat + ',' + markerPopup.lng) : '' })); } else if (markerPopup) { openWebDetail(markerPopup.name, markerPopup.address || markerPopup.province || ''); }; markerPopup = null"
                         class="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-blue-500/25 active:scale-95 transition-all">
                     <span>📖</span>
                     <span>Cẩm nang chi tiết</span>
@@ -1942,12 +1974,12 @@
                 <div class="grid grid-cols-2 gap-2">
                     <button @click="if (window.ReactNativeWebView && markerPopup) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'openVR', tourId: 'attraction-' + (markerPopup?.name || '') })); } else if (markerPopup) { openWebVR(markerPopup.name); }; markerPopup = null"
                             class="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/40 border border-emerald-500/30 text-emerald-300 font-bold text-[11px] transition-all active:scale-95">
-                        <span>🌐</span>
+                        <span>📖</span>
                         <span>VR 360°</span>
                     </button>
-                    <button @click="if (window.ReactNativeWebView && markerPopup) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'shareLocation', locationName: markerPopup?.name || '' })); }; markerPopup = null"
+                    <button @click="if (window.ReactNativeWebView && markerPopup) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'shareLocation', locationName: markerPopup?.name || '', address: markerPopup?.address || '', description: markerPopup?.description || '', lat: markerPopup?.lat || '', lng: markerPopup?.lng || '', mapsLink: (markerPopup?.lat && markerPopup?.lng) ? ('https://maps.google.com/?q=' + markerPopup.lat + ',' + markerPopup.lng) : '' })); }; markerPopup = null"
                             class="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl bg-slate-700/50 hover:bg-slate-700/70 border border-white/10 text-slate-200 font-bold text-[11px] transition-all active:scale-95">
-                        <span>📤</span>
+                        <span>📖</span>
                         <span>Chia sẻ</span>
                     </button>
                 </div>
@@ -1956,16 +1988,23 @@
         <!-- Included main location -->
         <template x-if="markerPopup?.type === 'location' && !markerPopup?.isExcluded">
             <div class="p-2.5 flex flex-col gap-2">
-                <button @click="if (window.ReactNativeWebView && markerPopup) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'openPlaceDetail', placeName: markerPopup.name })); } else if (markerPopup) { openWebDetail(markerPopup.name); }; markerPopup = null"
+                <button @click="if (window.ReactNativeWebView && markerPopup) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'openPlaceDetail', placeName: markerPopup.name, address: markerPopup.address || markerPopup.province || '', mapsLink: (markerPopup.lat && markerPopup.lng) ? ('https://maps.google.com/?q=' + markerPopup.lat + ',' + markerPopup.lng) : '' })); } else if (markerPopup) { openWebDetail(markerPopup.name, markerPopup.address || markerPopup.province || ''); }; markerPopup = null"
                         class="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-blue-500/25 active:scale-95 transition-all">
                     <span>📖</span>
-                    <span>Xem Cẩm nang</span>
+                    <span>Xem cẩm nang</span>
                 </button>
-                <button @click="toggleLocation(markerPopup.id); markerPopup = null"
-                        class="flex items-center justify-center gap-1.5 w-full px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] font-medium transition-all">
-                    <span>–</span>
-                    <span>Bỏ qua điểm này</span>
-                </button>
+                <div class="grid grid-cols-2 gap-2">
+                    <button @click="if (window.ReactNativeWebView && markerPopup) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'shareLocation', locationName: markerPopup?.name || '', address: markerPopup?.province || markerPopup?.address || '', description: markerPopup?.description || '', lat: markerPopup?.lat || '', lng: markerPopup?.lng || '', mapsLink: (markerPopup?.lat && markerPopup?.lng) ? ('https://maps.google.com/?q=' + markerPopup.lat + ',' + markerPopup.lng) : '' })); }; markerPopup = null"
+                            class="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl bg-slate-700/50 hover:bg-slate-700/70 border border-white/10 text-slate-200 font-bold text-[11px] transition-all active:scale-95">
+                        <span>📖</span>
+                        <span>Chia sẻ</span>
+                    </button>
+                    <button @click="toggleLocation(markerPopup.id); markerPopup = null"
+                            class="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition-all">
+                        <span>➖</span>
+                        <span>Bỏ qua điểm này</span>
+                    </button>
+                </div>
             </div>
         </template>
     </div>
@@ -1990,10 +2029,10 @@
             <div class="flex items-start justify-between mb-4">
                 <div>
                     <h3 class="font-bold text-white text-sm">Lịch trình của bạn đã lưu</h3>
-                    <p class="text-[11px] text-slate-400 mt-0.5">Chia sẻ link này — bạn bè sẽ thấy đúng những gì bạn đã tuỳ chỉnh.</p>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Chia sẻ link này để bạn bè xem đúng phiên bản đã tùy chỉnh.</p>
                 </div>
                 <button @click="showShareModal = false" class="text-slate-500 hover:text-white ml-3 flex-none transition-colors text-lg leading-none">×</button>
-            </div>
+        </div>
 
             <!-- URL input + copy -->
             <div class="flex gap-2 mb-3">
@@ -2003,17 +2042,17 @@
                 <button @click="copyShareUrl()"
                         class="flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all"
                         :class="shareUrlCopied ? 'bg-emerald-600 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'">
-                    <span x-text="shareUrlCopied ? '✓ Đã copy' : 'Copy'"></span>
+                    <span x-text="shareUrlCopied ? 'Đã copy' : 'Copy'"></span>
                 </button>
-            </div>
+        </div>
 
             <!-- Info pills -->
             <div class="flex flex-wrap gap-1.5 mt-4">
                 <span class="text-[10px] px-2.5 py-1 bg-white/5 rounded-full text-slate-400">
-                    🔗 Link ổn định — chỉnh tiếp hôm sau
+                    • Link ổn định, có thể mở lại sau
                 </span>
                 <span class="text-[10px] px-2.5 py-1 bg-white/5 rounded-full text-slate-400">
-                    👥 Bạn bè xem được khi mở link
+                    • Bạn bè xem được khi mở link
                 </span>
             </div>
 
@@ -2023,6 +2062,7 @@
     </div>
 
     <!-- Web Cẩm nang du lịch Modal -->
+    
     <div x-show="showWebDetailModal" 
          x-cloak
          x-transition:enter="transition ease-out duration-300"
@@ -2033,73 +2073,68 @@
          x-transition:leave-end="opacity-0 scale-95"
          class="fixed inset-0 z-[500] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
         
-        <div class="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 flex flex-col max-h-[85vh]">
-            <!-- Cover image -->
-            <div class="h-44 relative flex-none">
-                <img :src="webDetailData?.image" class="w-full h-full object-cover" />
-                <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+        <div class="bg-white rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-200 flex flex-col max-h-[88vh]">
+            <div class="h-48 relative flex-none">
+                <img :src="webDetailData?.image || 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80'" class="w-full h-full object-cover" />
+                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
                 <button @click="showWebDetailModal = false" 
                         class="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors text-lg font-bold leading-none">
                     ×
                 </button>
-                <div class="absolute bottom-3 left-4 right-4 text-white">
-                    <p class="text-[9px] uppercase tracking-wider font-extrabold text-emerald-400">Cẩm nang chi tiết</p>
-                    <h3 class="text-base font-extrabold mt-0.5" x-text="webDetailData?.title"></h3>
+                <div class="absolute bottom-4 left-4 right-4 text-white">
+                    <p class="text-[10px] uppercase tracking-[0.22em] font-extrabold text-emerald-300">Cẩm nang địa điểm</p>
+                    <h3 class="text-lg font-extrabold mt-1 leading-tight" x-text="webDetailData?.title"></h3>
+                    <p class="text-xs text-white/85 mt-1" x-text="webDetailData?.location"></p>
                 </div>
             </div>
 
-            <!-- Body -->
             <div class="p-5 flex-1 overflow-y-auto flex flex-col gap-4 text-slate-800">
-                <!-- Stats -->
-                <div class="grid grid-cols-3 gap-2 bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
-                    <div>
-                        <p class="text-[9px] text-slate-400 font-bold uppercase">Đánh giá</p>
-                        <p class="text-xs font-bold text-slate-800 mt-0.5" x-text="webDetailData?.rating + ' ⭐'"></p>
+                <div class="grid grid-cols-2 gap-2 rounded-2xl bg-slate-50 border border-slate-100 p-3">
+                    <div class="rounded-xl bg-white border border-slate-100 p-3">
+                        <p class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Diện tích</p>
+                        <p class="text-xs font-bold text-slate-800 mt-1 leading-relaxed" x-text="webDetailData?.area"></p>
                     </div>
-                    <div class="border-l border-slate-200">
-                        <p class="text-[9px] text-slate-400 font-bold uppercase">Thời gian</p>
-                        <p class="text-xs font-bold text-slate-800 mt-0.5" x-text="webDetailData?.duration"></p>
+                    <div class="rounded-xl bg-white border border-slate-100 p-3">
+                        <p class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Giá vé</p>
+                        <p class="text-xs font-bold text-slate-800 mt-1 leading-relaxed" x-text="webDetailData?.price"></p>
                     </div>
-                    <div class="border-l border-slate-200">
-                        <p class="text-[9px] text-slate-400 font-bold uppercase">Giá vé</p>
-                        <p class="text-xs font-bold text-slate-800 mt-0.5 truncate" x-text="webDetailData?.price"></p>
+                    <div class="rounded-xl bg-white border border-slate-100 p-3 col-span-2">
+                        <p class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Thời gian mở</p>
+                        <p class="text-xs font-bold text-slate-800 mt-1 leading-relaxed" x-text="webDetailData?.openHours"></p>
                     </div>
                 </div>
 
-                <!-- Description -->
                 <div>
-                    <h4 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <span>📖</span> Giới thiệu hành trình
-                    </h4>
-                    <p class="text-xs text-slate-600 leading-relaxed mt-1" x-text="webDetailData?.description"></p>
+                    <h4 class="text-sm font-extrabold text-slate-900">Thông tin địa điểm</h4>
+                    <p class="text-sm text-slate-600 leading-6 mt-2" x-text="webDetailData?.overview"></p>
                 </div>
 
-                <!-- Best time -->
-                <div class="bg-blue-50/60 border border-blue-100 rounded-xl p-3 text-xs">
-                    <p class="font-extrabold text-blue-700">💡 Thời điểm đẹp nhất:</p>
-                    <p class="text-slate-600 mt-0.5 font-medium" x-text="webDetailData?.bestTime"></p>
+                <div class="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+                    <h4 class="text-sm font-extrabold text-amber-900">Lịch sử hình thành</h4>
+                    <p class="text-sm text-amber-950/80 leading-6 mt-2" x-text="webDetailData?.history"></p>
                 </div>
 
-                <!-- Tips -->
                 <div>
-                    <h4 class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <span>💡</span> Mẹo du lịch hữu ích
-                    </h4>
-                    <ul class="flex flex-col gap-1.5 mt-1.5">
-                        <template x-for="tip in webDetailData?.tips || []">
-                            <li class="flex items-start gap-2 text-xs text-slate-600">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 flex-none"></span>
-                                <span class="leading-normal font-medium" x-text="tip"></span>
+                    <h4 class="text-sm font-extrabold text-slate-900">Đồ dùng thiết yếu nên mang theo</h4>
+                    <ul class="flex flex-col gap-2 mt-2">
+                        <template x-for="item in webDetailData?.essentials || []" :key="item">
+                            <li class="flex items-start gap-2 text-sm text-slate-600 leading-6">
+                                <span class="mt-2 h-1.5 w-1.5 rounded-full bg-emerald-500 flex-none"></span>
+                                <span x-text="item"></span>
                             </li>
                         </template>
                     </ul>
                 </div>
+
+                <div class="rounded-2xl border border-sky-100 bg-sky-50/80 p-4">
+                    <h4 class="text-sm font-extrabold text-sky-900">Thời điểm nên đi</h4>
+                    <p class="text-sm text-sky-950/80 leading-6 mt-2" x-text="webDetailData?.bestTime"></p>
+                </div>
             </div>
 
-            <!-- Footer -->
             <div class="p-4 border-t border-slate-100 bg-slate-50 flex gap-2 flex-none">
                 <button @click="showWebDetailModal = false" 
-                        class="flex-1 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all active:scale-95">
+                        class="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-sm font-bold transition-all active:scale-95">
                     Đóng cẩm nang
                 </button>
             </div>
@@ -2159,7 +2194,7 @@
                         :class="webVRMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-black/60 text-white'">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-glasses"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="12" r="3"/><path d="M12 12h.01"/><path d="M9 12h6"/><path d="M15 12h3a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3h-3"/><path d="M9 12H6a3 3 0 0 0-3 3v0a3 3 0 0 0 3 3h3"/></svg>
                 </button>
-            </div>
+        </div>
         </div>
 
         <!-- Help drag indicator -->
@@ -2644,6 +2679,23 @@
                     this.$watch('activeSubLocation', (val) => {
                         this.updateMap(!val);
                     });
+
+                    window.openPlaceGuideFromApp = (payload) => {
+                        const nextPayload = payload || window.__pendingVivu360PlaceGuide;
+                        if (!nextPayload) return;
+                        window.__pendingVivu360PlaceGuide = null;
+                        this.openPlaceGuideFromApp(nextPayload);
+                    };
+
+                    if (window.__pendingVivu360PlaceGuide) {
+                        setTimeout(() => {
+                            const pendingPayload = window.__pendingVivu360PlaceGuide;
+                            window.__pendingVivu360PlaceGuide = null;
+                            if (pendingPayload) {
+                                this.openPlaceGuideFromApp(pendingPayload);
+                            }
+                        }, 180);
+                    }
                 },
 
                 viewModeFromPath(pathname, params = new URLSearchParams()) {
@@ -2904,114 +2956,136 @@
                     }
                 },
 
-                openWebDetail(name) {
+                normalizePlaceKeyword(value) {
+                    return String(value || '')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/đ/g, 'd')
+                        .replace(/Đ/g, 'D')
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, ' ')
+                        .trim();
+                },
+
+                buildPlaceGuideData(name, fallbackAddress = '') {
                     const matchedKey = this.getMatchedPlaceKey(name);
-                    const mockData = this.placeMockDetails[matchedKey];
-                    if (mockData) {
-                        this.webDetailData = {
-                            ...mockData,
-                            title: name // Use specific attraction name as title
-                        };
-                        this.showWebDetailModal = true;
-                    }
+                    const baseData = this.placeMockDetails[matchedKey] || this.placeMockDetails['ha-noi'];
+                    if (!baseData) return null;
+
+                    const { match, ...detail } = baseData;
+                    const resolvedTitle = String(name || detail.title || 'Địa điểm du lịch').trim();
+                    const resolvedLocation = String(fallbackAddress || detail.location || '').trim();
+
+                    return {
+                        ...detail,
+                        title: resolvedTitle,
+                        location: resolvedLocation || detail.location,
+                        essentials: Array.isArray(detail.essentials) ? detail.essentials : [],
+                    };
                 },
 
                 getMatchedPlaceKey(name) {
-                    const lower = String(name || '').toLowerCase();
-                    if (lower.includes('ninh bình') || lower.includes('tràng an') || lower.includes('bái đính') || lower.includes('hang múa') || lower.includes('tam cốc') || lower.includes('đường lâm') || lower.includes('đền')) return 'ninh bình';
-                    if (lower.includes('quảng ninh') || lower.includes('hạ long') || lower.includes('ti tốp') || lower.includes('sửng sốt') || lower.includes('tuần châu')) return 'hạ long';
-                    if (lower.includes('kiên giang') || lower.includes('phú quốc') || lower.includes('an thới') || lower.includes('gành dầu') || lower.includes('sao') || lower.includes('bãi sao')) return 'phú quốc';
-                    if (lower.includes('lào cai') || lower.includes('sa pa') || lower.includes('fansipan') || lower.includes('cát cát') || lower.includes('mường hoa')) return 'sa pa';
-                    if (lower.includes('hà nội') || lower.includes('văn miếu') || lower.includes('hồ gươm') || lower.includes('lăng bác') || lower.includes('hoàn kiếm') || lower.includes('nội bài') || lower.includes('phố cổ') || lower.includes('ba đình')) return 'hà nội';
-                    if (lower.includes('nghệ an') || lower.includes('cửa lò') || lower.includes('kim liên') || lower.includes('làng sen') || lower.includes('thanh chương')) return 'nghệ an';
-                    if (lower.includes('vĩnh phúc') || lower.includes('tam đảo') || lower.includes('thác bạc') || lower.includes('cổng trời') || lower.includes('đan viện') || lower.includes('quảng trường')) return 'vĩnh phúc';
-                    return 'hà nội';
+                    const normalized = this.normalizePlaceKeyword(name);
+                    if (!normalized) return 'ha-noi';
+
+                    const matchedEntry = Object.entries(this.placeMockDetails || {}).find(([, detail]) =>
+                        (detail.match || []).some(keyword => normalized.includes(keyword))
+                    );
+
+                    return matchedEntry ? matchedEntry[0] : 'ha-noi';
                 },
 
                 placeMockDetails: {
-                    'ninh bình': {
-                        title: 'Tràng An & Bái Đính',
-                        province: 'Ninh Bình',
-                        image: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80',
-                        rating: '4.9',
-                        reviews: '8.4k',
-                        duration: '2 ngày 1 đêm',
-                        price: '1.200.000đ/người',
-                        description: 'Ninh Bình nổi tiếng với Quần thể di sản thế giới Tràng An, nơi có những dãy núi đá vôi hàng triệu năm tuổi đan xen cùng hệ thống hang động ngập nước kỳ bí. Du khách có thể chèo thuyền dọc sông Sào Khê hoặc ghé thăm chùa Bái Đính - ngôi chùa có quy mô lớn nhất Đông Nam Á.',
-                        tips: ['Mua vé thuyền sớm buổi sáng để tránh đông', 'Mặc áo mưa khi đi hang động', 'Thuê xe đạp khám phá làng quê'],
-                        bestTime: 'Tháng 1 - Tháng 4 (Mùa xuân se lạnh, hội hè lễ chùa)'
+                    'ninh-binh': {
+                        match: ['ninh binh', 'trang an', 'hang mua', 'hoa lu', 'bai dinh', 'tam coc', 'chau son'],
+                        title: 'Tràng An - Ninh Bình',
+                        location: 'Quần thể danh thắng Tràng An, Hoa Lư, Ninh Bình',
+                        image: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1200&q=80',
+                        area: 'Khoảng 6.226 ha vùng lõi di sản thế giới Tràng An',
+                        price: 'Giá vé tham khảo khoảng 250.000 - 300.000 đồng/người lớn, trẻ em từ khoảng 120.000 đồng tùy tuyến',
+                        openHours: 'Khoảng 07:00 - 16:30 hằng ngày; nên đi sớm để tránh đông và kịp chuyến thuyền cuối',
+                        overview: 'Ninh Bình nổi bật với địa hình karst ngập nước hiếm có, nơi núi đá vôi, sông ngòi và hang xuyên thủy đan xen thành một bức tranh vừa hùng vĩ vừa trầm mặc. Khu vực Tràng An, Hang Múa, Cố đô Hoa Lư và các làng quê ven sông tạo nên hành trình giàu cảnh quan, văn hóa và trải nghiệm chèo thuyền đặc trưng của miền di sản.',
+                        history: 'Theo hồ sơ di sản thế giới của UNESCO, Tràng An lưu giữ dấu tích cư trú và thích nghi của con người kéo dài hơn 30.000 năm. Vùng Hoa Lư từng là kinh đô của nhà nước Đại Cồ Việt vào thế kỷ X, vì vậy cảnh quan nơi đây không chỉ đẹp về địa chất mà còn gắn trực tiếp với giai đoạn định hình quốc gia phong kiến độc lập đầu tiên của Việt Nam.',
+                        essentials: ['Giày hoặc dép bám tốt để leo bậc đá ở Hang Múa, chùa hoặc điểm ngắm cảnh.', 'Nón, kem chống nắng và nước uống vì phần lớn thời gian di chuyển ngoài trời hoặc trên thuyền.', 'Áo chống nắng hoặc áo mỏng dài tay; mùa mưa nên mang thêm áo mưa gọn nhẹ.'],
+                        bestTime: 'Đẹp nhất từ tháng 1 đến tháng 4 và cuối tháng 5 đến đầu tháng 6, khi thời tiết dễ chịu và đồng lúa ven sông bắt đầu xanh rồi chuyển vàng.'
                     },
-                    'hạ long': {
+                    'ha-long': {
+                        match: ['ha long', 'quang ninh', 'bai chay', 'sun world', 'sung sot', 'ti top', 'tuan chau', 'gieng don'],
                         title: 'Vịnh Hạ Long',
-                        province: 'Quảng Ninh',
-                        image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
-                        rating: '4.9',
-                        reviews: '12k',
-                        duration: '3 ngày 2 đêm',
-                        price: '3.500.000đ/người',
-                        description: 'Di sản Thiên nhiên Thế giới Vịnh Hạ Long sở hữu hàng ngàn đảo đá vôi kỳ vĩ mọc lên giữa mặt biển xanh ngọc. Trải nghiệm tốt nhất ở đây là nghỉ dưỡng trên du thuyền 5 sao, chèo thuyền kayak qua Hang Luồn và ngắm cảnh hoàng hôn rực rỡ.',
-                        tips: ['Đặt du thuyền trước 2 tuần vào mùa hè', 'Mang kem chống nắng SPF 50+', 'Chụp ảnh lúc bình minh rất đẹp'],
-                        bestTime: 'Tháng 10 - Tháng 12 (Trời thu mát mẻ, nắng nhẹ lung linh)'
+                        location: 'Vịnh Hạ Long, thành phố Hạ Long, Quảng Ninh',
+                        image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
+                        area: 'Khoảng 65.650 ha theo phạm vi Di sản thế giới Hạ Long - Quần đảo Cát Bà',
+                        price: 'Vé tham quan ban ngày phổ biến khoảng 200.000 - 250.000 đồng/người theo tuyến; du thuyền nghỉ đêm tính riêng',
+                        openHours: 'Các tuyến tham quan vịnh thường đón khách từ 06:30 đến 18:30 hằng ngày',
+                        overview: 'Hạ Long là quần thể đảo đá vôi và mặt nước biển nổi tiếng bậc nhất Việt Nam, gây ấn tượng bởi những cột núi dựng đứng, hang động lớn và các bãi tắm ven vịnh. Khu vực này phù hợp cho cả trải nghiệm đi tàu ngắm cảnh, nghỉ đêm trên du thuyền, chèo kayak và kết hợp vui chơi ở Bãi Cháy hoặc Sun World.',
+                        history: 'Hạ Long được UNESCO ghi danh Di sản thiên nhiên thế giới lần đầu năm 1994 về giá trị thẩm mỹ, tiếp tục được công nhận bổ sung năm 2000 về giá trị địa chất - địa mạo và mở rộng thành Hạ Long - Quần đảo Cát Bà năm 2023. Các khối karst ở đây hình thành qua hàng triệu năm xâm thực biển và phong hóa, tạo nên một trong những cảnh quan tháp đá ngập biển đặc sắc nhất thế giới.',
+                        essentials: ['Kính mát, kem chống nắng và mũ rộng vành vì ánh nắng phản chiếu trên mặt biển khá gắt.', 'Túi chống nước cho điện thoại, giấy tờ và đồ điện tử nếu đi tàu nhỏ hoặc chèo kayak.', 'Áo khoác mỏng và thuốc say sóng nếu bạn đi tàu lâu hoặc ngủ đêm trên vịnh.'],
+                        bestTime: 'Đẹp nhất từ tháng 10 đến tháng 4 năm sau, khi trời khô ráo, tầm nhìn tốt và mặt vịnh thường êm hơn mùa hè mưa bão.'
                     },
-                    'phú quốc': {
-                        title: 'Đảo Ngọc Phú Quốc',
-                        province: 'Kiên Giang',
-                        image: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=800&q=80',
-                        rating: '5.0',
-                        reviews: '34k',
-                        duration: '4 ngày 3 đêm',
-                        price: '4.200.000đ/người',
-                        description: 'Phú Quốc là hòn đảo lớn nhất Việt Nam, sở hữu những bãi biển cát trắng mịn màng như Bãi Sao, Bãi Khem cùng làn nước biển trong vắt. Phú Quốc cũng nổi tiếng với cáp treo hòn Thơm vượt biển dài nhất thế giới và các khu vui chơi giải trí VinWonders đẳng cấp.',
-                        tips: ['Thuê xe máy khám phá toàn đảo', 'Tránh đi mùa mưa tháng 6–9', 'Mua nước mắm Phú Quốc làm quà'],
-                        bestTime: 'Tháng 11 - Tháng 4 (Mùa khô bãi biển êm ả, nắng vàng đẹp)'
+                    'phu-quoc': {
+                        match: ['phu quoc', 'kien giang', 'an thoi', 'hon thom', 'bai sao', 'gianh dau', 'duong dong', 'ham ninh'],
+                        title: 'Phú Quốc',
+                        location: 'Thành phố Phú Quốc, tỉnh Kiên Giang',
+                        image: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=1200&q=80',
+                        area: 'Khoảng 589,23 km²; riêng đảo Phú Quốc lớn khoảng 567 km²',
+                        price: 'Không thu vé để vào đảo; nhiều bãi biển và điểm công cộng miễn phí, còn cáp treo, khu vui chơi hoặc tour biển tính vé riêng',
+                        openHours: 'Đảo và bãi biển mở cả ngày; từng điểm tham quan, chợ đêm hoặc khu vui chơi có khung giờ riêng',
+                        overview: 'Phú Quốc là đảo lớn nhất Việt Nam, nổi bật với hệ sinh thái biển - rừng, bãi cát dài, làng chài và các quần đảo nhỏ phía nam như An Thới, Hòn Thơm. Điểm đến này phù hợp cho nghỉ dưỡng biển, lặn ngắm san hô, khám phá vườn quốc gia và trải nghiệm ẩm thực hải sản, hồ tiêu, nước mắm đặc trưng.',
+                        history: 'Theo tư liệu giới thiệu của địa phương, Phú Quốc gắn với quá trình khai phá vùng biển Tây Nam và lịch sử hình thành cộng đồng cư dân trên đảo từ rất sớm, đặc biệt liên quan đến dòng họ Mạc trong giai đoạn cuối thế kỷ XVII. Trải qua thời kỳ giao thương biển, chiến tranh và phát triển du lịch hiện đại, Phú Quốc dần trở thành trung tâm nghỉ dưỡng lớn của vùng vịnh Thái Lan.',
+                        essentials: ['Đồ bơi, dép đi biển và khăn nhanh khô nếu bạn di chuyển nhiều giữa bãi biển, cano và đảo nhỏ.', 'Kem chống nắng, mũ và kính râm là gần như bắt buộc vì nắng biển kéo dài trong ngày.', 'Thuốc chống côn trùng và túi chống nước hữu ích khi vào rừng, đi suối hoặc tham gia tour biển.'],
+                        bestTime: 'Thích hợp nhất từ tháng 11 đến tháng 4, khi biển êm, nắng đẹp và thuận lợi cho tắm biển, đi cano hoặc lặn ngắm san hô.'
                     },
-                    'sa pa': {
-                        title: 'Thị xã Sương Mù Sa Pa',
-                        province: 'Lào Cai',
-                        image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=800&q=80',
-                        rating: '4.8',
-                        reviews: '21k',
-                        duration: '3 ngày 2 đêm',
-                        price: '2.800.000đ/người',
-                        description: 'Nằm ở độ cao 1.600m thuộc dãy Hoàng Liên Sơn, Sa Pa quyến rũ du khách bởi những thửa ruộng bậc thang kỳ vĩ xếp tầng lớp như nấc thang lên trời, khí hậu mát mẻ quanh năm và nét văn hóa đa dạng đặc sắc của đồng bào các dân tộc thiểu số H\'Mông, Dao, Tày.',
-                        tips: ['Mang áo ấm dù đi mùa hè', 'Book phòng homestay H\'Mông trải nghiệm', 'Đăng ký leo Fansipan qua cáp treo'],
-                        bestTime: 'Tháng 9 - Tháng 11 (Mùa lúa chín vàng óng khắp các sườn đồi)'
+                    'sa-pa': {
+                        match: ['sa pa', 'sapa', 'lao cai', 'fansipan', 'cat cat', 'muong hoa', 'ta phin', 'ham rong'],
+                        title: 'Sa Pa',
+                        location: 'Thị xã Sa Pa, tỉnh Lào Cai',
+                        image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=1200&q=80',
+                        area: 'Hơn 68.000 ha diện tích tự nhiên của thị xã Sa Pa',
+                        price: 'Khu trung tâm thị xã tham quan tự do; các điểm như Cát Cát, Fansipan hoặc tàu Mường Hoa có giá vé riêng',
+                        openHours: 'Thị xã mở cả ngày; đa số điểm tham quan và dịch vụ hoạt động mạnh vào ban ngày đến đầu tối',
+                        overview: 'Sa Pa hấp dẫn bởi khí hậu mát lạnh, ruộng bậc thang, thung lũng sâu và nhịp sống văn hóa của cộng đồng H’Mông, Dao, Tày, Giáy. Ngoài khu trung tâm với nhà thờ đá và chợ, du khách còn dễ dàng nối chuyến tới bản Cát Cát, thung lũng Mường Hoa, Tả Phìn hoặc Fansipan.',
+                        history: 'Theo tư liệu du lịch Sa Pa và các bài viết lưu trữ về lịch sử khu du lịch quốc gia, Sa Pa được người Pháp khảo sát đầu thế kỷ XX và dần phát triển thành khu nghỉ dưỡng miền núi từ khoảng năm 1903. Trải qua chiến tranh và nhiều biến động, Sa Pa phục hồi mạnh từ cuối thế kỷ XX, rồi từng bước hình thành diện mạo của một trung tâm du lịch quốc gia gắn với thiên nhiên và văn hóa bản địa.',
+                        essentials: ['Áo khoác mỏng hoặc áo ấm kể cả mùa hè vì sáng sớm và đêm xuống nhiệt độ giảm nhanh.', 'Giày đi bộ chống trơn rất cần nếu bạn xuống bản, leo dốc hoặc di chuyển trong điều kiện sương ẩm.', 'Ô gọn hoặc áo mưa mỏng hữu ích vì thời tiết Sa Pa đổi nhanh trong ngày.'],
+                        bestTime: 'Đẹp nhất vào tháng 3 đến tháng 5 và tháng 9 đến tháng 11, khi trời quang, ruộng bậc thang đẹp và nhiệt độ dễ chịu.'
                     },
-                    'hà nội': {
-                        title: 'Thủ đô Hà Nội',
-                        province: 'Hà Nội',
-                        image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=800&q=80',
-                        rating: '4.9',
-                        reviews: '42k',
-                        duration: '2 ngày 1 đêm',
-                        price: '900.000đ/người',
-                        description: 'Hà Nội - thủ đô ngàn năm văn hiến, nơi gìn giữ những giá trị lịch sử và tinh hoa văn hóa lâu đời của dân tộc Việt Nam. Du khách có thể tản bộ quanh Hồ Gươm cổ kính, khám phá 36 phố phường nhộn nhịp, hay ghé thăm Văn Miếu - trường đại học đầu tiên của đất nước.',
-                        tips: ['Đi bộ khám phá phố cổ vào buổi sáng', 'Thưởng thức cà phê trứng tại phố Đinh Tiên Hoàng', 'Tham quan bảo tàng Dân tộc học'],
-                        bestTime: 'Tháng 9 - Tháng 11 (Mùa thu Hà Nội se lạnh, thơm mùi hoa sữa)'
+                    'ha-noi': {
+                        match: ['ha noi', 'hoan kiem', 'ngoc son', 'van mieu', 'quoc tu giam', 'lang chu tich ho chi minh', 'lang bac', 'pho co', 'ba dinh', 'dinh tien hoang'],
+                        title: 'Hà Nội',
+                        location: 'Khu trung tâm Thủ đô Hà Nội',
+                        image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80',
+                        area: 'Riêng không gian du lịch hồ Hoàn Kiếm và phố cổ khoảng 145,72 ha',
+                        price: 'Khu hồ Hoàn Kiếm đi bộ miễn phí; Đền Ngọc Sơn khoảng 50.000 đồng/lượt, Văn Miếu - Quốc Tử Giám khoảng 70.000 đồng/lượt',
+                        openHours: 'Đền Ngọc Sơn thường mở khoảng 07:00 - 19:00 ngày thường, cuối tuần có thể tới 22:00; Văn Miếu mở 08:00 - 17:00 hằng ngày',
+                        overview: 'Hà Nội là lớp trầm tích của kinh đô, phố thị và đời sống hiện đại, nơi các điểm đến lịch sử nằm khá gần nhau và dễ kết nối bằng đi bộ hoặc xe ngắn chặng. Từ hồ Hoàn Kiếm, phố cổ, Đền Ngọc Sơn tới Văn Miếu hay khu Ba Đình, mỗi điểm đều mang nét riêng nhưng cùng kể câu chuyện về bản sắc Thăng Long - Hà Nội.',
+                        history: 'Kinh thành Thăng Long được định đô từ năm 1010 và suốt nhiều thế kỷ là trung tâm chính trị, văn hóa của đất nước. Riêng hồ Hoàn Kiếm gắn với truyền thuyết vua Lê Lợi hoàn gươm vào thế kỷ XV, còn Văn Miếu - Quốc Tử Giám được lập từ năm 1070 và phát triển thành trung tâm đào tạo Nho học lớn nhất nước dưới các triều Lý, Trần, Lê.',
+                        essentials: ['Giày đi bộ êm chân vì các điểm trong khu trung tâm thường phù hợp nhất khi khám phá bằng cách đi bộ.', 'Quạt cầm tay hoặc ô nhỏ hữu ích vào mùa hè; mùa đông nên có áo khoác mỏng.', 'Một chai nước nhỏ và máy ảnh hoặc điện thoại đủ pin để chụp kiến trúc, phố cổ và các lớp không gian di sản.'],
+                        bestTime: 'Dễ chịu nhất từ tháng 9 đến tháng 11 và tháng 2 đến tháng 4, khi trời mát, ít mưa lớn và thuận tiện cho đi bộ tham quan.'
                     },
-                    'nghệ an': {
-                        title: 'Xứ Nghệ Địa Linh Nhân Kiệt',
-                        province: 'Nghệ An',
-                        image: 'https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?auto=format&fit=crop&w=800&q=80',
-                        rating: '4.8',
-                        reviews: '9.2k',
-                        duration: '2 ngày 1 đêm',
-                        price: '1.100.000đ/người',
-                        description: 'Nghệ An là vùng đất học hào kiệt, quê hương của Chủ tịch Hồ Chí Minh vĩ đại. Nơi đây sở hữu các di tích văn hóa lịch sử ý nghĩa, các danh lam thắng cảnh tự nhiên tươi đẹp như bãi biển Cửa Lò thoải rộng đầy nắng gió, đồi chè Thanh Chương mộng mơ.',
-                        tips: ['Tắm biển Cửa Lò buổi sáng sớm', 'Mua kẹo Cu Đơ đặc sản về làm quà', 'Tham quan làng nghề truyền thống'],
-                        bestTime: 'Tháng 5 - Tháng 8 (Mùa hè biển êm nắng ấm rất thích hợp du lịch)'
+                    'nghe-an': {
+                        match: ['nghe an', 'kim lien', 'lang sen', 'hoang tru', 'cua lo', 'thanh chuong', 'vinh'],
+                        title: 'Nghệ An',
+                        location: 'Nam Đàn, Cửa Lò và thành phố Vinh, Nghệ An',
+                        image: 'https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?auto=format&fit=crop&w=1200&q=80',
+                        area: 'Tỉnh Nghệ An có diện tích khoảng 16.490 km²; riêng cụm di tích Kim Liên phân bố trên nhiều điểm ở Nam Đàn',
+                        price: 'Nhiều không gian công cộng và bãi biển mở tự do; Nhà lưu niệm Hồ Chí Minh trong khu Kim Liên đang niêm yết miễn phí',
+                        openHours: 'Khu di tích Kim Liên mở tất cả các ngày trong tuần; Nhà lưu niệm Hồ Chí Minh tham khảo khoảng 07:00 - 17:00',
+                        overview: 'Nghệ An kết hợp khá rõ giữa du lịch về nguồn, văn hóa xứ Nghệ và nghỉ biển. Nếu đi theo tuyến Nam Đàn - Vinh - Cửa Lò, bạn có thể vừa thăm quê Bác, vừa cảm nhận không gian làng quê trung du, ẩm thực địa phương và sau đó nối hành trình ra biển.',
+                        history: 'Khu di tích Kim Liên là cụm di tích đặc biệt gắn với quê ngoại Hoàng Trù, quê nội Làng Sen và tuổi thơ của Chủ tịch Hồ Chí Minh. Tư liệu địa phương cho biết khu di tích được công nhận là Di tích lịch sử văn hóa từ năm 1979, đồng thời lưu dấu cả hai lần Bác Hồ về thăm quê vào ngày 14 tháng 6 năm 1957 và từ ngày 8 đến ngày 10 tháng 12 năm 1961.',
+                        essentials: ['Trang phục lịch sự nếu bạn vào các điểm di tích, nhà tưởng niệm hoặc khu thờ tự.', 'Mũ, kính và nước uống cần thiết khi di chuyển ngoài trời ở Nam Đàn hoặc đi biển Cửa Lò vào mùa hè.', 'Nên mang thêm khăn mỏng hoặc áo chống nắng vì khí hậu miền Trung có thể nóng và khô vào ban ngày.'],
+                        bestTime: 'Phù hợp nhất từ tháng 4 đến tháng 8 nếu ưu tiên nghỉ biển, còn du lịch về nguồn ở Nam Đàn có thể đi quanh năm và đẹp hơn vào ngày nắng nhẹ.'
                     },
-                    'vĩnh phúc': {
-                        title: 'Tam Đảo Mờ Sương',
-                        province: 'Vĩnh Phúc',
-                        image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=800&q=80',
-                        rating: '4.7',
-                        reviews: '6.5k',
-                        duration: '2 ngày 1 đêm',
-                        price: '1.500.000đ/người',
-                        description: 'Tam Đảo nổi tiếng với khí hậu mát mẻ quanh năm, được ví như Đà Lạt của miền Bắc. Nơi đây sở hữu cảnh sắc thiên nhiên thơ mộng với sương mù che phủ đỉnh núi, nhà thờ đá cổ kính và cổng trời mây ngàn tuyệt đẹp.',
-                        tips: ['Chuẩn bị áo khoác nhẹ vì đêm se lạnh', 'Ghé thăm nhà thờ đá cổ lúc hoàng hôn', 'Thưởng thức ngọn su su xào tỏi'],
-                        bestTime: 'Tháng 9 - Tháng 3 sang năm'
+                    'tam-dao': {
+                        match: ['tam dao', 'vinh phuc', 'nha tho da', 'tay thien', 'thac bac', 'cong troi', 'morocco homestay'],
+                        title: 'Tam Đảo',
+                        location: 'Thị trấn Tam Đảo, tỉnh Vĩnh Phúc',
+                        image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=1200&q=80',
+                        area: 'Khu du lịch quốc gia Tam Đảo khoảng 10.723 ha',
+                        price: 'Không thu vé để vào khu du lịch chung; một số điểm dịch vụ, cáp treo hoặc trải nghiệm riêng sẽ có giá riêng',
+                        openHours: 'Thị trấn và không gian cảnh quan mở cả ngày; các quán, điểm tham quan cụ thể hoạt động theo từng khung giờ',
+                        overview: 'Tam Đảo là điểm nghỉ núi gần Hà Nội, nổi bật với khí hậu mát, sương phủ, nhà thờ đá, quán cà phê ngắm mây và những cung đường dốc đặc trưng. Hành trình ngắn ngày ở đây thường kết hợp nghỉ dưỡng, săn mây, dạo trung tâm thị trấn và nối thêm Tây Thiên hoặc các điểm sinh thái quanh dãy núi.',
+                        history: 'Theo tư liệu du lịch quốc gia, Tam Đảo từ lâu đã được biết đến như một vùng nghỉ dưỡng nhờ độ cao, không khí mát và cảnh quan núi rừng. Khu vực này được người Pháp khai thác làm nơi nghỉ mát từ đầu thế kỷ XX, về sau phát triển dần thành thị trấn du lịch và được công nhận là Khu du lịch quốc gia vào ngày 25 tháng 1 năm 2022.',
+                        essentials: ['Áo khoác mỏng hoặc hoodie vì nhiệt độ buổi tối và sáng sớm giảm khá nhanh.', 'Giày bám tốt để đi dốc, leo bậc đá và di chuyển an toàn khi sương xuống hoặc mặt đường ẩm.', 'Ô gọn hoặc áo mưa nhẹ nên có sẵn trong balo vì mây mù và mưa nhỏ có thể xuất hiện bất chợt.'],
+                        bestTime: 'Dễ đi nhất từ tháng 4 đến tháng 7 để tránh nóng, hoặc từ tháng 9 đến tháng 11 khi không khí trong hơn và thuận lợi săn mây.'
                     }
                 },
 
@@ -3041,40 +3115,47 @@
                     });
                 },
 
-                openWebDetail(name) {
-                    if (!name) return;
-                    const lower = String(name).toLowerCase();
-                    let title = name;
-                    let image = 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80';
-                    let rating = '4.9';
-                    let duration = '2 ngày 1 đêm';
-                    let price = 'Miễn phí / Tự túc';
-                    let bestTime = 'Tháng 1 - Tháng 4 (Khí hậu mát mẻ, hội hè)';
-                    let tips = [
-                        'Mang theo mũ nón và kem chống nắng khi tham quan',
-                        'Sạc đầy pin điện thoại và máy ảnh',
-                        'Thưởng thức đặc sản địa phương tại khu vực lân cận'
-                    ];
+                openWebDetail(name, fallbackAddress = '') {
+                    const guideData = this.buildPlaceGuideData(name, fallbackAddress);
+                    if (!guideData) return;
+                    this.webDetailData = guideData;
+                    this.showWebDetailModal = true;
+                },
 
-                    if (lower.includes('hạ long') || lower.includes('quảng ninh') || lower.includes('bãi cháy')) {
-                        image = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80';
-                        price = '1.500.000đ/người';
-                    } else if (lower.includes('phú quốc') || lower.includes('kiên giang')) {
-                        image = 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=800&q=80';
-                        price = '2.200.000đ/người';
-                    } else if (lower.includes('sa pa') || lower.includes('lào cai') || lower.includes('fansipan')) {
-                        image = 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=800&q=80';
-                        price = '1.800.000đ/người';
-                    } else if (lower.includes('hà nội') || lower.includes('hoàn kiếm') || lower.includes('ngọc sơn') || lower.includes('văn miếu')) {
-                        image = 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=800&q=80';
-                        price = 'Miễn phí / Vé tham quan 30k';
-                    } else if (lower.includes('nghệ an') || lower.includes('cửa lò') || lower.includes('làng sen')) {
-                        image = 'https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?auto=format&fit=crop&w=800&q=80';
-                        price = '1.100.000đ/người';
+                async openPlaceGuideFromApp(payload) {
+                    const placeName = String(payload?.placeName || '').trim();
+                    if (!placeName) return;
+
+                    const targetAddress = String(payload?.address || '').trim();
+                    const normalizedTarget = this.normalizePlaceKeyword(placeName);
+                    let matched = null;
+
+                    const allLocations = this.getAllAvailableLocations();
+                    if (normalizedTarget) {
+                        matched = allLocations.find((item) => {
+                            const normalizedName = this.normalizePlaceKeyword(item?.name);
+                            return normalizedName && (normalizedName.includes(normalizedTarget) || normalizedTarget.includes(normalizedName));
+                        }) || null;
                     }
 
-                    this.webDetailData = { title, image, rating, duration, price, bestTime, tips };
-                    this.showWebDetailModal = true;
+                    if (matched?.planSlug && matched.planSlug !== this.currentPlanId) {
+                        await this.changePlan(matched.planSlug);
+                    }
+
+                    if (matched) {
+                        this.$nextTick(() => {
+                            this.selectMapSearchResult(matched);
+                            if (payload?.openGuide === false) return;
+                            setTimeout(() => {
+                                this.openWebDetail(matched.name || placeName, targetAddress || matched.address || '');
+                            }, 280);
+                        });
+                        return;
+                    }
+
+                    if (payload?.openGuide !== false) {
+                        this.openWebDetail(placeName, targetAddress);
+                    }
                 },
 
                 closeWebVR() {
@@ -5828,3 +5909,6 @@
     </script>
 </body>
 </html>
+
+
+

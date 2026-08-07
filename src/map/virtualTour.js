@@ -30,6 +30,7 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { extractPinterestImage, getImageSource } from './pinterestExtractor';
+import { getSafeImageSource } from '../utils/image';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -393,7 +394,7 @@ export function VirtualTourScreen({ theme, isDarkMode, tourId, startSpotIdx, onB
     return (
       <View style={styles.panoContainer} {...panResponder.panHandlers}>
         <Animated.Image
-          source={imageSource || { uri: spot.image }}
+          source={imageSource || getSafeImageSource(spot.image)}
           style={[
             styles.panoImage,
             {
@@ -672,7 +673,7 @@ export function VirtualTourScreen({ theme, isDarkMode, tourId, startSpotIdx, onB
               {extractedSpotImg ? (
                 <View style={styles.imagePreviewContainer}>
                   <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Xem trước ảnh:</Text>
-                  <Image source={getImageSource(extractedSpotImg) || { uri: extractedSpotImg }} style={styles.previewImage} resizeMode="cover" />
+                  <Image source={getImageSource(extractedSpotImg) || getSafeImageSource(extractedSpotImg)} style={styles.previewImage} resizeMode="cover" />
                   <Pressable style={styles.removePreviewBtn} onPress={() => setExtractedSpotImg('')}>
                     <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '700' }}>Xóa ảnh preview</Text>
                   </Pressable>
@@ -1731,3 +1732,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 });
+
+
+

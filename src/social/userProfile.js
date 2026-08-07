@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, Image, Pressable, ScrollView, StyleSheet, Modal, Dimensions, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getRankDetails } from '../data';
+import { getSafeAvatarSource, getSafeCoverSource, getSafeImageSource } from '../utils/image';
 import {
   X,
   MapPin,
@@ -95,7 +96,7 @@ export function UserProfileModal({ username, visible, onClose, isDarkMode, theme
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
           {/* Header images */}
           <View style={styles.headerArea}>
-            <Image source={{ uri: profile.cover }} style={styles.coverImage} />
+            <Image source={getSafeCoverSource(profile.cover)} style={styles.coverImage} />
             <LinearGradient
               colors={['rgba(0,0,0,0.5)', 'transparent', 'rgba(0,0,0,0.4)']}
               style={styles.coverGradient}
@@ -118,7 +119,7 @@ export function UserProfileModal({ username, visible, onClose, isDarkMode, theme
                 end={{ x: 1, y: 1 }}
               >
                 <View style={[styles.modalAvatarInner, { backgroundColor: theme.card }]}>
-                  <Image source={{ uri: profile.avatar }} style={styles.modalAvatarImage} />
+                  <Image source={getSafeAvatarSource(profile.avatar)} style={styles.modalAvatarImage} />
                 </View>
               </LinearGradient>
               <View style={styles.actionRow}>
@@ -179,7 +180,7 @@ export function UserProfileModal({ username, visible, onClose, isDarkMode, theme
                 <Text style={[styles.bioTitle, { color: theme.textPrimary, marginTop: 14 }]}>Ảnh Check-in</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoGrid}>
                   {profile.photos.map((photoUrl, idx) => (
-                    <Image key={idx} source={{ uri: photoUrl }} style={styles.checkinPhoto} />
+                    <Image key={idx} source={getSafeImageSource(photoUrl)} style={styles.checkinPhoto} />
                   ))}
                 </ScrollView>
               </>
@@ -294,3 +295,7 @@ const styles = StyleSheet.create({
   photoGrid: { gap: 8, marginTop: 8 },
   checkinPhoto: { width: 90, height: 90, borderRadius: 12 },
 });
+
+
+
+

@@ -3,6 +3,7 @@ import { View, Text, Image, Pressable, StyleSheet, TextInput, Alert } from 'reac
 import { LinearGradient } from 'expo-linear-gradient';
 import { Camera, Heart, Image as ImageIcon, MapPin, MessageCircle, Pencil, Send, UserRound, X } from 'lucide-react-native';
 import { createPost, getUserPosts } from '../services/postService';
+import { getSafeAvatarSource, getSafeCoverSource, getSafeImageSource, hasImageUri } from '../utils/image';
 
 const DEFAULT_COVER = 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80';
 
@@ -75,14 +76,14 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
     <View style={styles.page}>
       <View style={[styles.profileCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <View style={styles.coverWrap}>
-          <Image source={{ uri: userInfo.cover || DEFAULT_COVER }} style={styles.cover} />
+          <Image source={getSafeCoverSource(userInfo.cover, DEFAULT_COVER)} style={styles.cover} />
           <LinearGradient colors={['transparent', 'rgba(0,0,0,0.5)']} style={StyleSheet.absoluteFillObject} />
           <View style={styles.cameraBadge}><Camera size={16} color="#fff" /></View>
         </View>
 
         <View style={styles.identityArea}>
           <View style={[styles.avatarFrame, { backgroundColor: theme.card }]}>
-            <Image source={{ uri: userInfo.avatar }} style={styles.avatar} />
+            <Image source={getSafeAvatarSource(userInfo.avatar)} style={styles.avatar} />
           </View>
           <Pressable style={styles.editButton} onPress={onEditProfile}>
             <Pencil size={14} color="#fff" />
@@ -96,7 +97,7 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
 
       <View style={[styles.composerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <View style={styles.composerTopRow}>
-          <Image source={{ uri: userInfo.avatar }} style={styles.composerAvatar} />
+          <Image source={getSafeAvatarSource(userInfo.avatar)} style={styles.composerAvatar} />
           <Pressable
             style={[styles.composerPrompt, { backgroundColor: theme.searchBg, borderColor: theme.border }]}
             onPress={() => setComposerOpen(true)}
@@ -130,7 +131,7 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
               <ImageIcon size={16} color="#10b981" />
               <TextInput value={postImage} onChangeText={setPostImage} placeholder="Dán URL hình ảnh (không bắt buộc)" placeholderTextColor={theme.textMuted} autoCapitalize="none" style={[styles.extraInput, { color: theme.textPrimary }]} />
             </View>
-            {!!postImage.trim() && <Image source={{ uri: postImage.trim() }} style={styles.imagePreview} />}
+            {hasImageUri(postImage) && <Image source={getSafeImageSource(postImage)} style={styles.imagePreview} />}
             <Pressable style={[styles.publishButton, publishing && { opacity: 0.6 }]} onPress={publishPost} disabled={publishing}>
               <Send size={16} color="#fff" />
               <Text style={styles.publishText}>{publishing ? 'Đang đăng...' : 'Đăng bài'}</Text>
@@ -157,7 +158,7 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
       ) : myPosts.map(post => (
         <View key={post.id} style={[styles.postCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <View style={styles.postHeader}>
-            <Image source={{ uri: userInfo.avatar }} style={styles.postAvatar} />
+            <Image source={getSafeAvatarSource(userInfo.avatar)} style={styles.postAvatar} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.postAuthor, { color: theme.textPrimary }]}>{userInfo.name}</Text>
               <Text style={[styles.postMeta, { color: theme.textSecondary }]}>{post.time || 'Vừa xong'} · Vivu360</Text>
@@ -167,7 +168,7 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
           {!!post.location && (
             <View style={styles.locationRow}><MapPin size={13} color="#3b82f6" /><Text style={styles.locationText}>{post.location}</Text></View>
           )}
-          {!!post.image && <Image source={{ uri: post.image }} style={styles.postImage} />}
+          {hasImageUri(post.image) && <Image source={getSafeImageSource(post.image)} style={styles.postImage} />}
           <View style={[styles.postActions, { borderTopColor: theme.border }]}>
             <View style={styles.action}><Heart size={17} color={post.likedByUser ? '#ef4444' : theme.textSecondary} fill={post.likedByUser ? '#ef4444' : 'transparent'} /><Text style={{ color: theme.textSecondary }}>{post.likes || 0}</Text></View>
             <View style={styles.action}><MessageCircle size={17} color={theme.textSecondary} /><Text style={{ color: theme.textSecondary }}>{post.commentsCount || 0}</Text></View>
@@ -225,3 +226,10 @@ const styles = StyleSheet.create({
   postActions: { height: 44, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
   action: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 });
+
+
+
+
+
+
+

@@ -52,6 +52,7 @@ import {
   mockMapMarkers,
   getRankDetails,
 } from '../data';
+import { getSafeAvatarSource, getSafeImageSource } from '../utils/image';
 
 
 const { width } = Dimensions.get('window');
@@ -365,7 +366,7 @@ export function HomeScreen({
               >
                 <View style={[styles.headerAvatarInner, { backgroundColor: theme.background }]}>
                   <Image
-                    source={{ uri: currentUser.avatar }}
+                    source={getSafeAvatarSource(currentUser.avatar)}
                     style={styles.avatarImage}
                   />
                 </View>
@@ -690,7 +691,7 @@ export function HomeScreen({
       {/* PROMOTION BANNER SLIDER */}
       <View style={styles.bannerContainer}>
         <Pressable style={[styles.bannerCard, { borderColor: theme.border }]}>
-          <Image source={{ uri: banner.image }} style={styles.bannerImg} resizeMode="cover" />
+          <Image source={getSafeImageSource(banner.image)} style={styles.bannerImg} resizeMode="cover" />
           <LinearGradient
             colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
             style={styles.bannerGradient}
@@ -797,7 +798,7 @@ export function HomeScreen({
             style={[styles.vrCard, { borderColor: theme.border }]}
             onPress={() => onNavigateToTour && onNavigateToTour(item.id, 0)}
           >
-            <Image source={{ uri: item.image }} style={styles.vrImg} resizeMode="cover" />
+            <Image source={getSafeImageSource(item.image)} style={styles.vrImg} resizeMode="cover" />
             <LinearGradient
               colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
               style={styles.vrGrad}
@@ -844,7 +845,7 @@ export function HomeScreen({
       >
         {diaDiem.map((item, index) => (
           <Pressable key={index} style={[styles.destCard, { borderColor: theme.border }]}>
-            <Image source={{ uri: item.hinhAnh }} style={styles.destImg} resizeMode="cover" />
+            <Image source={getSafeImageSource(item.hinhAnh)} style={styles.destImg} resizeMode="cover" />
             <LinearGradient
               colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
               style={styles.destGrad}
@@ -1172,7 +1173,7 @@ export function ExploreScreen({
               onPress={() => handleOpenItemDetail(item)}
             >
               <View style={styles.exploreItemImageContainer}>
-                <Image source={{ uri: item.image }} style={styles.exploreItemImage} />
+                <Image source={getSafeImageSource(item.image)} style={styles.exploreItemImage} />
                 <LinearGradient
                   colors={['transparent', 'rgba(0,0,0,0.85)']}
                   style={styles.exploreItemGrad}
@@ -1391,7 +1392,7 @@ export function ExploreScreen({
                 <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
                   {/* Cover Image */}
                   <View style={{ height: 200, position: 'relative' }}>
-                    <Image source={{ uri: selectedItem.image }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    <Image source={getSafeImageSource(selectedItem.image)} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                     <LinearGradient
                       colors={['transparent', 'rgba(0,0,0,0.85)']}
                       style={StyleSheet.absoluteFillObject}
@@ -1758,7 +1759,7 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
       <View style={[styles.viewfinderBox, { borderColor: theme.border }]}>
         {/* Mock background placeholder - like camera image */}
         <Image
-          source={{ uri: cameraBgImage }}
+          source={getSafeImageSource(cameraBgImage)}
           blurRadius={isCameraTransitioning ? 15 : 0}
           style={[
             styles.viewfinderBg, 
@@ -2035,7 +2036,7 @@ export function ProfileScreen({ isDarkMode, setIsDarkMode, theme, userInfo, setU
               >
                 <View style={[styles.profileAvatarInner, { backgroundColor: theme.card }]}>
                   <Image
-                    source={{ uri: userInfo.avatar }}
+                    source={getSafeAvatarSource(userInfo.avatar)}
                     style={styles.profileAvatarImage}
                   />
                 </View>
@@ -3644,3 +3645,12 @@ const styles = StyleSheet.create({
   },
 
 });
+
+
+
+
+
+
+
+
+

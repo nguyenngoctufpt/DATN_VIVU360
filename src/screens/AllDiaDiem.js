@@ -3,6 +3,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { getDiaDiem } from '../services/diaDiemService';
 import { Heart, Flame, MapPin, Search } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getSafeImageSource } from '../utils/image';
 
 const AllDiaDiem = ({ theme,onSelectDiaDiem }) => {
   //Địa điểm
@@ -29,7 +30,7 @@ const AllDiaDiem = ({ theme,onSelectDiaDiem }) => {
       ]}
     >
       <Image
-        source={{ uri: item.hinhAnh }}
+        source={getSafeImageSource(item.hinhAnh)}
         style={styles.destImg}
         resizeMode="cover"
       />
@@ -327,3 +328,4 @@ const styles = StyleSheet.create({
   },
 
 })
+

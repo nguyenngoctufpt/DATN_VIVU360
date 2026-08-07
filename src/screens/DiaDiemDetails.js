@@ -7,6 +7,7 @@ import {
     Pressable,
 } from 'react-native'
 import React from 'react'
+import { getSafeImageSource } from '../utils/image'
 
 import {
     MapPin,
@@ -37,7 +38,7 @@ const DiaDiemDetails = ({
             <View>
 
                 <Image
-                    source={{ uri: diaDiem.hinhAnh }}
+                    source={getSafeImageSource(diaDiem.hinhAnh)}
                     style={styles.banner}
                     resizeMode="cover"
                 />
@@ -269,3 +270,4 @@ doDungText: {
   marginTop: 6,
 },
 })
+

@@ -1,25 +1,11 @@
-import React, { useRef, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View, Text, Pressable, SafeAreaView, ActivityIndicator, BackHandler, Platform, StatusBar, Alert } from 'react-native';
-import { WebView } from 'react-native-webview';
-import { ChevronLeft } from 'lucide-react-native';
-import Constants from 'expo-constants';
-import ShareLocationModal from '../components/ShareLocationModal';
-import { LEAFLET_CSS_INLINE, LEAFLET_JS_INLINE } from './leafletInline';
-
-
-const createLeafletHtml = (isDark = true) => `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Bản đồ Du lịch Việt Nam - Vivu360</title>
-  <style>
-    ${LEAFLET_CSS_INLINE}
-  </style>
-  <script>
-    ${LEAFLET_JS_INLINE}
-  </script>
+  <title>Bản đồ Du lịch Việt Nam - Vivu360 Web</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   <style>
     html, body, #map {
       width: 100vw;
@@ -132,31 +118,6 @@ const createLeafletHtml = (isDark = true) => `
       background: #0f172a;
       border-color: #3b82f6;
     }
-    .map-share-location-btn {
-      position: relative;
-      flex-shrink: 0;
-      white-space: nowrap;
-      height: 34px;
-      padding: 0 12px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      background: linear-gradient(135deg, rgba(16,185,129,0.92), rgba(5,150,105,0.95));
-      color: #ffffff;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(16,185,129,0.5);
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 4px 14px rgba(16,185,129,0.3);
-      transition: all 0.2s ease;
-    }
-    .map-share-location-btn:hover {
-      background: linear-gradient(135deg, #10b981, #047857);
-      box-shadow: 0 6px 18px rgba(16,185,129,0.45);
-    }
     .search-container {
       position: relative;
       top: 0;
@@ -264,16 +225,13 @@ const createLeafletHtml = (isDark = true) => `
     }
     .badge-prov { background: #e0f2fe; color: #0284c7; }
     .badge-sub { background: #dcfce7; color: #15803d; }
-    /* Place Detail Modal CSS */
+    /* Premium Place Detail Modal CSS */
     .modal-overlay {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(15, 23, 42, 0.65);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       z-index: 2000;
       display: flex;
       align-items: center;
@@ -283,49 +241,88 @@ const createLeafletHtml = (isDark = true) => `
     }
     .modal-card {
       background: #ffffff;
-      border-radius: 24px;
+      border-radius: 28px;
       width: 100%;
       max-width: 440px;
-      max-height: 85vh;
+      max-height: 88vh;
       overflow-y: auto;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
       position: relative;
-      animation: slideUp 0.3s ease;
+      animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
     }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .modal-hero {
-      height: 180px;
+      height: 210px;
       background-size: cover;
       background-position: center;
-      border-top-left-radius: 24px;
-      border-top-right-radius: 24px;
+      border-top-left-radius: 28px;
+      border-top-right-radius: 28px;
       position: relative;
+    }
+    .modal-hero-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.1) 60%, transparent 100%);
+      border-top-left-radius: 28px;
+      border-top-right-radius: 28px;
     }
     .modal-close-btn {
       position: absolute;
-      top: 12px;
-      right: 12px;
-      background: rgba(0, 0, 0, 0.5);
+      top: 14px;
+      right: 14px;
+      background: rgba(15, 23, 42, 0.5);
+      backdrop-filter: blur(8px);
       color: #ffffff;
-      border: none;
-      width: 32px;
-      height: 32px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
-      font-size: 16px;
+      font-size: 15px;
+      font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
+      z-index: 10;
+      transition: all 0.2s ease;
+    }
+    .modal-close-btn:hover {
+      background: rgba(239, 68, 68, 0.9);
+      transform: scale(1.08);
+    }
+    .modal-hero-badge {
+      position: absolute;
+      bottom: 14px;
+      left: 16px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .modal-hero-badge span {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(8px);
+      color: #0f172a;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .modal-hero-badge .category-chip {
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: #ffffff;
     }
     .modal-body {
-      padding: 20px;
+      padding: 20px 22px 24px 22px;
     }
     .modal-title {
-      font-size: 18px;
+      font-size: 20px;
       font-weight: 800;
       color: #0f172a;
       margin: 0 0 6px 0;
+      letter-spacing: -0.3px;
     }
     .modal-prov-tag {
       display: inline-block;
@@ -333,15 +330,56 @@ const createLeafletHtml = (isDark = true) => `
       color: #0284c7;
       font-size: 11px;
       font-weight: 700;
-      padding: 3px 10px;
+      padding: 4px 12px;
       border-radius: 12px;
-      margin-bottom: 12px;
+      margin-bottom: 16px;
+    }
+    .modal-info-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 10px 12px;
+      border-radius: 16px;
+      margin-bottom: 18px;
+    }
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .info-icon {
+      font-size: 16px;
+    }
+    .info-label {
+      display: block;
+      font-size: 9.5px;
+      color: #64748b;
+      font-weight: 600;
+    }
+    .info-val {
+      display: block;
+      font-size: 11px;
+      color: #0f172a;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .modal-section-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #334155;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
     }
     .modal-desc {
       font-size: 13px;
       color: #475569;
-      line-height: 1.6;
-      margin-bottom: 18px;
+      line-height: 1.65;
+      margin-bottom: 22px;
     }
     .modal-actions {
       display: flex;
@@ -352,25 +390,36 @@ const createLeafletHtml = (isDark = true) => `
       background: linear-gradient(135deg, #8b5cf6, #6d28d9);
       color: #ffffff;
       border: none;
-      padding: 10px 14px;
-      border-radius: 14px;
+      padding: 12px 14px;
+      border-radius: 16px;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 800;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+      box-shadow: 0 6px 18px rgba(139, 92, 246, 0.35);
+      transition: all 0.2s ease;
+    }
+    .btn-vr:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(139, 92, 246, 0.45);
     }
     .btn-share {
       flex: 1;
       background: linear-gradient(135deg, #3b82f6, #1d4ed8);
       color: #ffffff;
       border: none;
-      padding: 10px 14px;
-      border-radius: 14px;
+      padding: 12px 14px;
+      border-radius: 16px;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 800;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      box-shadow: 0 6px 18px rgba(59, 130, 246, 0.35);
+      transition: all 0.2s ease;
     }
+    .btn-share:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.45);
+    }
+    /* Toast message */
     .toast-msg {
       position: fixed;
       bottom: 24px;
@@ -399,19 +448,51 @@ const createLeafletHtml = (isDark = true) => `
       </div>
       <div class="search-results" id="searchResults" style="display:none;"></div>
     </div>
-    <button class="map-share-location-btn" onclick="shareCurrentMapView()" title="Chia sẻ vị trí bản đồ vào nhóm">📍 Chia sẻ</button>
   </div>
 
-  <!-- Place Detail Modal -->
-  <div id="placeDetailModal" class="modal-overlay" style="display:none;">
+  <!-- Premium Place Detail Modal -->
+  <div id="placeDetailModal" class="modal-overlay" style="display:none;" onclick="closePlaceDetailModalOnClickOutside(event)">
     <div class="modal-card">
-      <div id="modalHero" class="modal-hero" style="background-image:url('https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=600&q=80');">
+      <div id="modalHero" class="modal-hero" style="background-image:url('https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80');">
+        <div class="modal-hero-overlay"></div>
         <button class="modal-close-btn" onclick="closePlaceDetailModal()">✕</button>
+        <div class="modal-hero-badge">
+          <span id="modalRating">⭐ 4.9</span>
+          <span id="modalCategoryTag" class="category-chip">🌿 Thắng cảnh nổi tiếng</span>
+        </div>
       </div>
       <div class="modal-body">
-        <h2 id="modalTitle" class="modal-title">Tràng An</h2>
+        <h2 id="modalTitle" class="modal-title">Tam Cốc - Bích Động</h2>
         <span id="modalProvTag" class="modal-prov-tag">📍 Ninh Bình</span>
-        <p id="modalDesc" class="modal-desc">Quần thể danh thắng Tràng An là một khu du lịch sinh thái kết hợp tâm linh nổi tiếng tại tỉnh Ninh Bình, được UNESCO công nhận là di sản thế giới đôi.</p>
+
+        <!-- Quick Info Grid -->
+        <div class="modal-info-grid">
+          <div class="info-item">
+            <span class="info-icon">📍</span>
+            <div>
+              <span class="info-label">Vị trí</span>
+              <span id="modalLocInfo" class="info-val">Ninh Bình</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <span class="info-icon">⏱️</span>
+            <div>
+              <span class="info-label">Thời gian</span>
+              <span id="modalTimeInfo" class="info-val">2 - 3 giờ</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <span class="info-icon">🎫</span>
+            <div>
+              <span class="info-label">Gợi ý vé</span>
+              <span id="modalFeeInfo" class="info-val">Tham quan tự do</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-section-title">Giới thiệu trải nghiệm</div>
+        <p id="modalDesc" class="modal-desc">Tam Cốc - Bích Động được mệnh danh là "Nam thiên đệ nhị động" hay "Hạ Long trên cạn". Nơi đây nổi tiếng với hệ thống sông Ngô Đồng uốn lượn qua các dãy núi đá vôi hùng vĩ và ruộng lúa chín vàng óng ánh.</p>
+
         <div class="modal-actions">
           <button id="modalVrBtn" class="btn-vr" onclick="triggerVrFromModal()">🥽 Tour VR 360°</button>
           <button id="modalShareBtn" class="btn-share" onclick="triggerShareFromModal()">💬 Chia sẻ vào nhóm</button>
@@ -426,11 +507,10 @@ const createLeafletHtml = (isDark = true) => `
       zoomControl: false,
       attributionControl: false
     }).setView([16.047079, 108.20623], 6);
-    window.currentMap = map;
 
     L.control.zoom({ position: 'topright' }).addTo(map);
 
-    // CARTO Voyager Tiles (Nạp cực mượt trên trình duyệt & WebView)
+    // CARTO Voyager Tiles (Nạp cực mượt trên trình duyệt)
     var tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       subdomains: ['a', 'b', 'c', 'd'],
       maxZoom: 19
@@ -453,13 +533,9 @@ const createLeafletHtml = (isDark = true) => `
       } else if (isCapital) {
         bg = 'linear-gradient(135deg, rgba(239,68,68,0.95), rgba(185,28,28,0.98))';
         border = '1px solid rgba(239,68,68,0.6)';
-        dotColor = '#fca5a5';
-        dotChar = '★';
       } else {
         bg = 'linear-gradient(135deg, rgba(59,130,246,0.92), rgba(2,132,199,0.95))';
         border = '1px solid rgba(59,130,246,0.5)';
-        dotColor = '#93c5fd';
-        dotChar = '●';
       }
       var html = '<div class="custom-pill-inner' + extraClass + '" style="' +
         'background:' + bg + ';' +
@@ -479,7 +555,7 @@ const createLeafletHtml = (isDark = true) => `
         'transition:transform 0.15s,opacity 0.15s;' +
         'text-shadow:0 1px 2px rgba(0,0,0,0.3);' +
         '">' + name + '</div>';
-      var w = Math.max(55, len * 6.5 + 28);
+      var w = Math.max(55, len * 6.5 + 12);
       return L.divIcon({
         className: 'custom-pill-marker',
         html: html,
@@ -489,19 +565,19 @@ const createLeafletHtml = (isDark = true) => `
     }
 
     var subAttractions = [
-      { prov: "Ninh Bình", name: "Tràng An", lat: 20.2506, lng: 105.9083, info: "Quần thể di sản thế giới Tràng An." },
-      { prov: "Ninh Bình", name: "Chùa Bái Đính", lat: 20.2747, lng: 105.8670, info: "Ngôi chùa lớn nhất Việt Nam." },
-      { prov: "Ninh Bình", name: "Tam Cốc - Bích Động", lat: 20.2178, lng: 105.9392, info: "Nam thiên đệ nhị động." },
-      { prov: "Ninh Bình", name: "Hang Múa", lat: 20.2317, lng: 105.9525, info: "Thánh địa check-in đỉnh núi Rồng." },
-      { prov: "Quảng Ninh", name: "Vịnh Hạ Long", lat: 20.9101, lng: 107.1839, info: "Kỳ quan thiên nhiên thế giới." },
-      { prov: "Quảng Ninh", name: "Đảo Ti Tốp", lat: 20.8594, lng: 107.0784, info: "Bãi tắm tuyệt đẹp trên vịnh." },
-      { prov: "Lào Cai", name: "Đỉnh Fansipan", lat: 22.3033, lng: 103.7750, info: "Nóc nhà Đông Dương 3.143m." },
-      { prov: "Đà Nẵng", name: "Cầu Vàng Bà Nà", lat: 15.9952, lng: 107.9965, info: "Biểu tượng du lịch quốc tế Đà Nẵng." },
-      { prov: "Đà Nẵng", name: "Biển Mỹ Khê", lat: 16.0592, lng: 108.2464, info: "Top bãi biển đẹp nhất hành tinh." },
-      { prov: "Quảng Nam", name: "Phố Cổ Hội An", lat: 15.8801, lng: 108.3380, info: "Di sản văn hóa thế giới Hội An." },
-      { prov: "Lâm Đồng", name: "Hồ Xuân Hương", lat: 11.9404, lng: 108.4440, info: "Trái tim ngàn hoa Đà Lạt." },
-      { prov: "TP.HCM", name: "Chợ Bến Thành", lat: 10.7725, lng: 106.6980, info: "Biểu tượng văn hóa Sài Gòn." },
-      { prov: "Kiên Giang", name: "Grand World", lat: 10.3242, lng: 103.8580, info: "Thành phố không ngủ Phú Quốc." }
+      { prov: "Ninh Bình", name: "Tràng An", lat: 20.2506, lng: 105.9083, info: "Quần thể danh thắng Tràng An được UNESCO công nhận là Di sản Thế giới kép. Trải nghiệm chèo thuyền xuyên qua hàng chục hang động xuyên thủy kỳ ảo và các ngôi đền cổ kính linh thiêng.", rating: "4.9", category: "🚣 KDL Sinh Thái", time: "3 - 4 giờ", fee: "250.000đ/người", img: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=800&q=80" },
+      { prov: "Ninh Bình", name: "Chùa Bái Đính", lat: 20.2747, lng: 105.8670, info: "Ngôi chùa sở hữu nhiều kỷ lục Châu Á và Việt Nam như: tượng Phật bằng đồng dát vàng lớn nhất, hành lang 500 vị La Hán dài nhất và tháp Bảo Tháp cao nhất Đông Nam Á.", rating: "4.8", category: "🛕 Tâm linh Văn hóa", time: "2 - 3 giờ", fee: "Miễn phí (Xe điện 60k)", img: "https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=800&q=80" },
+      { prov: "Ninh Bình", name: "Tam Cốc - Bích Động", lat: 20.2178, lng: 105.9392, info: "Tam Cốc - Bích Động được mệnh danh là \"Nam thiên đệ nhị động\" hay \"Hạ Long trên cạn\". Nơi đây nổi tiếng với hệ thống sông Ngô Đồng uốn lượn qua các dãy núi đá vôi hùng vĩ và ruộng lúa chín vàng óng ánh.", rating: "4.9", category: "🌾 Hạ Long trên cạn", time: "2 - 3 giờ", fee: "120.000đ/người", img: "https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80" },
+      { prov: "Ninh Bình", name: "Hang Múa", lat: 20.2317, lng: 105.9525, info: "Thánh địa check-in với 486 bậc đá vút lên đỉnh núi Ngọa Long. Từ đỉnh Hang Múa, du khách có thể thu trọn toàn bộ tầm nhìn ngoạn mục của dòng sông Tam Cốc uốn lượn.", rating: "4.9", category: "📸 Check-in Sống ảo", time: "1 - 2 giờ", fee: "100.000đ/người", img: "https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=800&q=80" },
+      { prov: "Quảng Ninh", name: "Vịnh Hạ Long", lat: 20.9101, lng: 107.1839, info: "Một trong 7 Kỳ quan Thiên nhiên Mới của Thế giới với hàng ngàn hòn đảo đá vôi nhấp nhô trên làn nước biển xanh ngọc bích tuyệt đẹp.", rating: "5.0", category: "🌊 Kỳ quan Thế giới", time: "Nửa ngày / Cả ngày", fee: "290.000đ/vé", img: "https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?auto=format&fit=crop&w=800&q=80" },
+      { prov: "Quảng Ninh", name: "Đảo Ti Tốp", lat: 20.8594, lng: 107.0784, info: "Hòn đảo sở hữu bãi tắm hình vầng trăng khuyết tuyệt đẹp cùng đỉnh núi cao view 360 độ toàn cảnh Vịnh Hạ Long rực rỡ.", rating: "4.8", category: "🏝️ Đảo Nghỉ dưỡng", time: "1 - 2 giờ", fee: "Bao gồm trong tour", img: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80" },
+      { prov: "Lào Cai", name: "Đỉnh Fansipan", lat: 22.3033, lng: 103.7750, info: "Nóc nhà Đông Dương ở độ cao 3.143m. Trải nghiệm tuyến cáp treo kỷ lục thế giới săn mây bồng bềnh và chiêm bái đại tượng Phật trên đỉnh núi linh thiêng.", rating: "4.9", category: "🏔️ Nóc nhà Đông Dương", time: "3 - 4 giờ", fee: "800.000đ/vé", img: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80" },
+      { prov: "Đà Nẵng", name: "Cầu Vàng Bà Nà", lat: 15.9952, lng: 107.9965, info: "Biểu tượng kiến trúc du lịch quốc tế độc đáo được nâng đỡ bởi hai bàn tay đá khổng lồ vươn mây trên đỉnh núi Bà Nà Đà Nẵng.", rating: "4.9", category: "🌉 Biểu tượng Quốc tế", time: "Nửa ngày", fee: "900.000đ/người", img: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=800&q=80" },
+      { prov: "Đà Nẵng", name: "Biển Mỹ Khê", lat: 16.0592, lng: 108.2464, info: "Bãi biển từng được tạp chí Forbes vinh danh là một trong 6 bãi biển quyến rũ nhất hành tinh với bãi cát trắng mịn uốn lượn.", rating: "4.9", category: "🏖️ Bãi biển Đẹp nhất", time: "Tự do", fee: "Miễn phí", img: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80" },
+      { prov: "Quảng Nam", name: "Phố Cổ Hội An", lat: 15.8801, lng: 108.3380, info: "Di sản Văn hóa Thế giới lung linh với hàng ngàn đèn lồng rực rỡ đêm sông Hoài, kiến trúc nhà cổ vàng óng rêu phong nghìn năm.", rating: "5.0", category: "🏮 Di sản Thế giới", time: "Cả ngày", fee: "120.000đ/vé tham quan", img: "https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=800&q=80" },
+      { prov: "Lâm Đồng", name: "Hồ Xuân Hương", lat: 11.9404, lng: 108.4440, info: "Trái tim lãng mạn của thành phố sương mù Đà Lạt, uốn lượn qua những đồi thông thơ mộng và ngàn hoa tươi thắm.", rating: "4.8", category: "🌲 Hồ Nước Thơ mộng", time: "1 - 2 giờ", fee: "Miễn phí", img: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80" },
+      { prov: "TP.HCM", name: "Chợ Bến Thành", lat: 10.7725, lng: 106.6980, info: "Biểu tượng văn hóa lịch sử lâu đời hơn trăm năm của Sài Gòn tấp nập, điểm giao lưu ẩm thực & quà lưu niệm đặc sắc.", rating: "4.7", category: "🏙️ Biểu tượng Văn hóa", time: "1 - 2 giờ", fee: "Miễn phí", img: "https://images.unsplash.com/photo-1583417319070-4a69db38a482?auto=format&fit=crop&w=800&q=80" },
+      { prov: "Kiên Giang", name: "Grand World", lat: 10.3242, lng: 103.8580, info: "Thành phố không ngủ Phú Quốc lộng lẫy phong cách Châu Âu với sông Venice thu nhỏ, show diễn sắc màu rực rỡ hàng đêm.", rating: "4.9", category: "🎡 KDL Giải trí", time: "Cả ngày", fee: "Vào cửa tự do", img: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=800&q=80" }
     ];
 
     var provinces = [
@@ -616,45 +692,14 @@ const createLeafletHtml = (isDark = true) => `
     }
 
     function shareLocation(placeName, provinceName) {
-      var lat = currentViewState ? currentViewState.lat : 16.047079;
-      var lng = currentViewState ? currentViewState.lng : 108.20623;
-      var mapsLink = 'https://maps.google.com/?q=' + lat + ',' + lng;
       if (window.ReactNativeWebView) {
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'shareLocation',
           placeName: placeName || 'Địa danh du lịch',
-          provinceName: provinceName || 'Việt Nam',
-          locationName: placeName || 'Địa danh du lịch',
-          address: provinceName || 'Việt Nam',
-          description: 'Khám phá ' + (placeName || 'địa danh du lịch') + ' tại ' + (provinceName || 'Việt Nam') + ' cùng Vivu360!',
-          mapsLink: mapsLink,
-          lat: lat,
-          lng: lng
+          provinceName: provinceName || 'Việt Nam'
         }));
       } else {
         showToast('💬 Đã mở chia sẻ địa danh ' + placeName + ' vào nhóm!');
-      }
-    }
-
-    function shareCurrentMapView() {
-      var lat = currentViewState ? currentViewState.lat : 16.047079;
-      var lng = currentViewState ? currentViewState.lng : 108.20623;
-      var name = currentViewState ? currentViewState.name : 'Bản đồ Du lịch Việt Nam';
-      var mapsLink = 'https://maps.google.com/?q=' + lat + ',' + lng;
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'shareLocation',
-          placeName: name,
-          provinceName: 'Việt Nam',
-          locationName: name,
-          address: 'Tọa độ: ' + lat.toFixed(4) + ', ' + lng.toFixed(4),
-          description: 'Đang xem vị trí "' + name + '" trên bản đồ Vivu360. Cùng khám phá nhé!',
-          mapsLink: mapsLink,
-          lat: lat,
-          lng: lng
-        }));
-      } else {
-        showToast('💬 Chia sẻ vị trí "' + name + '" vào nhóm!');
       }
     }
 
@@ -697,14 +742,68 @@ const createLeafletHtml = (isDark = true) => `
       var q = query.trim().toLowerCase();
       
       if (!q) {
-        resultsDiv.style.display = 'none';
-        clearBtn.style.display = 'none';
+        showHotSuggestions();
         return;
       }
       clearBtn.style.display = 'block';
-      
+      renderSearchResults(q, 'all');
+    }
+
+    function showHotSuggestions() {
+      var resultsDiv = document.getElementById('searchResults');
+      var clearBtn = document.getElementById('searchClear');
+      clearBtn.style.display = 'none';
+
+      var chipsHtml = '<div class="filter-chips">' +
+        '<button class="chip-btn active" onclick="filterByRegion(\'all\', this)">🔥 Tất cả</button>' +
+        '<button class="chip-btn" onclick="filterByRegion(\'north\', this)">🏔️ Miền Bắc</button>' +
+        '<button class="chip-btn" onclick="filterByRegion(\'central\', this)">🌊 Miền Trung</button>' +
+        '<button class="chip-btn" onclick="filterByRegion(\'south\', this)">🌴 Miền Nam</button>' +
+        '</div>';
+
+      var hotList = [
+        { name: "Thủ đô Hà Nội", info: "Hồ Gươm, Phố Cổ, Văn Miếu.", lat: 21.0285, lng: 105.8542, type: "Tỉnh thành" },
+        { name: "Quảng Ninh (Vịnh Hạ Long)", info: "Vịnh Hạ Long & Đảo Ti Tốp.", lat: 20.9500, lng: 107.0333, type: "Tỉnh thành" },
+        { name: "Lào Cai (Sa Pa)", info: "Fansipan & Bản Cát Cát.", lat: 22.3364, lng: 103.8438, type: "Tỉnh thành" },
+        { name: "Ninh Bình", info: "Tràng An, Bái Đính & Hang Múa.", lat: 20.2525, lng: 105.9750, type: "Tỉnh thành" },
+        { name: "Đà Nẵng", info: "Bà Nà Hills & Biển Mỹ Khê.", lat: 16.0544, lng: 108.2022, type: "Tỉnh thành" },
+        { name: "Quảng Nam (Hội An)", info: "Phố cổ Hội An & Chùa Cầu.", lat: 15.8801, lng: 108.3380, type: "Tỉnh thành" },
+        { name: "Lâm Đồng (Đà Lạt)", info: "Hồ Xuân Hương & Thung lũng.", lat: 11.9404, lng: 108.4583, type: "Tỉnh thành" },
+        { name: "Kiên Giang (Đảo Phú Quốc)", info: "Đảo ngọc & Grand World.", lat: 10.2289, lng: 103.9572, type: "Tỉnh thành" }
+      ];
+
+      var itemsHtml = '';
+      hotList.forEach(function(item) {
+        var cleanName = item.name.replace(/'/g, "\\'");
+        itemsHtml += '<div class="search-item" onclick="selectSearchResult(' + item.lat + ',' + item.lng + ',\'' + cleanName + '\')">' +
+          '<div><strong>📍 ' + item.name + '</strong><br/><span class="item-sub">' + item.info + '</span></div>' +
+          '<span class="badge-tag badge-prov">' + item.type + '</span>' +
+          '</div>';
+      });
+
+      resultsDiv.innerHTML = chipsHtml + itemsHtml;
+      resultsDiv.style.display = 'block';
+    }
+
+    function filterByRegion(region, btn) {
+      if (btn) {
+        var buttons = btn.parentNode.querySelectorAll('.chip-btn');
+        buttons.forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+      }
+      var query = document.getElementById('searchInput').value.trim().toLowerCase();
+      renderSearchResults(query, region);
+    }
+
+    function renderSearchResults(q, regionFilter) {
+      var resultsDiv = document.getElementById('searchResults');
       var matches = [];
+
       provinces.forEach(function(prov) {
+        var lat = prov.lat;
+        var reg = lat > 19.5 ? 'north' : (lat > 14.0 ? 'central' : 'south');
+        if (regionFilter !== 'all' && reg !== regionFilter) return;
+
         var fullName = prov.fullName || prov.name;
         if (!q || prov.name.toLowerCase().indexOf(q) !== -1 || fullName.toLowerCase().indexOf(q) !== -1 || prov.info.toLowerCase().indexOf(q) !== -1) {
           matches.push({ name: fullName, info: prov.info, lat: prov.lat, lng: prov.lng, type: 'Tỉnh thành', isSub: false });
@@ -712,26 +811,39 @@ const createLeafletHtml = (isDark = true) => `
       });
 
       subAttractions.forEach(function(sub) {
-        if (sub.name.toLowerCase().indexOf(q) !== -1 || sub.info.toLowerCase().indexOf(q) !== -1) {
-          matches.push({ name: sub.name, info: sub.info + ' (' + sub.prov + ')', lat: sub.lat, lng: sub.lng, type: 'Địa danh' });
+        var lat = sub.lat;
+        var reg = lat > 19.5 ? 'north' : (lat > 14.0 ? 'central' : 'south');
+        if (regionFilter !== 'all' && reg !== regionFilter) return;
+
+        if (!q || sub.name.toLowerCase().indexOf(q) !== -1 || sub.info.toLowerCase().indexOf(q) !== -1) {
+          matches.push({ name: sub.name, info: sub.info + ' (' + sub.prov + ')', lat: sub.lat, lng: sub.lng, type: 'Danh thắng', isSub: true });
         }
       });
 
+      var chipsHtml = '<div class="filter-chips">' +
+        '<button class="chip-btn ' + (regionFilter==='all'?'active':'') + '" onclick="filterByRegion(\'all\', this)">🔥 Tất cả</button>' +
+        '<button class="chip-btn ' + (regionFilter==='north'?'active':'') + '" onclick="filterByRegion(\'north\', this)">🏔️ Miền Bắc</button>' +
+        '<button class="chip-btn ' + (regionFilter==='central'?'active':'') + '" onclick="filterByRegion(\'central\', this)">🌊 Miền Trung</button>' +
+        '<button class="chip-btn ' + (regionFilter==='south'?'active':'') + '" onclick="filterByRegion(\'south\', this)">🌴 Miền Nam</button>' +
+        '</div>';
+
       if (matches.length === 0) {
-        resultsDiv.innerHTML = '<div class="search-item" style="color:#94a3b8;justify-content:center;">Không tìm thấy địa danh</div>';
+        resultsDiv.innerHTML = chipsHtml + '<div class="search-item" style="color:#94a3b8;justify-content:center;padding:14px;">Không tìm thấy địa danh nào</div>';
         resultsDiv.style.display = 'block';
         return;
       }
 
-      var html = '';
-      matches.slice(0, 6).forEach(function(item) {
+      var itemsHtml = '';
+      matches.slice(0, 7).forEach(function(item) {
         var cleanName = item.name.replace(/'/g, "\\'");
-        html += '<div class="search-item" onclick="selectSearchResult(' + item.lat + ',' + item.lng + ',\'' + cleanName + '\')">' +
+        var badgeClass = item.isSub ? 'badge-sub' : 'badge-prov';
+        itemsHtml += '<div class="search-item" onclick="selectSearchResult(' + item.lat + ',' + item.lng + ',\'' + cleanName + '\')">' +
           '<div><strong>📍 ' + item.name + '</strong><br/><span class="item-sub">' + item.info + '</span></div>' +
-          '<span style="font-size:9px;background:#e0f2fe;color:#0284c7;padding:2px 6px;border-radius:6px;">' + item.type + '</span>' +
+          '<span class="badge-tag ' + badgeClass + '">' + item.type + '</span>' +
           '</div>';
       });
-      resultsDiv.innerHTML = html;
+
+      resultsDiv.innerHTML = chipsHtml + itemsHtml;
       resultsDiv.style.display = 'block';
     }
 
@@ -740,11 +852,11 @@ const createLeafletHtml = (isDark = true) => `
       zoomToProvince(lat, lng, name);
 
       var targetMarker = provinceMarkers.find(function(m) {
-        return m.getLatLng().lat === lat && m.getLatLng().lng === lng;
+        return Math.abs(m.getLatLng().lat - lat) < 0.001 && Math.abs(m.getLatLng().lng - lng) < 0.001;
       });
       if (!targetMarker) {
         var subItem = subMarkers.find(function(s) {
-          return s.marker.getLatLng().lat === lat && s.marker.getLatLng().lng === lng;
+          return Math.abs(s.marker.getLatLng().lat - lat) < 0.001 && Math.abs(s.marker.getLatLng().lng - lng) < 0.001;
         });
         if (subItem) targetMarker = subItem.marker;
       }
@@ -752,6 +864,7 @@ const createLeafletHtml = (isDark = true) => `
         if (!map.hasLayer(targetMarker)) targetMarker.addTo(map);
         setTimeout(function() { targetMarker.openPopup(); }, 400);
       }
+      openPlaceDetail(name, name);
     }
 
     function clearSearch() {
@@ -761,8 +874,9 @@ const createLeafletHtml = (isDark = true) => `
     }
 
     var hanoiMarker = L.marker([21.0285, 105.8542], { icon: createPillIcon('Thủ đô Hà Nội', true, false) }).addTo(map);
-    hanoiMarker.bindPopup('<div class="pretty-popup"><h3>📍 Thủ đô Hà Nội</h3><p>Hồ Gươm, Phố Cổ, Văn Miếu Quốc Tử Giám.</p><button class="popup-btn" onclick="zoomToProvince(21.0285, 105.8542, \'Thủ đô Hà Nội\')">🔍 Zoom to Hà Nội</button></div>')
+    hanoiMarker.bindPopup('<div class="pretty-popup"><h3>📍 Thủ đô Hà Nội</h3><p>Hồ Gươm, Phố Cổ, Văn Miếu Quốc Tử Giám.</p><button class="popup-btn" onclick="zoomToProvince(21.0285, 105.8542)">🔍 Zoom to Hà Nội</button></div>')
       .openPopup();
+
     var viewHistory = [];
     var currentViewState = { lat: 16.047079, lng: 108.20623, zoom: 6, name: 'Toàn cảnh Việt Nam' };
 
@@ -776,13 +890,9 @@ const createLeafletHtml = (isDark = true) => `
       if (viewHistory.length > 0) {
         var prevState = viewHistory.pop();
         currentViewState = prevState;
-        if (window.currentMap) {
-          window.currentMap.flyTo([prevState.lat, prevState.lng], prevState.zoom, { duration: 1.2 });
-        }
+        map.flyTo([prevState.lat, prevState.lng], prevState.zoom, { duration: 1.2 });
       } else {
-        if (window.currentMap) {
-          window.currentMap.flyTo([16.047079, 108.20623], 6, { duration: 1.2 });
-        }
+        map.flyTo([16.047079, 108.20623], 6, { duration: 1.2 });
       }
       updateBackButtonState();
     }
@@ -800,217 +910,21 @@ const createLeafletHtml = (isDark = true) => `
       }
     }
 
-    // Hàm Zoom to cận cảnh tỉnh thành vừa phải (Chỉ Zoom 9.0 trên bản đồ, bao quát toàn tỉnh)
     function zoomToProvince(lat, lng, name) {
       pushViewState(lat, lng, 9.0, name || 'Địa danh');
-      if (window.currentMap) {
-        window.currentMap.flyTo([lat, lng], 9.0, { duration: 1.2 });
-      }
+      map.flyTo([lat, lng], 9.0, { duration: 1.2 });
     }
 
     function openVR(tourId) {
       if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'openVR', tourId: tourId }));
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'openVR', tourId: tourId || 1 }));
       }
     }
 
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-      startMap();
-    } else {
-      document.addEventListener('DOMContentLoaded', startMap);
-    }
-    window.onload = startMap;
-    setTimeout(startMap, 100);
+    window.addEventListener('resize', function() {
+      map.invalidateSize(true);
+    });
+    setTimeout(function() { map.invalidateSize(true); }, 200);
   </script>
 </body>
 </html>
-`;
-
-export function VietnamTravelWebScreen({ theme, isDarkMode, setIsDarkMode, onBack, onOpenVR, onNavigateToTour, onOpenPlaceDetail, onNavigateToProvince, onNavigateToTab, selectedPlaceRequest, onSelectedPlaceRequestHandled, ownerId, currentUser, onCheckIn }) {
-  const webViewRef = useRef(null);
-  const pendingPlaceRequestRef = useRef(null);
-  const [shareModalVisible, setShareModalVisible] = useState(false);
-  const [shareLocationData, setShareLocationData] = useState(null);
-  const [webViewReady, setWebViewReady] = useState(false);
-
-  useEffect(() => {
-    const backAction = () => {
-      if (onBack) {
-        onBack();
-        return true;
-      }
-      return false;
-    };
-
-    const backHandler = BackHandler.addEventListener(
-      'hardwareBackPress',
-      backAction
-    );
-
-    return () => backHandler.remove();
-  }, [onBack]);
-
-  const flushPendingPlaceRequest = () => {
-    const nextRequest = pendingPlaceRequestRef.current;
-    if (!nextRequest?.placeName || !webViewRef.current || !webViewReady) return false;
-
-    const payload = JSON.stringify({
-      placeName: nextRequest.placeName,
-      address: nextRequest.address || '',
-      mapsLink: nextRequest.mapsLink || '',
-      openGuide: nextRequest.openGuide !== false,
-    });
-
-    webViewRef.current.injectJavaScript(`
-      (function() {
-        window.__pendingVivu360PlaceGuide = ${payload};
-        if (typeof window.openPlaceGuideFromApp === 'function') {
-          window.openPlaceGuideFromApp(window.__pendingVivu360PlaceGuide);
-        }
-      })();
-      true;
-    `);
-
-    pendingPlaceRequestRef.current = null;
-    if (onSelectedPlaceRequestHandled && nextRequest.requestId) {
-      onSelectedPlaceRequestHandled(nextRequest.requestId);
-    }
-    return true;
-  };
-
-  const requestPlaceGuide = (request) => {
-    if (!request?.placeName) return false;
-    pendingPlaceRequestRef.current = {
-      requestId: request.requestId || Date.now(),
-      placeName: request.placeName,
-      address: request.address || '',
-      mapsLink: request.mapsLink || '',
-      openGuide: request.openGuide !== false,
-    };
-    flushPendingPlaceRequest();
-    return true;
-  };
-
-  useEffect(() => {
-    if (selectedPlaceRequest?.placeName) {
-      requestPlaceGuide(selectedPlaceRequest);
-    }
-  }, [selectedPlaceRequest?.requestId, selectedPlaceRequest?.placeName, webViewReady]);
-  const handleMessage = (event) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'openVR') {
-        const tourId = data.tourId || 1;
-        if (onOpenVR) {
-          onOpenVR(tourId);
-        } else if (onNavigateToTour) {
-          onNavigateToTour(tourId);
-        }
-      } else if (data.type === 'openPlaceDetail') {
-        const queued = requestPlaceGuide({
-          requestId: Date.now(),
-          placeName: data.placeName,
-          address: data.address || data.province || '',
-          mapsLink: data.mapsLink || '',
-          openGuide: true,
-        });
-        if (!queued && onOpenPlaceDetail) {
-          onOpenPlaceDetail(data.placeName);
-        }
-      } else if (data.type === 'goBack') {
-        if (onBack) {
-          onBack();
-        }
-      } else if (data.type === 'shareLocation' || data.type === 'sharePlace') {
-        const formattedPrice = data.unitPrice
-          ? (Number(data.unitPrice) > 0 ? `${Number(data.unitPrice).toLocaleString('vi-VN')}đ/người` : 'Miễn phí / Tự túc')
-          : 'Miễn phí / Tự túc';
-
-        const lat = data.lat;
-        const lng = data.lng;
-        const autoMapsLink = (lat && lng)
-          ? `https://maps.google.com/?q=${lat},${lng}`
-          : '';
-
-        setShareLocationData({
-          name: data.locationName || data.placeName || data.name || 'Địa điểm du lịch',
-          location: data.address || data.viTri || data.location || 'Việt Nam',
-          description: data.description || data.moTa || 'Khám phá vị trí và danh thắng tuyệt đẹp cùng Vivu360!',
-          price: formattedPrice,
-          mapsLink: data.mapsLink || autoMapsLink,
-        });
-        setShareModalVisible(true);
-      }
-    } catch (err) {
-      console.error('Error parsing webview message:', err);
-    }
-  };
-
-  const expoHost = useMemo(() => {
-    const hostUri = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost || '';
-    return hostUri ? hostUri.split(':')[0] : 'localhost';
-  }, []);
-
-  const mapServerUrl = useMemo(
-    () => process.env.EXPO_PUBLIC_TRAVEL_MAP_URL || `http://${expoHost}:3000/travel-map/?view=map&isApp=1`,
-    [expoHost]
-  );
-  const webViewSource = useMemo(() => ({ uri: mapServerUrl }), [mapServerUrl]);
- 
-  const containerStyle = useMemo(() => [
-    styles.container,
-    {
-      backgroundColor: theme ? theme.background : '#0f172a',
-      paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : (Platform.OS === 'ios' ? 44 : 0)
-    }
-  ], [theme]);
-
-  return (
-    <View style={containerStyle}>
-      {/* Direct Leaflet OpenStreetMap WebView */}
-      <WebView
-        ref={webViewRef}
-        source={webViewSource}
-        style={styles.webview}
-        onMessage={handleMessage}
-        originWhitelist={['*']}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        allowFileAccess={true}
-        allowUniversalAccessFromFileURLs={true}
-        allowFileAccessFromFileURLs={true}
-        mixedContentMode="always"
-        startInLoadingState={false}
-        onLoadStart={() => setWebViewReady(false)}
-        onLoadEnd={() => { setWebViewReady(true); flushPendingPlaceRequest(); }}
-      />
-
-      <ShareLocationModal
-        visible={shareModalVisible}
-        onClose={() => setShareModalVisible(false)}
-        locationData={shareLocationData}
-        ownerId={ownerId}
-        currentUser={currentUser}
-        onShareSuccess={(groupId) => {
-          setShareModalVisible(false);
-          if (onNavigateToTab) onNavigateToTab('chat', groupId || null);
-        }}
-        theme={theme}
-        isDarkMode={isDarkMode}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  webview: {
-    flex: 1,
-  },
-  loading: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

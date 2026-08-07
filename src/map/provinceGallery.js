@@ -19,6 +19,7 @@ import { ArrowLeft, Plus, X, Sparkles, AlertCircle, MapPin, ChevronRight } from 
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { extractPinterestImage, getImageSource, fetchRealProvinceImages } from './pinterestExtractor';
+import { getSafeImageSource } from '../utils/image';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -281,7 +282,7 @@ export function ProvinceGalleryScreen({ theme, isDarkMode, provinceName, onBack,
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* HERO IMAGE */}
         <View style={styles.heroWrapper}>
-          <Image source={getImageSource(photos[0]) || { uri: photos[0] }} style={styles.heroImage} resizeMode="cover" />
+          <Image source={getImageSource(photos[0]) || getSafeImageSource(photos[0])} style={styles.heroImage} resizeMode="cover" />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.85)']}
             style={styles.heroGradient}
@@ -414,7 +415,7 @@ export function ProvinceGalleryScreen({ theme, isDarkMode, provinceName, onBack,
         <View style={styles.gridContainer}>
           {photos.map((photo, index) => (
             <View key={index} style={[styles.gridItem, { borderColor: theme.border }]}>
-              <Image source={getImageSource(photo) || { uri: photo }} style={styles.gridImage} resizeMode="cover" />
+              <Image source={getImageSource(photo) || getSafeImageSource(photo)} style={styles.gridImage} resizeMode="cover" />
             </View>
           ))}
         </View>
@@ -671,3 +672,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 });
+
+
+
