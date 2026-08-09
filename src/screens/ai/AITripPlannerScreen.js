@@ -204,10 +204,37 @@ export function AITripPlannerScreen({
   ownerId,
   currentUser,
   context,
+  userSettings,
   onBack,
   onNavigateToPreview,
 }) {
-  const initialInput = useMemo(() => createPlannerInitialInput(context), [context]);
+  const initialInput = useMemo(() => {
+    const nextInput = createPlannerInitialInput(context);
+    const savedInput = context?.savedSnapshot?.input || context?.itinerary?.input || {};
+    const savedInterests = Array.isArray(savedInput.interests)
+      ? savedInput.interests
+      : String(savedInput.interests || '').trim();
+    const hasSavedInterests = Array.isArray(savedInterests) ? savedInterests.length > 0 : Boolean(savedInterests);
+    const hasSavedPace = Boolean(savedInput.travelPace);
+    const aiSettingsEnabled = userSettings?.aiRecommendations?.enabled !== false;
+    const preferredInterests = Array.isArray(userSettings?.travelPreferences)
+      ? userSettings.travelPreferences.filter((item) => INTEREST_OPTIONS.includes(item))
+      : [];
+    const preferredPace = PACE_OPTIONS.includes(userSettings?.aiRecommendations?.pace)
+      ? userSettings.aiRecommendations.pace
+      : 'normal';
+
+    if (aiSettingsEnabled) {
+      if (!hasSavedInterests && preferredInterests.length) {
+        nextInput.interests = preferredInterests;
+      }
+      if (!hasSavedPace) {
+        nextInput.travelPace = preferredPace;
+      }
+    }
+
+    return nextInput;
+  }, [context, userSettings]);
   const [form, setForm] = useState(initialInput);
   const [generating, setGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -230,6 +257,10 @@ export function AITripPlannerScreen({
       normalizeDestinationText(item.label).includes(keyword)
     ));
   }, [destinationKeyword]);
+
+  useEffect(() => {
+    setForm(initialInput);
+  }, [initialInput]);
 
   const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -377,6 +408,18 @@ export function AITripPlannerScreen({
 
     try {
       const payload = parseFormToPayload(form);
+      if (userSettings?.aiRecommendations?.enabled !== false) {
+        const aiNotes = [];
+        if (userSettings?.aiRecommendations?.keepBudget && Number(payload.totalBudget || 0) > 0) {
+          aiNotes.push('Ưu tiên giữ tổng chi phí gần với ngân sách đã đặt.');
+        }
+        if (userSettings?.aiRecommendations?.hiddenGems) {
+          aiNotes.push('Gợi ý thêm các điểm đến độc đáo hoặc ít đông hơn nếu phù hợp.');
+        }
+        if (aiNotes.length) {
+          payload.additionalRequest = [payload.additionalRequest, ...aiNotes].filter(Boolean).join(' ');
+        }
+      }
       const response = await generateAIItinerary(ownerId, payload);
       onNavigateToPreview({
         ...context,

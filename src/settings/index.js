@@ -1,3 +1,14 @@
 export { EditProfileScreen } from './editProfile';
 export { MembershipTiersScreen } from './membershipTiers';
 export { TravelChallengesScreen } from './travelChallenges';
+export { SettingsScreen } from './SettingsScreen';
+export { ChangePasswordScreen } from './ChangePasswordScreen';
+export { TravelPreferencesScreen } from './TravelPreferencesScreen';
+export { AIRecommendationSettingsScreen } from './AIRecommendationSettingsScreen';
+export { PrivacySecurityScreen } from './PrivacySecurityScreen';
+export { LocationAccessScreen } from './LocationAccessScreen';
+export { BlockedUsersScreen } from './BlockedUsersScreen';
+export { LoginDevicesScreen } from './LoginDevicesScreen';
+export { HelpCenterScreen } from './HelpCenterScreen';
+export { FeedbackScreen } from './FeedbackScreen';
+export { StaticContentScreen } from './StaticContentScreen';

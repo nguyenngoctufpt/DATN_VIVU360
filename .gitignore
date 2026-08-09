@@ -1,4 +1,5 @@
 # expo
+.expo/
 .expo/*
 npm-debug.log*
 yarn-debug.log*
@@ -20,6 +21,7 @@ node_modules/
 
 # Local build verification and databases
 .expo-*-check/
+.expo-export-check*/
 travel.db
 travel.db-shm
 travel.db-wal
