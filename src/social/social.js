@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+﻿import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal, Dimensions, Share, Alert, Platform, StatusBar, Animated, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { searchFriends } from '../services/userService';
@@ -34,6 +34,7 @@ import {
   BellRing,
   Compass,
   Map,
+  Settings,
   Ticket,
   User
 } from 'lucide-react-native';
@@ -235,7 +236,7 @@ const initialPosts = [];
 
 const initialGroups = [];
 
-export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, onLogout }) {
+export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, onLogout, language = 'vi', blockedUserIds = [] }) {
   const [posts, setPosts] = useState(initialPosts);
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
   const [menuVisible, setMenuVisible] = useState(false);
@@ -243,6 +244,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   const [friendships, setFriendships] = useState([]);
   const [socialNotifications, setSocialNotifications] = useState([]);
   const [friendActionId, setFriendActionId] = useState(null);
+  const blockedUserIdSet = useMemo(() => new Set(blockedUserIds || []), [blockedUserIds]);
 
   const normalizeFeed = feed => feed.map(post => ({
     ...post, id: post._id, image: post.images?.[0] || '', likes: post.likesCount || 0,
@@ -279,12 +281,12 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   const mockStories = useMemo(() => [], []);
 
   const incomingRequests = useMemo(
-    () => friendships.filter(item => item.status === 'pending' && item.direction === 'incoming'),
-    [friendships]
+    () => friendships.filter(item => item.status === 'pending' && item.direction === 'incoming' && !blockedUserIdSet.has(item.friend?.firebaseUid)),
+    [blockedUserIdSet, friendships]
   );
   const acceptedFriends = useMemo(
-    () => friendships.filter(item => item.status === 'accepted' && item.friend).map(item => item.friend),
-    [friendships]
+    () => friendships.filter(item => item.status === 'accepted' && item.friend && !blockedUserIdSet.has(item.friend?.firebaseUid)).map(item => item.friend),
+    [blockedUserIdSet, friendships]
   );
 
   useEffect(() => {
@@ -391,7 +393,9 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
     setFriendSearchError('');
     const timer = setTimeout(() => {
       searchFriends(query, ownerId)
-        .then(users => active && setFriendResults(Array.isArray(users) ? users : []))
+        .then(users => active && setFriendResults(
+          (Array.isArray(users) ? users : []).filter(friend => !blockedUserIdSet.has(friend?.firebaseUid))
+        ))
         .catch(error => {
           if (active) {
             setFriendResults([]);
@@ -410,10 +414,20 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
       active = false;
       clearTimeout(timer);
     };
-  }, [searchText, ownerId]);
+  }, [searchText, ownerId, blockedUserIdSet]);
+
+  const visibleFriendResults = useMemo(
+    () => friendResults.filter(friend => !blockedUserIdSet.has(friend?.firebaseUid)),
+    [blockedUserIdSet, friendResults]
+  );
+
+  const visibleSocialNotifications = useMemo(
+    () => socialNotifications.filter(item => !blockedUserIdSet.has(item.actor?.firebaseUid)),
+    [blockedUserIdSet, socialNotifications]
+  );
 
   const filteredPosts = useMemo(() => {
-    let result = posts;
+    let result = posts.filter(post => !blockedUserIdSet.has(post.user?.firebaseUid));
     if (selectedCategory !== 'Tất cả') {
       result = result.filter(post => post.category === selectedCategory);
     }
@@ -427,7 +441,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
       );
     }
     return result;
-  }, [posts, selectedCategory, searchText]);
+  }, [blockedUserIdSet, posts, selectedCategory, searchText]);
 
   const featuredPost = null;
 
@@ -514,7 +528,11 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   const handleSharePost = async (post) => {
     try {
       const result = await Share.share({
-        message: `Khám phá check-in của ${post.user.name} tại ${post.location || 'Việt Nam'} trên Vivu360:\n\n"${post.content}"\n\nTải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 độ nhé! 🇻🇳✨`,
+        message: `Khám phá check-in của ${post.user.name} tại ${post.location || 'Việt Nam'} trên Vivu360:
+
+"${post.content}"
+
+Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 độ nhé! 🇻🇳✨`,
       });
       if (result.action === Share.sharedAction) {
         setShareAlertVisible(true);
@@ -553,7 +571,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
               }}
             >
               <BellRing size={22} color={theme.textPrimary} />
-              {(incomingRequests.length > 0 || socialNotifications.some(item => !item.read)) && <View style={styles.messengerBadge} />}
+              {(incomingRequests.length > 0 || visibleSocialNotifications.some(item => !item.read)) && <View style={styles.messengerBadge} />}
             </Pressable>
           </View>
         </View>
@@ -629,7 +647,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
               <ActivityIndicator color="#3b82f6" style={{ marginVertical: 14 }} />
             ) : friendSearchError ? (
               <Text style={[styles.emptyFriendSearch, { color: '#ef4444' }]}>{friendSearchError}</Text>
-            ) : friendResults.length > 0 ? friendResults.map(friend => {
+            ) : visibleFriendResults.length > 0 ? visibleFriendResults.map(friend => {
               const relation = relationFor(friend.firebaseUid) || friend.friendship;
               const isBusy = friendActionId === friend.firebaseUid;
               return (
@@ -638,7 +656,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                 <Pressable style={{ flex: 1 }} onPress={() => handleOpenUserProfile(friend)}>
                   <Text style={[styles.friendSearchName, { color: theme.textPrimary }]}>{friend.name}</Text>
                   <Text style={[styles.friendSearchContact, { color: theme.textSecondary }]} numberOfLines={1}>
-                    {friend.email}{friend.phone ? ` · ${friend.phone}` : ''}
+                    {friend.email}{friend.phone ? ` • ${friend.phone}` : ''}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -1015,6 +1033,18 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             })}
 
             <Pressable
+              style={({ pressed }) => [styles.sideMenuItem, pressed && { backgroundColor: theme.searchBg }]}
+              onPress={() => {
+                setMenuVisible(false);
+                if (onNavigateToTab) onNavigateToTab('settings');
+              }}
+            >
+              <View style={[styles.sideMenuIcon, { backgroundColor: theme.searchBg }]}><Settings size={19} color="#3b82f6" /></View>
+              <Text style={[styles.sideMenuLabel, { color: theme.textPrimary }]}>{language === 'en' ? 'Settings' : 'Cài đặt'}</Text>
+              <ChevronRight size={17} color={theme.textMuted} />
+            </Pressable>
+
+            <Pressable
               style={({ pressed }) => [
                 styles.sideMenuItem,
                 {
@@ -1087,7 +1117,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                   </View>
                 );
               })}
-              {socialNotifications.map(item => {
+              {visibleSocialNotifications.map(item => {
                 const isLike = item.type === 'post_like';
                 return (
                   <Pressable key={item._id} style={({ pressed }) => [styles.notificationItem, { borderBottomColor: theme.border }, pressed && { backgroundColor: theme.searchBg }]}
@@ -1099,7 +1129,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>{item.actor?.name || 'Một thành viên'}</Text>
                       <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>
-                        {isLike ? 'đã thích bài viết của bạn.' : `đã bình luận: “${item.message}”`}
+                        {isLike ? 'đã thích bài viết của bạn.' : `đã bình luận: "${item.message}"`}
                       </Text>
                       <Text style={[styles.notificationTime, { color: theme.textMuted }]}>{new Date(item.createdAt).toLocaleString('vi-VN')}</Text>
                     </View>
@@ -1107,7 +1137,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                   </Pressable>
                 );
               })}
-              {incomingRequests.length === 0 && socialNotifications.length === 0 && (
+              {incomingRequests.length === 0 && visibleSocialNotifications.length === 0 && (
                 <View style={{ paddingHorizontal: 18, paddingVertical: 28 }}>
                   <Text style={[styles.notificationTitle, { color: theme.textPrimary }]}>Chưa có thông báo nào</Text>
                   <Text style={[styles.notificationMessage, { color: theme.textSecondary }]}>
@@ -1188,7 +1218,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             <View style={[styles.formInputGroup, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder, marginBottom: 16 }]}>
               <Newspaper size={18} color="#3b82f6" />
               <TextInput
-                placeholder="Nhập tiêu đề (e.g. Festival Hoa Đà Lạt 2026...)"
+                placeholder="Nhập tiêu đề (ví dụ: Festival Hoa Đà Lạt 2026...)"
                 placeholderTextColor={theme.textMuted}
                 value={newTitle}
                 onChangeText={setNewTitle}
@@ -1261,7 +1291,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
             <View style={[styles.formInputGroup, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder, marginBottom: 16 }]}>
               <MapPin size={18} color="#3b82f6" />
               <TextInput
-                placeholder="Check-in vị trí (e.g. Sapa, Lào Cai...)"
+                placeholder="Check-in vị trí (ví dụ: Sapa, Lào Cai...)"
                 placeholderTextColor={theme.textMuted}
                 value={newLocation}
                 onChangeText={setNewLocation}

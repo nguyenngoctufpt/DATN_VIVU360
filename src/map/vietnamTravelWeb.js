@@ -826,7 +826,7 @@ const createLeafletHtml = (isDark = true) => `
 </html>
 `;
 
-export function VietnamTravelWebScreen({ theme, isDarkMode, setIsDarkMode, onBack, onOpenVR, onNavigateToTour, onOpenPlaceDetail, onNavigateToProvince, onNavigateToTab, selectedPlaceRequest, onSelectedPlaceRequestHandled, ownerId, currentUser, onCheckIn }) {
+export function VietnamTravelWebScreen({ theme, isDarkMode, setIsDarkMode, onBack, onOpenVR, onNavigateToTour, onOpenPlaceDetail, onNavigateToProvince, onNavigateToTab, selectedPlaceRequest, onSelectedPlaceRequestHandled, ownerId, currentUser, onCheckIn, locationSharingEnabled = true }) {
   const webViewRef = useRef(null);
   const pendingPlaceRequestRef = useRef(null);
   const [shareModalVisible, setShareModalVisible] = useState(false);
@@ -891,11 +891,33 @@ export function VietnamTravelWebScreen({ theme, isDarkMode, setIsDarkMode, onBac
     return true;
   };
 
+  const syncShareControlVisibility = () => {
+    if (!webViewRef.current || !webViewReady) return;
+
+    webViewRef.current.injectJavaScript(`
+      (function() {
+        var enabled = ${locationSharingEnabled ? 'true' : 'false'};
+        var selectors = ['.map-share-location-btn', '#modalShareBtn'];
+        selectors.forEach(function(selector) {
+          var element = document.querySelector(selector);
+          if (!element) return;
+          element.style.display = enabled ? '' : 'none';
+        });
+      })();
+      true;
+    `);
+  };
+
   useEffect(() => {
     if (selectedPlaceRequest?.placeName) {
       requestPlaceGuide(selectedPlaceRequest);
     }
   }, [selectedPlaceRequest?.requestId, selectedPlaceRequest?.placeName, webViewReady]);
+
+  useEffect(() => {
+    syncShareControlVisibility();
+  }, [locationSharingEnabled, webViewReady]);
+
   const handleMessage = (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -922,6 +944,13 @@ export function VietnamTravelWebScreen({ theme, isDarkMode, setIsDarkMode, onBac
           onBack();
         }
       } else if (data.type === 'shareLocation' || data.type === 'sharePlace') {
+        if (!locationSharingEnabled) {
+          Alert.alert(
+            'Location sharing is off',
+            'Enable location sharing in Settings before sending places into chat.'
+          );
+          return;
+        }
         const formattedPrice = data.unitPrice
           ? (Number(data.unitPrice) > 0 ? `${Number(data.unitPrice).toLocaleString('vi-VN')}đ/người` : 'Miễn phí / Tự túc')
           : 'Miễn phí / Tự túc';
@@ -982,7 +1011,11 @@ export function VietnamTravelWebScreen({ theme, isDarkMode, setIsDarkMode, onBac
         mixedContentMode="always"
         startInLoadingState={false}
         onLoadStart={() => setWebViewReady(false)}
-        onLoadEnd={() => { setWebViewReady(true); flushPendingPlaceRequest(); }}
+        onLoadEnd={() => {
+          setWebViewReady(true);
+          flushPendingPlaceRequest();
+          syncShareControlVisibility();
+        }}
       />
 
       <ShareLocationModal
