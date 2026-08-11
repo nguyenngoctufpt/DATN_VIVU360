@@ -29,6 +29,21 @@ export async function getChatMessages(groupId, requesterId) {
   return response.data.data;
 }
 
+export async function updateChatMessage(groupId, messageId, requesterId, newContent) {
+  const response = await api.patch(`/chat/groups/${encodeURIComponent(groupId)}/messages/${encodeURIComponent(messageId)}`, {
+    requesterId,
+    content: newContent
+  });
+  return response.data.data;
+}
+
+export async function recallChatMessage(groupId, messageId, requesterId) {
+  const response = await api.delete(`/chat/groups/${encodeURIComponent(groupId)}/messages/${encodeURIComponent(messageId)}`, {
+    params: { requesterId },
+  });
+  return response.data.data;
+}
+
 export async function getGroupNotifications(groupId, requesterId) {
   const response = await api.get(`/notifications/groups/${encodeURIComponent(groupId)}`, {
     params: { requesterId, limit: 100 },

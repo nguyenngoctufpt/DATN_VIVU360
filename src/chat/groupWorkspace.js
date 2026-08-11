@@ -20,7 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { loadAppData, saveAppData } from '../services/appDataService';
 import { searchFriends } from '../services/userService';
-import { addChatMembers, createChatGroup, getChatGroups, getChatMessages, getGroupNotifications, removeChatMember, renameChatGroup, sendChatMessage, updateChatGroupWorkspace } from '../services/chatService';
+import { addChatMembers, createChatGroup, getChatGroups, getChatMessages, getGroupNotifications, recallChatMessage, removeChatMember, renameChatGroup, sendChatMessage, updateChatGroupWorkspace, updateChatMessage } from '../services/chatService';
 import { isSystemChatEntry, looksLikeSystemAnnouncement, normalizeGroupPreviewText, normalizeSystemAnnouncementText } from '../utils/chatText';
 import { getSafeAvatarSource, getSafeImageSource } from '../utils/image';
 import { parseLocationShareMessage, stripLocationShareMetadata } from '../utils/sharedLocation';
@@ -632,6 +632,8 @@ const normalizeLocalMessageEntry = (message, membersList, currentUser, ownerId) 
       ? normalizeSystemAnnouncementText(rawText, senderProfile.name || 'Th\u00e0nh vi\u00ean')
       : rawText,
     createdAt: message?.createdAt || message?.id || Date.now(),
+    isEdited: message.isEdited || false,
+    editedAt: message.editedAt || null,
   };
 };
 
@@ -654,6 +656,8 @@ const normalizeApiMessage = (message, currentUser, ownerId, membersList = []) =>
       ? normalizeSystemAnnouncementText(rawText, senderProfile.name || 'Th\u00e0nh vi\u00ean')
       : rawText,
     createdAt: message.createdAt,
+    isEdited: message.isEdited || false,
+    editedAt: message.editedAt || null,
   };
 };
 
@@ -802,6 +806,10 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const [fundContributionProofFile, setFundContributionProofFile] = useState(null);
   const [fundExpenseTitle, setFundExpenseTitle] = useState('');
   const [fundExpenseInput, setFundExpenseInput] = useState('');
+
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editMessageContent, setEditMessageContent] = useState('');
+  const [editMessageId, setEditMessageId] = useState(null);
 
   const messageStreamRef = useRef(null);
   const currentUserId = getCurrentUserMemberId(currentUser, ownerId);
@@ -1460,6 +1468,97 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     }
   };
 
+  const openEditModal = (msg) => {
+    setEditMessageId(msg.id);
+    setEditMessageContent(msg.text);
+    setEditModalVisible(true);
+  };
+
+  const handleEditMessage = async () => {
+    if (!editMessageContent.trim() || !editMessageId || !selectedGroup) return;
+    try {
+      const updated = await updateChatMessage(
+        selectedGroup.id,
+        editMessageId,
+        ownerId,
+        editMessageContent.trim()
+      );
+      
+      // Cập nhật trực tiếp state groups
+      setGroups((prevGroups) =>
+        prevGroups.map((group) => {
+          if (group.id !== selectedGroup.id) return group;
+          const updatedMessages = group.messages.map((msg) =>
+            msg.id === editMessageId
+              ? {
+                  ...msg,
+                  text: updated.content,
+                  isEdited: true,
+                  editedAt: updated.editedAt,
+                }
+              : msg
+          );
+          return { ...group, messages: updatedMessages };
+        })
+      );
+
+      setEditModalVisible(false);
+      setEditMessageContent('');
+      setEditMessageId(null);
+    } catch (error) {
+      Alert.alert('Lỗi', 'Không thể sửa tin nhắn.');
+    }
+  };
+
+  const confirmRecall = (msg) => {
+    Alert.alert(
+      'Thu hồi tin nhắn',
+      'Bạn chắc chứ?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Thu hồi',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await recallChatMessage(selectedGroup.id, msg.id, ownerId);
+
+              setGroups((prevGroups) =>
+                prevGroups.map((group) => {
+                  if (group.id !== selectedGroup.id) return group;
+                  const updatedMessages = group.messages.map((m) =>
+                    m.id === msg.id
+                      ? {
+                          ...m,
+                          messages: group.messages.filter((m) => m.id !== msg.id),
+                        }
+                      : m
+                  );
+                  return { ...group, messages: updatedMessages };
+                })
+              );
+            } catch (error) {
+              Alert.alert('Lỗi', 'Không thể thu hồi.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleLongPress = (msg) => {
+    if (String(msg.senderId) !== String(ownerId)) return; // không phải tin của mình
+    Alert.alert(
+      'Tùy chọn',
+      'Chọn thao tác',
+      [
+        { text: 'Sửa', onPress: () => openEditModal(msg) },
+        { text: 'Thu hồi', onPress: () => confirmRecall(msg) },
+        { text: 'Hủy', style: 'cancel' },
+      ]
+    );
+  };
+
   const currentRole = selectedGroup ? getMemberRole(selectedGroup, currentUserId) : 'member';
 
   return (
@@ -1663,13 +1762,17 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                         <View key={message.id} style={[styles.msgWrapper, isMe ? styles.msgWrapperMe : null]}>
                           {isMe ? (
                             <View style={{ alignItems: 'flex-end' }}>
-                              <LinearGradient colors={['#06b6d4', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.msgBubble, styles.msgBubbleMe]}>
-                                {sharedLocation ? renderSharedLocationCard(sharedLocation, true) : <Text style={styles.msgTextMe}>{displayMessageText}</Text>}
-                              </LinearGradient>
-                              <View style={styles.msgMetaMe}>
-                                <Text style={[styles.msgTimeTextMe, { color: theme.textMuted }]}>{messageTime}</Text>
-                                <CheckCheck size={11} color="#06b6d4" />
-                              </View>
+                              <Pressable
+                                onLongPress={() => handleLongPress(message)}
+                              >
+                                <LinearGradient colors={['#06b6d4', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.msgBubble, styles.msgBubbleMe]}>
+                                  {sharedLocation ? renderSharedLocationCard(sharedLocation, true) : <Text style={styles.msgTextMe}>{displayMessageText}</Text>}
+                                </LinearGradient>
+                                <View style={styles.msgMetaMe}>
+                                  <Text style={[styles.msgTimeTextMe, { color: theme.textMuted }]}>{messageTime}</Text>
+                                  <CheckCheck size={11} color="#06b6d4" />
+                                </View>
+                              </Pressable>
                             </View>
                           ) : (
                             <View style={styles.otherMsgRow}>
@@ -1708,6 +1811,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                                   {sharedLocation ? renderSharedLocationCard(sharedLocation, false) : <Text style={[styles.msgTextContent, { color: theme.textPrimary }]}>{displayMessageText}</Text>}
                                 </View>
                                 <Text style={[styles.msgTimeTextOther, { color: theme.textMuted }]}>{messageTime}</Text>
+                                {message.isEdited && <Text style={[styles.msgTimeTextOther, { fontSize: 9 }]}> (đã sửa)</Text>}
                               </View>
                             </View>
                           )}
@@ -2188,6 +2292,43 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
         theme={theme}
         currentUser={currentUser}
       />
+
+      <Modal
+        animationType="slide"
+        transparent
+        visible={editModalVisible}
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, { backgroundColor: theme.cardGlass, borderColor: theme.border, height: 280 }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.modalHeaderTitle, { color: theme.textPrimary }]}>Sửa tin nhắn</Text>
+              <Pressable style={styles.closeModalBtn} onPress={() => setEditModalVisible(false)}>
+                <X size={20} color={theme.textPrimary} />
+              </Pressable>
+            </View>
+            <View style={{ flex: 1, padding: 16 }}>
+              <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Nội dung mới</Text>
+              <TextInput
+                style={[styles.formInputGroup, { color: '#fff', backgroundColor: theme.searchBg, borderColor: theme.searchBorder, marginTop: 6, height: 80, textAlignVertical: 'top', paddingTop: 8 }]}
+                multiline
+                value={editMessageContent}
+                onChangeText={setEditMessageContent}
+                placeholder="Nhập nội dung mới..."
+                placeholderTextColor={theme.textMuted}
+              />
+            </View>
+            <View style={[styles.modalFooter, { borderTopColor: theme.border }]}>
+              <Pressable style={styles.modalSubmitBtn} onPress={handleEditMessage}>
+                <LinearGradient colors={['#06b6d4', '#3b82f6']} style={styles.modalSubmitGradient}>
+                  <Send size={16} color="#fff" />
+                  <Text style={styles.modalSubmitText}>Lưu thay đổi</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
