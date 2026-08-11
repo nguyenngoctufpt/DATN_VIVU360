@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { Appearance, Linking, PermissionsAndroid, Platform } from 'react-native';
 import { loadAppData, saveAppData } from './appDataService';
+import api from './api';
 
 export const SETTINGS_NAMESPACE = 'settings';
 const FEEDBACK_NAMESPACE = 'feedback';
@@ -330,6 +331,20 @@ export async function addFeedbackEntry(ownerId, entry) {
     createdAt: new Date().toISOString(),
   };
   const nextEntries = [nextEntry, ...current].slice(0, 20);
+  // Persist to app-data store (user-scoped cache)
   await saveAppData(ownerId, FEEDBACK_NAMESPACE, { entries: nextEntries });
+
+  // Also attempt to send to central feedback API (best-effort)
+  try {
+    await api.post('/feedback', {
+      ownerId,
+      category: nextEntry.category,
+      message: nextEntry.message,
+      contact: nextEntry.contact,
+    });
+  } catch (error) {
+    // ignore network errors; app-data retains the entry locally
+  }
+
   return nextEntries;
 }

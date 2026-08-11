@@ -44,6 +44,23 @@ export function FeedbackScreen({ theme, language, ownerId, onBack }) {
       return;
     }
 
+    // Validate contact (email or phone) — required
+    const rawContact = String(contact || '').trim();
+    if (!rawContact) {
+      showBanner('error', language === 'en' ? 'Please provide your email or phone so we can follow up.' : 'Vui lòng nhập email hoặc số điện thoại để Vivu360 phản hồi.');
+      return;
+    }
+
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawContact);
+    const isPhone = /^0\d{8,11}$/.test(rawContact); // starts with 0 and 9-12 digits total
+    if (!isEmail && !isPhone) {
+      const msg = language === 'en'
+        ? 'Invalid phone number / email format.'
+        : 'Nhập sai định dạng số điện thoại / Email';
+      showBanner('error', msg);
+      return;
+    }
+
     setSending(true);
     try {
       const nextEntries = await addFeedbackEntry(ownerId, {
