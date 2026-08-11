@@ -511,13 +511,13 @@
     L.control.zoom({ position: 'topright' }).addTo(map);
 
     // CARTO Voyager Tiles (Nạp cực mượt trên trình duyệt)
-    var tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    var tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
       subdomains: ['a', 'b', 'c', 'd'],
       maxZoom: 19
     }).addTo(map);
 
     tiles.on('tileerror', function() {
-      tiles.setUrl('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+      tiles.setUrl('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
     });
 
     function createPillIcon(name, isCapital, isSub) {
@@ -617,7 +617,7 @@
         '<h3>📍 ' + fullName + '</h3>' +
         '<p>' + prov.info + '</p>' +
         '<div style="display:flex;gap:6px;margin-top:8px;">' +
-        '<button class="popup-btn" style="background:linear-gradient(135deg, #0284c7, #0369a1);" onclick="openPlaceDetail(\'' + fullName.replace(/'/g, "\\'") + '\', \'' + prov.name.replace(/'/g, "\\'") + '\')">📖 Chi tiết</button>' +
+        '<button class="popup-btn" style="background:linear-gradient(135deg, #0284c7, #0369a1);" onclick="fetchAndOpenCamNang(\'' + fullName.replace(/'/g, "\\'") + '\')">📖 Cẩm nang</button>' +
         '<button class="popup-btn" style="background:linear-gradient(135deg, #3b82f6, #1d4ed8);" onclick="shareLocation(\'' + fullName.replace(/'/g, "\\'") + '\', \'' + prov.name.replace(/'/g, "\\'") + '\')">💬 Chia sẻ</button>' +
         '</div></div>';
 
@@ -638,13 +638,14 @@
         '<h3>📍 ' + sub.name + '</h3>' +
         '<p>' + sub.info + '</p>' +
         '<div style="display:flex;gap:6px;margin-top:8px;">' +
-        '<button class="popup-btn" style="background:linear-gradient(135deg, #0284c7, #0369a1);" onclick="openPlaceDetail(\'' + sub.name.replace(/'/g, "\\'") + '\', \'' + sub.prov.replace(/'/g, "\\'") + '\')">📖 Chi tiết</button>' +
+        '<button class="popup-btn" style="background:linear-gradient(135deg, #0284c7, #0369a1);" onclick="fetchAndOpenCamNang(\'' + sub.name.replace(/'/g, "\\'") + '\')">📖 Cẩm nang</button>' +
         '<button class="popup-btn" style="background:linear-gradient(135deg, #3b82f6, #1d4ed8);" onclick="shareLocation(\'' + sub.name.replace(/'/g, "\\'") + '\', \'' + sub.prov.replace(/'/g, "\\'") + '\')">💬 Chia sẻ</button>' +
         '</div></div>';
       sm.bindPopup(subPopup);
 
       sm.on('click', function() {
-        openPlaceDetail(sub.name, sub.prov);
+        zoomToProvince(sub.lat, sub.lng, sub.name);
+        setTimeout(function() { sm.openPopup(); }, 300);
       });
 
       subMarkers.push({ prov: sub.prov, marker: sm });

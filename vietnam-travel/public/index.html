@@ -1891,6 +1891,10 @@
             </div>
             
             <div class="flex items-center gap-2">
+                <button @click="showRoutePlannerModal = true" class="px-3 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-black text-xs transition-all flex items-center gap-1.5 shadow-lg active:scale-95">
+                    <span>🛣️</span>
+                    <span>Tìm đường</span>
+                </button>
                 <a :href="adminCalendarUrl()" class="w-8 h-8 lg:w-10 lg:h-10 rounded-xl flex items-center justify-center transition-all bg-white/5 hover:bg-white/10" title="Quản trị admin trên calendar">
                     <i data-lucide="shield-check" class="w-3 h-3 lg:w-4 lg:h-4"></i>
                 </a>
@@ -2061,6 +2065,92 @@
         </div>
     </div>
 
+    <!-- Floating On-Map Directions Banner (positioned below top search header) -->
+    <div x-show="activeRouteOnMap" 
+         x-cloak
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 -translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         class="fixed top-16 left-1/2 -translate-x-1/2 z-[2500] bg-slate-950/95 backdrop-blur-xl border border-sky-400/40 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 text-xs font-black whitespace-nowrap max-w-[92vw]">
+        <span x-text="routeBannerText" class="text-sky-300 truncate"></span>
+        <button @click="clearMapRoute()" class="px-2.5 py-1 bg-red-600 hover:bg-red-500 text-white rounded-full text-[11px] font-black transition-all shadow-md flex-none">
+            ✕ Hủy
+        </button>
+    </div>
+
+    <!-- Custom Route Planner Modal -->
+    <div x-show="showRoutePlannerModal" 
+         x-cloak
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         class="fixed inset-0 z-[650] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+        
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 my-auto">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                    <span>🛣️</span>
+                    <span>Chọn Tuyến Đường Chỉ Dẫn</span>
+                </h3>
+                <button @click="showRoutePlannerModal = false" 
+                        class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-lg font-bold">
+                    ×
+                </button>
+            </div>
+
+            <div class="flex flex-col gap-4">
+                <div>
+                    <label class="text-xs font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                        🚩 1. Chọn Điểm Xuất Phát (Origin):
+                    </label>
+                    <select x-model="routePlannerOrigin" class="w-full p-3 rounded-2xl border border-slate-200 text-sm font-bold text-slate-800 bg-slate-50 outline-none focus:border-sky-500">
+                        <option value="CURRENT">📍 Vị trí hiện tại của tôi</option>
+                        <template x-for="item in getAllAvailableLocations()" :key="item.name">
+                            <option :value="`${item.lat}|${item.lng}|${item.name}`" x-text="item.name"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div class="flex justify-center my-1">
+                    <button type="button" @click="swapRoutePlannerPoints()" class="px-4 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm border border-slate-200">
+                        <span>🔄</span>
+                        <span>Đảo ngược Điểm Đi ➔ Điểm Đến</span>
+                    </button>
+                </div>
+
+                <div>
+                    <label class="text-xs font-black uppercase tracking-wider text-slate-400 block mb-1.5">
+                        🏁 2. Chọn Điểm Đến (Destination):
+                    </label>
+                    <select x-model="routePlannerDest" class="w-full p-3 rounded-2xl border border-slate-200 text-sm font-bold text-slate-800 bg-slate-50 outline-none focus:border-sky-500">
+                        <option value="">-- Chọn điểm đến du lịch --</option>
+                        <template x-for="item in getAllAvailableLocations()" :key="item.name">
+                            <option :value="`${item.lat}|${item.lng}|${item.name}`" x-text="item.name"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <button @click="submitCustomRoute()" 
+                        class="w-full py-3.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white rounded-2xl text-sm font-black shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 mt-1">
+                    <span>🚀</span>
+                    <span>Vẽ Tuyến Đường Chỉ Dẫn</span>
+                </button>
+
+                <div class="relative flex py-0.5 items-center">
+                    <div class="flex-grow border-t border-slate-200"></div>
+                    <span class="flex-shrink mx-2 text-[10px] text-slate-400 font-extrabold uppercase">Hoặc</span>
+                    <div class="flex-grow border-t border-slate-200"></div>
+                </div>
+
+                <button @click="startMapRoutePicker()" 
+                        class="w-full py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-2xl text-xs font-black transition-all active:scale-95 flex items-center justify-center gap-2">
+                    <span>👉</span>
+                    <span>Click Chọn 2 Điểm Trực Tiếp Trên Bản Đồ</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Web Cẩm nang du lịch Modal -->
     
     <div x-show="showWebDetailModal" 
@@ -2071,74 +2161,116 @@
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100 scale-100"
          x-transition:leave-end="opacity-0 scale-95"
-         class="fixed inset-0 z-[500] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+         class="fixed inset-0 z-[600] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
         
-        <div class="bg-white rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-200 flex flex-col max-h-[88vh]">
-            <div class="h-48 relative flex-none">
+        <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[85vh] my-auto">
+            <div class="h-52 relative flex-none">
                 <img :src="webDetailData?.image || 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80'" class="w-full h-full object-cover" />
-                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent"></div>
                 <button @click="showWebDetailModal = false" 
-                        class="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors text-lg font-bold leading-none">
+                        class="absolute top-3.5 right-3.5 w-9 h-9 rounded-full bg-slate-950/50 hover:bg-slate-950/80 text-white flex items-center justify-center transition-all text-xl font-bold backdrop-blur-md border border-white/20 shadow-md">
                     ×
                 </button>
-                <div class="absolute bottom-4 left-4 right-4 text-white">
-                    <p class="text-[10px] uppercase tracking-[0.22em] font-extrabold text-emerald-300">Cẩm nang địa điểm</p>
-                    <h3 class="text-lg font-extrabold mt-1 leading-tight" x-text="webDetailData?.title"></h3>
-                    <p class="text-xs text-white/85 mt-1" x-text="webDetailData?.location"></p>
+                <div class="absolute bottom-4 left-5 right-5 text-white z-10">
+                    <p class="text-[10px] uppercase tracking-[0.25em] font-black text-emerald-400 drop-shadow">Cẩm nang địa điểm</p>
+                    <h3 class="text-2xl font-black mt-1 leading-tight !text-white drop-shadow-md" x-text="webDetailData?.title"></h3>
+                    <p class="text-xs !text-slate-200 font-semibold mt-1 drop-shadow flex items-center gap-1">
+                        <span>📍</span>
+                        <span x-text="webDetailData?.location"></span>
+                    </p>
                 </div>
             </div>
 
             <div class="p-5 flex-1 overflow-y-auto flex flex-col gap-4 text-slate-800">
-                <div class="grid grid-cols-2 gap-2 rounded-2xl bg-slate-50 border border-slate-100 p-3">
-                    <div class="rounded-xl bg-white border border-slate-100 p-3">
-                        <p class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Diện tích</p>
-                        <p class="text-xs font-bold text-slate-800 mt-1 leading-relaxed" x-text="webDetailData?.area"></p>
+                <div class="grid grid-cols-2 gap-2.5 rounded-2xl bg-slate-50 border border-slate-100 p-3">
+                    <div class="rounded-xl bg-white border border-slate-100 p-3 shadow-sm">
+                        <p class="text-[9.5px] uppercase font-black tracking-wider text-slate-400">Diện tích</p>
+                        <p class="text-xs font-extrabold text-slate-800 mt-1 leading-relaxed" x-text="webDetailData?.area"></p>
                     </div>
-                    <div class="rounded-xl bg-white border border-slate-100 p-3">
-                        <p class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Giá vé</p>
-                        <p class="text-xs font-bold text-slate-800 mt-1 leading-relaxed" x-text="webDetailData?.price"></p>
+                    <div class="rounded-xl bg-white border border-slate-100 p-3 shadow-sm">
+                        <p class="text-[9.5px] uppercase font-black tracking-wider text-slate-400">Giá vé</p>
+                        <p class="text-xs font-extrabold text-emerald-600 mt-1 leading-relaxed" x-text="webDetailData?.price"></p>
                     </div>
-                    <div class="rounded-xl bg-white border border-slate-100 p-3 col-span-2">
-                        <p class="text-[10px] uppercase font-extrabold tracking-wide text-slate-400">Thời gian mở</p>
-                        <p class="text-xs font-bold text-slate-800 mt-1 leading-relaxed" x-text="webDetailData?.openHours"></p>
+                    <div class="rounded-xl bg-white border border-slate-100 p-3 col-span-2 shadow-sm">
+                        <p class="text-[9.5px] uppercase font-black tracking-wider text-slate-400">Thời gian mở cửa</p>
+                        <p class="text-xs font-extrabold text-slate-800 mt-1 leading-relaxed" x-text="webDetailData?.openHours"></p>
                     </div>
                 </div>
 
                 <div>
-                    <h4 class="text-sm font-extrabold text-slate-900">Thông tin địa điểm</h4>
-                    <p class="text-sm text-slate-600 leading-6 mt-2" x-text="webDetailData?.overview"></p>
+                    <h4 class="text-sm font-black text-slate-900">Thông tin địa điểm</h4>
+                    <p class="text-sm text-slate-600 leading-relaxed mt-2" x-text="webDetailData?.overview"></p>
                 </div>
 
-                <div class="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
-                    <h4 class="text-sm font-extrabold text-amber-900">Lịch sử hình thành</h4>
-                    <p class="text-sm text-amber-950/80 leading-6 mt-2" x-text="webDetailData?.history"></p>
+                <div class="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-4">
+                    <h4 class="text-sm font-black text-amber-900 flex items-center gap-1.5">
+                        <span>🏛️</span>
+                        <span>Lịch sử hình thành</span>
+                    </h4>
+                    <p class="text-sm text-amber-950/85 leading-relaxed mt-2" x-text="webDetailData?.history"></p>
                 </div>
 
                 <div>
-                    <h4 class="text-sm font-extrabold text-slate-900">Đồ dùng thiết yếu nên mang theo</h4>
-                    <ul class="flex flex-col gap-2 mt-2">
+                    <h4 class="text-sm font-black text-slate-900">Đồ dùng thiết yếu nên mang theo</h4>
+                    <ul class="flex flex-col gap-2 mt-2.5">
                         <template x-for="item in webDetailData?.essentials || []" :key="item">
-                            <li class="flex items-start gap-2 text-sm text-slate-600 leading-6">
-                                <span class="mt-2 h-1.5 w-1.5 rounded-full bg-emerald-500 flex-none"></span>
+                            <li class="flex items-start gap-2.5 text-sm text-slate-600 leading-relaxed">
+                                <span class="mt-2 h-2 w-2 rounded-full bg-emerald-500 flex-none shadow-sm"></span>
                                 <span x-text="item"></span>
                             </li>
                         </template>
                     </ul>
                 </div>
 
-                <div class="rounded-2xl border border-sky-100 bg-sky-50/80 p-4">
-                    <h4 class="text-sm font-extrabold text-sky-900">Thời điểm nên đi</h4>
-                    <p class="text-sm text-sky-950/80 leading-6 mt-2" x-text="webDetailData?.bestTime"></p>
+                <div class="rounded-2xl border border-sky-200/80 bg-sky-50/80 p-4">
+                    <h4 class="text-sm font-black text-sky-900 flex items-center gap-1.5">
+                        <span>☀️</span>
+                        <span>Thời điểm nên đi</span>
+                    </h4>
+                    <p class="text-sm text-sky-950/85 leading-relaxed mt-2" x-text="webDetailData?.bestTime || 'Nên đi từ tháng 1 đến tháng 5 và tháng 9 đến tháng 11 khi thời tiết ráo mát, thoáng đãng.'"></p>
                 </div>
             </div>
 
-            <div class="p-4 border-t border-slate-100 bg-slate-50 flex gap-2 flex-none">
+            <div class="p-4 pb-6 border-t border-slate-100 bg-slate-50 flex gap-2.5 flex-none shadow-lg">
+                <button @click="openDirections(webDetailData?.lat, webDetailData?.lng, webDetailData?.title)" 
+                        class="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl text-sm font-black shadow-md transition-all active:scale-95 flex items-center justify-center gap-2">
+                    <span class="text-base">🚗</span>
+                    <span>Chỉ đường</span>
+                </button>
                 <button @click="showWebDetailModal = false" 
-                        class="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-sm font-bold transition-all active:scale-95">
+                        class="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-2xl text-sm font-extrabold transition-all active:scale-95">
                     Đóng cẩm nang
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- On-Map Directions Banner -->
+    <div x-show="activeRouteOnMap" 
+         x-cloak
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 -translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         class="fixed top-4 left-1/2 transform -translate-x-1/2 z-[450] bg-slate-900/90 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-sky-500/40 flex items-center gap-3">
+        <span class="text-xs font-extrabold text-sky-300" x-text="routeBannerText"></span>
+        <button @click="clearMapRoute()" 
+                class="px-3 py-1 bg-red-500/80 hover:bg-red-600 text-white rounded-xl text-xs font-black transition-all shadow-sm active:scale-95">
+            ❌ Hủy chỉ đường
+        </button>
+    </div>
+
+    <!-- On-Map Interactive Route Picker Banner -->
+    <div x-show="isRoutePickerMode" 
+         x-cloak
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 -translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         class="fixed top-4 left-1/2 transform -translate-x-1/2 z-[700] bg-slate-950/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-emerald-400/50 flex items-center gap-4">
+        <span class="text-xs font-black text-emerald-300" x-html="pickerBannerText"></span>
+        <button @click="cancelMapRoutePicker()" 
+                class="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-black transition-all shadow-md active:scale-95">
+            ❌ Hủy
+        </button>
     </div>
 
     <!-- Web VR 360 Viewer Modal -->
@@ -2410,6 +2542,13 @@
                 markerPopup: null,      // { type, id, name, isExcluded, x, y }
                 activeSubLocation: null, // Chi tiết điểm du lịch đang chọn
                 showWebDetailModal: false, // Hiện modal cẩm nang du lịch trên Web
+                showRoutePlannerModal: false, // Hiện modal chọn điểm đi & điểm đến
+                isRoutePickerMode: false, // Trạng thái đang chọn điểm trực tiếp trên bản đồ
+                routePickerStep: 1,      // 1 = chọn điểm đi, 2 = chọn điểm đến
+                pickedStartPlace: null,  // Điểm xuất phát đã chọn
+                pickerBannerText: '',   // Thông báo hướng dẫn trên bản đồ
+                routePlannerOrigin: 'CURRENT',
+                routePlannerDest: '',
                 webDetailData: null,     // Dữ liệu cẩm nang của địa danh đang chọn
                 showWebVRModal: false,   // Hiện modal xem VR 360 trên Web
                 webVRTitle: '',          // Tên địa danh đang xem VR
@@ -2548,6 +2687,17 @@
                     if (savedCalendarMoveOnly === '0') this.calendarMoveOnly = false;
                     if (savedCalendarMoveOnly === '1') this.calendarMoveOnly = true;
                     lucide.createIcons();
+
+                    window._openWebDetailFromMap = (name, addr) => this.openWebDetail(name, addr);
+                    window._openDirectionsFromMap = (lat, lng, name) => this.openDirections(lat, lng, name);
+                    window._setRouteOriginFromWebMap = (lat, lng) => {
+                        this.routePlannerOrigin = `${lat}|${lng}|Vị trí chọn`;
+                        this.showRoutePlannerModal = true;
+                    };
+                    window._setRouteDestFromWebMap = (lat, lng) => {
+                        this.routePlannerDest = `${lat}|${lng}|Vị trí chọn`;
+                        this.showRoutePlannerModal = true;
+                    };
 
                     this.$nextTick(() => {
                         if (!this.map) this.initMap();
@@ -2737,8 +2887,8 @@
                     const mapUrl = this.theme === 'osm'
                         ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
                         : (this.theme === 'light'
-                            ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-                            : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
+                            ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
+                            : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png');
                     this.tileLayer = L.tileLayer(mapUrl, {
                         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
                         subdomains: 'abcd',
@@ -2751,8 +2901,8 @@
                         const newUrl = val === 'osm'
                             ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
                             : (val === 'light'
-                                ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-                                : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
+                                ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
+                                : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png');
                         if (this.tileLayer) {
                             this.tileLayer.setUrl(newUrl);
                         }
@@ -2870,24 +3020,27 @@
                         return;
                     }
 
-                    // Overview mode: show all plan locations
+                    // Overview mode: show all plan locations by Province Name
                     const orderedLocs = this.orderedPlanLocations();
                     const visibleLocs = orderedLocs.filter(l => !this.excludedLocations[l.id]);
 
                     orderedLocs.forEach((loc, index) => {
                         const isActive = loc.id === this.activeId;
                         const isExcluded = !!this.excludedLocations[loc.id];
+                        const provinceLabel = loc.province ? loc.province : loc.name;
 
                         const bgClass = this.theme === 'light'
-                            ? (isActive ? 'bg-blue-600 border-2 border-white text-white scale-110 z-[100] shadow-lg' : 'bg-white text-slate-800 border border-slate-200 shadow-md')
-                            : (isActive ? 'bg-blue-600 border-2 border-white text-white scale-110 z-[100] shadow-xl' : 'bg-slate-900/90 text-white border border-slate-700/50 shadow-xl');
+                            ? (isActive ? 'bg-blue-600 border-2 border-white text-white scale-110 z-[100] shadow-lg' : 'bg-white text-slate-800 border border-slate-200 shadow-md hover:bg-blue-50')
+                            : (isActive ? 'bg-blue-600 border-2 border-white text-white scale-110 z-[100] shadow-xl' : 'bg-slate-900/90 text-white border border-slate-700/50 shadow-xl hover:bg-slate-800');
 
                         const markerHtml = isExcluded
                              ? `<div class="relative w-8 h-8 flex items-center justify-center">
-                                 <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-200 text-slate-400 px-2 py-1 rounded border border-dashed border-slate-300 shadow-sm font-bold text-xs whitespace-nowrap select-none">${loc.name}</div>
+                                 <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-200 text-slate-400 px-2 py-1 rounded border border-dashed border-slate-300 shadow-sm font-bold text-xs whitespace-nowrap select-none">${provinceLabel}</div>
                                 </div>`
                              : `<div class="relative w-8 h-8 flex items-center justify-center cursor-pointer group">
-                                 <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 ${bgClass} px-3 py-1.5 rounded-lg font-bold text-xs whitespace-nowrap transition-all duration-300">${loc.name}</div>
+                                 <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 ${bgClass} px-3 py-1.5 rounded-xl font-black text-xs whitespace-nowrap transition-all duration-300 shadow-lg">
+                                     <span>${provinceLabel}</span>
+                                 </div>
                                 </div>`;
 
                         const marker = L.marker([loc.lat, loc.lng], {
@@ -2899,14 +3052,75 @@
                             })
                         }).addTo(this.map);
 
+                        const popupHtml = `<div class="p-1 min-w-[180px]">
+                            <h3 class="font-black text-slate-900 text-sm mb-1">${loc.name || provinceLabel}</h3>
+                            <p class="text-xs text-slate-500 mb-2">${loc.province || provinceLabel}</p>
+                            <div class="flex gap-1.5 mt-2">
+                                <button onclick="window._openWebDetailFromMap('${(loc.name || provinceLabel).replace(/'/g, "\\'")}', '${(loc.province || provinceLabel).replace(/'/g, "\\'")}')" class="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-extrabold transition-all shadow-sm">📖 Cẩm nang</button>
+                                <button onclick="window._openDirectionsFromMap(${loc.lat}, ${loc.lng}, '${(loc.name || provinceLabel).replace(/'/g, "\\'")}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-extrabold transition-all shadow-sm">🚗 Chỉ đường</button>
+                            </div>
+                        </div>`;
+                        marker.bindPopup(popupHtml);
+
                         marker.on('click', (e) => {
                             L.DomEvent.stopPropagation(e);
+                            if (this.handleLocationTapForRoute(loc.lat, loc.lng, loc.name || provinceLabel)) return;
                             this.activeId = loc.id;
                             this.detailMode = 'detail';
+                            this.map.flyTo([loc.lat, loc.lng], 13.5, { duration: 1.5 });
+                            this.openWebDetail(loc.name || provinceLabel, loc.province || provinceLabel);
+                            setTimeout(() => { marker.openPopup(); }, 300);
                             this.$nextTick(() => this.updateMap(true));
                         });
                         this.markers[loc.id] = marker;
                     });
+
+                    if (!this._routeMapClickListenerAdded) {
+                        this._routeMapClickListenerAdded = true;
+                        this.map.on('click', (e) => {
+                            if (this.isRoutePickerMode) {
+                                this.handleLocationTapForRoute(e.latlng.lat, e.latlng.lng, 'Vị trí đã chọn');
+                                return;
+                            }
+
+                            const lat = e.latlng.lat;
+                            const lng = e.latlng.lng;
+
+                            if (this.droppedPinMarker) this.map.removeLayer(this.droppedPinMarker);
+
+                            this.droppedPinMarker = L.marker([lat, lng], {
+                                icon: L.divIcon({
+                                    className: 'custom-dropped-pin',
+                                    html: '<div style="background:#ef4444;color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(239,68,68,0.5);border:2.5px solid #fff;font-weight:900;font-size:12px;">📍</div>',
+                                    iconSize: [28, 28],
+                                    iconAnchor: [14, 14]
+                                })
+                            }).addTo(this.map);
+
+                            const coordStr = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                            const popupHtml = `<div class="p-1 min-w-[200px]">
+                                <p class="text-[9.5px] uppercase font-black tracking-wider text-sky-600 mb-1">📍 Vị trí bạn chọn trên bản đồ</p>
+                                <h3 id="webDroppedPinTitle" class="font-black text-slate-900 text-sm mb-2">Tọa độ: ${coordStr}</h3>
+                                <div class="flex gap-1.5 mt-2">
+                                    <button onclick="window._setRouteOriginFromWebMap(${lat}, ${lng})" class="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-black transition-all shadow-sm">🚩 Điểm đi</button>
+                                    <button onclick="window._setRouteDestFromWebMap(${lat}, ${lng})" class="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black transition-all shadow-sm">🏁 Điểm đến</button>
+                                </div>
+                            </div>`;
+
+                            this.droppedPinMarker.bindPopup(popupHtml).openPopup();
+
+                            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+                                .then(res => res.json())
+                                .then(data => {
+                                    if (data && data.display_name) {
+                                        const shortAddress = (data.address.road || data.address.suburb || data.address.city || data.address.state || data.display_name.split(',')[0]).trim();
+                                        const el = document.getElementById('webDroppedPinTitle');
+                                        if (el) el.innerText = shortAddress;
+                                    }
+                                })
+                                .catch(err => {});
+                        });
+                    }
 
                     if (fitBounds && visibleLocs.length > 0) {
                         const bounds = L.latLngBounds(visibleLocs.map(l => [l.lat, l.lng]));
@@ -3115,7 +3329,273 @@
                     });
                 },
 
-                openWebDetail(name, fallbackAddress = '') {
+                openDirections(targetLat, targetLng, placeName = '') {
+                    if (!targetLat || !targetLng) {
+                        const activeLoc = this.activeSubLocation || this.activeLocation;
+                        if (activeLoc) {
+                            targetLat = activeLoc.lat;
+                            targetLng = activeLoc.lng;
+                            placeName = activeLoc.name;
+                        }
+                    }
+                    if (!targetLat || !targetLng) return;
+
+                    this.showWebDetailModal = false;
+
+                    let startLat = 21.0285;
+                    let startLng = 105.8542;
+                    let startName = 'Hà Nội';
+
+                    if (Math.abs(targetLat - 21.0285) < 0.005 && Math.abs(targetLng - 105.8542) < 0.005) {
+                        startLat = 20.8436;
+                        startLng = 104.6811;
+                        startName = 'Mộc Châu';
+                    }
+
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => this.renderMapRouteBetweenPoints(pos.coords.latitude, pos.coords.longitude, 'Vị trí của bạn', targetLat, targetLng, placeName || 'Điểm đến'),
+                            () => this.renderMapRouteBetweenPoints(startLat, startLng, startName, targetLat, targetLng, placeName || 'Điểm đến'),
+                            { timeout: 3000 }
+                        );
+                    } else {
+                        this.renderMapRouteBetweenPoints(startLat, startLng, startName, targetLat, targetLng, placeName || 'Điểm đến');
+                    }
+                },
+
+                getAllAvailableLocations() {
+                    const list = [];
+                    if (Array.isArray(this.provinces)) {
+                        this.provinces.forEach(p => {
+                            list.push({ lat: p.lat, lng: p.lng, name: p.fullName || p.name });
+                        });
+                    }
+                    if (Array.isArray(this.subLocations)) {
+                        this.subLocations.forEach(s => {
+                            list.push({ lat: s.lat, lng: s.lng, name: s.name });
+                        });
+                    }
+                    if (list.length === 0) {
+                        return [
+                            { lat: 21.0285, lng: 105.8542, name: 'Hà Nội' },
+                            { lat: 20.8651, lng: 106.6838, name: 'Hải Phòng' },
+                            { lat: 20.2506, lng: 105.9745, name: 'Tràng An (Ninh Bình)' },
+                            { lat: 20.9101, lng: 107.0800, name: 'Vịnh Hạ Long' },
+                            { lat: 16.0544, lng: 108.2022, name: 'Đà Nẵng' },
+                            { lat: 11.9404, lng: 108.4583, name: 'Đà Lạt' },
+                            { lat: 10.7769, lng: 106.7009, name: 'TP Hồ Chí Minh' },
+                            { lat: 10.2899, lng: 103.9840, name: 'Phú Quốc' },
+                        ];
+                    }
+                    return list;
+                },
+
+                swapRoutePlannerPoints() {
+                    const temp = this.routePlannerOrigin;
+                    this.routePlannerOrigin = this.routePlannerDest || 'CURRENT';
+                    this.routePlannerDest = temp === 'CURRENT' ? '' : temp;
+                },
+
+                startMapRoutePicker() {
+                    this.showRoutePlannerModal = false;
+                    this.clearMapRoute();
+                    this.isRoutePickerMode = true;
+                    this.routePickerStep = 1;
+                    this.pickedStartPlace = null;
+                    this.pickerBannerText = '🚩 Bước 1: Click chọn <b>Điểm Xuất Phát</b> trên bản đồ';
+                },
+
+                cancelMapRoutePicker() {
+                    this.isRoutePickerMode = false;
+                    this.routePickerStep = 1;
+                    this.pickedStartPlace = null;
+                    this.pickerBannerText = '';
+                    this.clearMapRoute();
+                },
+
+                handleLocationTapForRoute(lat, lng, name) {
+                    if (!this.isRoutePickerMode) return false;
+
+                    if (this.routePickerStep === 1) {
+                        this.pickedStartPlace = { lat, lng, name };
+                        this.routePickerStep = 2;
+                        this.pickerBannerText = '🏁 Bước 2: Click chọn <b>Điểm Đến</b> trên bản đồ';
+
+                        this.onMapStartMarker = L.marker([lat, lng], {
+                            icon: L.divIcon({
+                                className: 'custom-start-icon',
+                                html: `<div style="background:#10b981;color:#fff;padding:6px 12px;border-radius:20px;font-weight:900;font-size:11px;box-shadow:0 4px 12px rgba(16,185,129,0.4);border:2px solid #fff;white-space:nowrap;">🚩 ${name}</div>`,
+                                iconSize: [140, 36],
+                                iconAnchor: [70, 18]
+                            })
+                        }).addTo(this.map);
+                        return true;
+                    } else if (this.routePickerStep === 2) {
+                        const start = this.pickedStartPlace;
+                        this.isRoutePickerMode = false;
+                        this.pickerBannerText = '';
+                        this.renderMapRouteBetweenPoints(start.lat, start.lng, start.name, lat, lng, name);
+                        return true;
+                    }
+                    return false;
+                },
+
+                submitCustomRoute() {
+                    if (!this.routePlannerDest) return;
+                    this.showRoutePlannerModal = false;
+
+                    const destParts = this.routePlannerDest.split('|');
+                    const destLat = parseFloat(destParts[0]);
+                    const destLng = parseFloat(destParts[1]);
+                    const destName = destParts[2] || 'Điểm đến';
+
+                    if (this.routePlannerOrigin === 'CURRENT') {
+                        this.openDirections(destLat, destLng, destName);
+                    } else {
+                        const origParts = this.routePlannerOrigin.split('|');
+                        const origLat = parseFloat(origParts[0]);
+                        const origLng = parseFloat(origParts[1]);
+                        const origName = origParts[2] || 'Điểm xuất phát';
+
+                        this.renderMapRouteBetweenPoints(origLat, origLng, origName, destLat, destLng, destName);
+                    }
+                },
+
+                renderMapRouteBetweenPoints(startLat, startLng, startName, targetLat, targetLng, placeName, travelMode = 'driving') {
+                    this.showWebDetailModal = false;
+
+                    // Clean Focus Mode: hide markers during route navigation
+                    if (this.markers) {
+                        Object.values(this.markers).forEach(m => { if (this.map.hasLayer(m)) this.map.removeLayer(m); });
+                    }
+                    if (this.droppedPinMarker) { this.map.removeLayer(this.droppedPinMarker); this.droppedPinMarker = null; }
+
+                    if (this.onMapRouteLine) { this.map.removeLayer(this.onMapRouteLine); this.onMapRouteLine = null; }
+                    if (this.onMapStartGlow) { this.map.removeLayer(this.onMapStartGlow); this.onMapStartGlow = null; }
+                    if (this.onMapStartMarker) { this.map.removeLayer(this.onMapStartMarker); this.onMapStartMarker = null; }
+                    if (this.onMapEndMarker) { this.map.removeLayer(this.onMapEndMarker); this.onMapEndMarker = null; }
+
+                    this.onMapStartMarker = L.marker([startLat, startLng], {
+                        icon: L.divIcon({
+                            className: 'custom-start-icon',
+                            html: `<div style="background:#2563eb;color:#fff;padding:6px 14px;border-radius:20px;font-weight:900;font-size:11px;box-shadow:0 4px 14px rgba(37,99,235,0.4);border:2px solid #fff;white-space:nowrap;">🔵 ${startName}</div>`,
+                            iconSize: [140, 36],
+                            iconAnchor: [70, 18]
+                        })
+                    }).addTo(this.map);
+
+                    this.onMapEndMarker = L.marker([targetLat, targetLng], {
+                        icon: L.divIcon({
+                            className: 'custom-end-icon',
+                            html: `<div style="background:#ef4444;color:#fff;padding:6px 14px;border-radius:20px;font-weight:900;font-size:11px;box-shadow:0 4px 14px rgba(239,68,68,0.4);border:2px solid #fff;white-space:nowrap;">🔴 ${placeName}</div>`,
+                            iconSize: [140, 36],
+                            iconAnchor: [70, 18]
+                        })
+                    }).addTo(this.map);
+
+                    this.routeBannerText = `⏳ Đang tìm tuyến đường xe chạy mượt nhất...`;
+                    this.activeRouteOnMap = true;
+
+                    const profile = travelMode === 'walking' ? 'foot' : (travelMode === 'biking' ? 'bike' : 'driving');
+                    const osrmUrl = `https://router.project-osrm.org/route/v1/${profile}/${startLng},${startLat};${targetLng},${targetLat}?overview=full&geometries=geojson`;
+
+                    fetch(osrmUrl)
+                        .then(res => res.json())
+                        .then(data => {
+                            let routeCoords = [];
+                            let distKmStr = '';
+                            let durStr = '';
+
+                            if (data && data.routes && data.routes.length > 0) {
+                                const route = data.routes[0];
+                                routeCoords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+                                const km = (route.distance / 1000).toFixed(1);
+                                const mins = Math.round(route.duration / 60);
+                                distKmStr = `${km} km`;
+                                durStr = mins >= 60 ? `${Math.floor(mins / 60)} giờ ${mins % 60} phút` : `${mins} phút`;
+                            } else {
+                                routeCoords = [[startLat, startLng], [targetLat, targetLng]];
+                                distKmStr = 'Tuyến đường thẳng';
+                                durStr = '--';
+                            }
+
+                            this.onMapStartGlow = L.polyline(routeCoords, {
+                                color: '#60a5fa',
+                                weight: 10,
+                                opacity: 0.5,
+                                lineCap: 'round',
+                                lineJoin: 'round'
+                            }).addTo(this.map);
+
+                            this.onMapRouteLine = L.polyline(routeCoords, {
+                                color: '#2563eb',
+                                weight: 6,
+                                opacity: 0.95,
+                                lineCap: 'round',
+                                lineJoin: 'round'
+                            }).addTo(this.map);
+
+                            const modeIcon = travelMode === 'walking' ? '🚶' : (travelMode === 'biking' ? '🏍️' : '🚗');
+                            this.routeBannerText = `${modeIcon} ${durStr} (${distKmStr}) • ${startName} ➔ ${placeName}`;
+
+                            const bounds = L.latLngBounds(routeCoords);
+                            this.map.fitBounds(bounds, { padding: [80, 80], animate: true });
+                        })
+                        .catch(err => {
+                            console.warn('OSRM route error, fallback:', err);
+                            const fallbackCoords = [[startLat, startLng], [targetLat, targetLng]];
+                            this.onMapRouteLine = L.polyline(fallbackCoords, {
+                                color: '#2563eb',
+                                weight: 6,
+                                opacity: 0.9,
+                                dashArray: '10, 10'
+                            }).addTo(this.map);
+                            this.routeBannerText = `🚗 ${startName} ➔ ${placeName}`;
+                            const bounds = L.latLngBounds(fallbackCoords);
+                            this.map.fitBounds(bounds, { padding: [80, 80], animate: true });
+                        });
+                },
+
+                clearMapRoute() {
+                    if (this.onMapRouteLine) { this.map.removeLayer(this.onMapRouteLine); this.onMapRouteLine = null; }
+                    if (this.onMapStartGlow) { this.map.removeLayer(this.onMapStartGlow); this.onMapStartGlow = null; }
+                    if (this.onMapStartMarker) { this.map.removeLayer(this.onMapStartMarker); this.onMapStartMarker = null; }
+                    if (this.onMapEndMarker) { this.map.removeLayer(this.onMapEndMarker); this.onMapEndMarker = null; }
+                    this.activeRouteOnMap = false;
+                    this.routeBannerText = '';
+
+                    if (this.markers) {
+                        Object.values(this.markers).forEach(m => { if (!this.map.hasLayer(m)) this.map.addLayer(m); });
+                    }
+                },
+
+                async openWebDetail(name, fallbackAddress = '') {
+                    try {
+                        const clean = (name || '').replace('Thủ đô ', '').replace('Tỉnh ', '').replace('Thành phố ', '').trim();
+                        const res = await fetch(`/api/camnang/location/${encodeURIComponent(clean)}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            let items = data.itemsToBring;
+                            if (typeof items === 'string') {
+                                try { items = JSON.parse(items); } catch(e) { items = []; }
+                            }
+                            this.webDetailData = {
+                                title: data.locationName || name,
+                                location: fallbackAddress || data.locationName || name,
+                                image: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1200&q=80',
+                                area: data.areaSize || 'Quy mô vùng',
+                                price: data.ticketPrice || 'Miễn phí',
+                                openHours: `${data.openingHours || '07:00'} - ${data.closingHours || '18:00'}`,
+                                overview: data.description || '',
+                                history: data.history || '',
+                                essentials: Array.isArray(items) ? items : []
+                            };
+                            this.showWebDetailModal = true;
+                            return;
+                        }
+                    } catch (err) {
+                        console.warn('Fetch API /api/camnang failed, falling back to local mock:', err);
+                    }
                     const guideData = this.buildPlaceGuideData(name, fallbackAddress);
                     if (!guideData) return;
                     this.webDetailData = guideData;

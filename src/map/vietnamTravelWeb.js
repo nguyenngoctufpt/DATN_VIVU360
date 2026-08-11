@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View, Text, Pressable, SafeAreaView, ActivityIndicator, BackHandler, Platform, StatusBar, Alert } from 'react-native';
+import { StyleSheet, View, Text, Pressable, SafeAreaView, ActivityIndicator, BackHandler, Platform, StatusBar, Alert, Linking } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { ChevronLeft } from 'lucide-react-native';
 import Constants from 'expo-constants';
@@ -295,28 +295,64 @@ const createLeafletHtml = (isDark = true) => `
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .modal-hero {
-      height: 180px;
+      height: 200px;
       background-size: cover;
       background-position: center;
       border-top-left-radius: 24px;
       border-top-right-radius: 24px;
       position: relative;
     }
+    .modal-hero-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 0.45) 60%, transparent 100%);
+      border-top-left-radius: 24px;
+      border-top-right-radius: 24px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    .modal-hero-tag {
+      color: #34d399 !important;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      margin-bottom: 2px;
+    }
+    .modal-hero-title {
+      color: #ffffff !important;
+      font-size: 22px;
+      font-weight: 900;
+      line-height: 1.2;
+      margin: 0;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.85);
+    }
+    .modal-hero-sub {
+      color: rgba(255,255,255,0.9) !important;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 4px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
     .modal-close-btn {
       position: absolute;
       top: 12px;
       right: 12px;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(0, 0, 0, 0.55);
       color: #ffffff;
-      border: none;
-      width: 32px;
-      height: 32px;
+      border: 1px solid rgba(255,255,255,0.2);
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
-      font-size: 16px;
+      font-size: 18px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
+      z-index: 10;
     }
     .modal-body {
       padding: 20px;
@@ -399,7 +435,55 @@ const createLeafletHtml = (isDark = true) => `
       </div>
       <div class="search-results" id="searchResults" style="display:none;"></div>
     </div>
+    <button class="map-share-location-btn" style="background:linear-gradient(135deg,#0284c7,#0369a1);" onclick="openCustomRoutePlanner()" title="Chọn điểm đi điểm đến">🛣️ Tìm đường</button>
     <button class="map-share-location-btn" onclick="shareCurrentMapView()" title="Chia sẻ vị trí bản đồ vào nhóm">📍 Chia sẻ</button>
+  </div>
+
+  <!-- Custom Route Planner Modal -->
+  <div id="customRouteModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="max-width:440px;padding:20px;border-radius:24px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h3 style="margin:0;font-size:17px;font-weight:900;color:#0f172a;display:flex;align-items:center;gap:6px;">
+          <span>🛣️</span><span>Chọn Tuyến Đường Tìm Kiếm</span>
+        </h3>
+        <button class="modal-close-btn" style="position:static;background:#cbd5e1;color:#334155;" onclick="closeCustomRoutePlanner()">✕</button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <!-- Origin Selection -->
+        <div>
+          <label style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">
+            🚩 1. Chọn Điểm Xuất Phát (Origin):
+          </label>
+          <select id="routeOriginSelect" style="width:100%;padding:10px 12px;border-radius:14px;border:1px solid #cbd5e1;font-size:13px;font-weight:700;color:#0f172a;background:#f8fafc;outline:none;">
+            <option value="CURRENT">📍 Vị trí hiện tại của tôi</option>
+          </select>
+        </div>
+
+        <!-- Destination Selection -->
+        <div>
+          <label style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">
+            🏁 2. Chọn Điểm Đến (Destination):
+          </label>
+          <select id="routeDestSelect" style="width:100%;padding:10px 12px;border-radius:14px;border:1px solid #cbd5e1;font-size:13px;font-weight:700;color:#0f172a;background:#f8fafc;outline:none;">
+          </select>
+        </div>
+
+        <div style="position:relative;text-align:center;margin:4px 0;">
+          <span style="background:#fff;padding:0 8px;font-size:11px;font-weight:800;color:#94a3b8;position:relative;z-index:1;">HOẶC CHỌN TRỰC TIẾP</span>
+          <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:#e2e8f0;z-index:0;"></div>
+        </div>
+
+        <button onclick="startOnMapRoutePicker()" style="padding:11px;background:#f0fdf4;color:#15803d;border:1.5px dashed #4ade80;border-radius:16px;font-size:12.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all;">
+          <span>👉</span><span>Click Chọn 2 Điểm Trực Tiếp Trên Bản Đồ</span>
+        </button>
+
+        <!-- Submit Button -->
+        <button onclick="submitCustomRoutePlan()" style="margin-top:4px;padding:12px;background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff;border:none;border-radius:16px;font-size:13.5px;font-weight:900;cursor:pointer;box-shadow:0 4px 14px rgba(2,132,199,0.4);display:flex;align-items:center;justify-content:center;gap:6px;">
+          <span>🚀</span><span>Vẽ Tuyến Đường Đã Chọn</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Place Detail Modal -->
@@ -413,14 +497,41 @@ const createLeafletHtml = (isDark = true) => `
         <span id="modalProvTag" class="modal-prov-tag">📍 Ninh Bình</span>
         <p id="modalDesc" class="modal-desc">Quần thể danh thắng Tràng An là một khu du lịch sinh thái kết hợp tâm linh nổi tiếng tại tỉnh Ninh Bình, được UNESCO công nhận là di sản thế giới đôi.</p>
         <div class="modal-actions">
-          <button id="modalVrBtn" class="btn-vr" onclick="triggerVrFromModal()">🥽 Tour VR 360°</button>
-          <button id="modalShareBtn" class="btn-share" onclick="triggerShareFromModal()">💬 Chia sẻ vào nhóm</button>
+          <button id="modalVrBtn" class="btn-vr" onclick="triggerVrFromModal()">🥽 Tour VR</button>
+          <button id="modalGuideBtn" class="btn-vr" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);" onclick="triggerCamNangFromModal()">📖 Cẩm nang</button>
+          <button id="modalShareBtn" class="btn-share" onclick="triggerShareFromModal()">💬 Chia sẻ</button>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- Cam Nang Handbook Modal -->
+  <div id="camNangModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="max-width:480px;padding:0;">
+      <div id="cnHero" class="modal-hero" style="background-image:url('https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80');">
+        <button class="modal-close-btn" onclick="closeCamNangModal()">✕</button>
+        <div class="modal-hero-overlay">
+          <div class="modal-hero-tag">CẨM NANG ĐỊA ĐIỂM</div>
+          <h3 id="cnTitle" class="modal-hero-title">Hồ Hoàn Kiếm</h3>
+          <div id="cnSubtitle" class="modal-hero-sub">Hà Nội</div>
+        </div>
+      </div>
+      <div id="cnContent" style="padding:16px 20px 20px 20px;max-height:400px;overflow-y:auto;font-size:13px;color:#334155;line-height:1.6;">
+        <!-- Content inserted dynamically -->
+      </div>
+      <div style="padding:12px 16px 20px 16px;border-top:1px solid #f1f5f9;background:#f8fafc;display:flex;gap:8px;border-bottom-left-radius:24px;border-bottom-right-radius:24px;">
+        <button id="cnDirectionsBtn" style="flex:1;padding:12px;background:linear-gradient(135deg,#10b981,#059669);color:#ffffff;border:none;border-radius:16px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;gap:6px;">
+          <span>🚗</span><span>Chỉ đường</span>
+        </button>
+        <button onclick="closeCamNangModal()" style="flex:1;padding:12px;background:#e2e8f0;color:#334155;border:none;border-radius:16px;font-size:13px;font-weight:800;cursor:pointer;">
+          Đóng cẩm nang
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div id="map"></div>
+
   <script>
     var map = L.map('map', {
       zoomControl: false,
@@ -430,14 +541,14 @@ const createLeafletHtml = (isDark = true) => `
 
     L.control.zoom({ position: 'topright' }).addTo(map);
 
-    // CARTO Voyager Tiles (Nạp cực mượt trên trình duyệt & WebView)
-    var tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    // CARTO Voyager Tiles (Nạp mượt trên trình duyệt & WebView)
+    var tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
       subdomains: ['a', 'b', 'c', 'd'],
       maxZoom: 19
     }).addTo(map);
 
     tiles.on('tileerror', function() {
-      tiles.setUrl('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+      tiles.setUrl('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
     });
 
     function createPillIcon(name, isCapital, isSub) {
@@ -495,13 +606,36 @@ const createLeafletHtml = (isDark = true) => `
       { prov: "Ninh Bình", name: "Hang Múa", lat: 20.2317, lng: 105.9525, info: "Thánh địa check-in đỉnh núi Rồng." },
       { prov: "Quảng Ninh", name: "Vịnh Hạ Long", lat: 20.9101, lng: 107.1839, info: "Kỳ quan thiên nhiên thế giới." },
       { prov: "Quảng Ninh", name: "Đảo Ti Tốp", lat: 20.8594, lng: 107.0784, info: "Bãi tắm tuyệt đẹp trên vịnh." },
+      { prov: "Quảng Ninh", name: "Danh thắng Yên Tử", lat: 21.1565, lng: 106.7196, info: "Đất tổ Phật giáo Trúc Lâm." },
       { prov: "Lào Cai", name: "Đỉnh Fansipan", lat: 22.3033, lng: 103.7750, info: "Nóc nhà Đông Dương 3.143m." },
+      { prov: "Lào Cai", name: "Bản Cát Cát", lat: 22.3312, lng: 103.8324, info: "Ngôi bản cổ đẹp nhất Sa Pa." },
+      { prov: "Yên Bái", name: "Mù Cang Chải", lat: 21.8542, lng: 104.0841, info: "Kiệt tác ruộng bậc thang hùng vĩ." },
+      { prov: "Yên Bái", name: "Đèo Khau Phạ", lat: 21.7644, lng: 104.1485, info: "Tứ đại đỉnh đèo điểm nhảy dù." },
+      { prov: "Cao Bằng", name: "Thác Bản Giốc", lat: 22.8550, lng: 106.6090, info: "Thác nước biên giới hùng vĩ." },
+      { prov: "Cao Bằng", name: "Động Ngườm Ngao", lat: 22.8427, lng: 106.6006, info: "Kiệt tác thạch nhũ kỳ vĩ." },
+      { prov: "Sơn La", name: "Mộc Châu", lat: 20.8436, lng: 104.6811, info: "Cao nguyên đồi chè trái tim." },
+      { prov: "Hà Giang", name: "Mã Pí Lèng", lat: 22.7933, lng: 105.4101, info: "Hẻm vực Tu Sản sông Nho Quý." },
+      { prov: "Hà Giang", name: "Cột cờ Lũng Cú", lat: 23.3601, lng: 105.3164, info: "Điểm cực Bắc thiêng liêng Tổ quốc." },
+      { prov: "Hà Nội", name: "Hồ Hoàn Kiếm", lat: 21.0285, lng: 105.8542, info: "Trái tim ngàn năm văn hiến." },
+      { prov: "Hà Nội", name: "Văn Miếu Quốc Tử Giám", lat: 21.0293, lng: 105.8361, info: "Trường đại học đầu tiên Việt Nam." },
+      { prov: "Thanh Hóa", name: "Pù Luông", lat: 20.4500, lng: 105.2167, info: "Khu sinh thái mây phủ thơ mộng." },
+      { prov: "Quảng Bình", name: "Phong Nha - Kẻ Bàng", lat: 17.4833, lng: 106.3167, info: "Vương quốc hang động thế giới." },
+      { prov: "Thừa Thiên Huế", name: "Đại Nội Huế", lat: 16.4695, lng: 107.5776, info: "Quần thể di tích Cố đô Huế." },
       { prov: "Đà Nẵng", name: "Cầu Vàng Bà Nà", lat: 15.9952, lng: 107.9965, info: "Biểu tượng du lịch quốc tế Đà Nẵng." },
       { prov: "Đà Nẵng", name: "Biển Mỹ Khê", lat: 16.0592, lng: 108.2464, info: "Top bãi biển đẹp nhất hành tinh." },
       { prov: "Quảng Nam", name: "Phố Cổ Hội An", lat: 15.8801, lng: 108.3380, info: "Di sản văn hóa thế giới Hội An." },
+      { prov: "Bình Định", name: "Kỳ Co - Eo Gió", lat: 13.8872, lng: 109.2882, info: "Thiên đường biển xanh Quy Nhơn." },
+      { prov: "Phú Yên", name: "Gành Đá Đĩa", lat: 13.3364, lng: 109.3031, info: "Tuyệt tác đá bazan hình lục giác." },
+      { prov: "Khánh Hòa", name: "VinWonders Nha Trang", lat: 12.2173, lng: 109.2179, info: "Công viên giải trí đỉnh cao." },
+      { prov: "Ninh Thuận", name: "Vịnh Vĩnh Hy", lat: 11.7088, lng: 109.1912, info: "Vịnh biển hoang sơ nồng nàn." },
+      { prov: "Bình Thuận", name: "Đồi cát Mũi Né", lat: 10.9548, lng: 108.2934, info: "Thủ đô resort & Đồi cát bay." },
       { prov: "Lâm Đồng", name: "Hồ Xuân Hương", lat: 11.9404, lng: 108.4440, info: "Trái tim ngàn hoa Đà Lạt." },
+      { prov: "Vũng Tàu", name: "Tượng Chúa Kito", lat: 10.3267, lng: 107.0850, info: "Tượng Chúa giang tay núi Nhỏ." },
       { prov: "TP.HCM", name: "Chợ Bến Thành", lat: 10.7725, lng: 106.6980, info: "Biểu tượng văn hóa Sài Gòn." },
-      { prov: "Kiên Giang", name: "Grand World", lat: 10.3242, lng: 103.8580, info: "Thành phố không ngủ Phú Quốc." }
+      { prov: "Cần Thơ", name: "Chợ nổi Cái Răng", lat: 10.0058, lng: 105.7461, info: "Chợ nổi sầm uất Tây Đô." },
+      { prov: "An Giang", name: "Rừng tràm Trà Sư", lat: 10.5050, lng: 105.0538, info: "Thánh địa bèo xanh miền Tây." },
+      { prov: "Bến Tre", name: "Cù lao Thới Sơn", lat: 10.3341, lng: 106.3385, info: "Miệt vườn dừa nước sông nước." },
+      { prov: "Kiên Giang", name: "Grand World Phú Quốc", lat: 10.3242, lng: 103.8580, info: "Thành phố không ngủ Phú Quốc." }
     ];
 
     var provinces = [
@@ -525,29 +659,369 @@ const createLeafletHtml = (isDark = true) => `
       { name: "Phan Thiết", fullName: "Bình Thuận (Phan Thiết)", lat: 10.9333, lng: 108.1000, info: "Mũi Né & Đảo Phú Quý." },
       { name: "Đà Lạt", fullName: "Lâm Đồng (Đà Lạt)", lat: 11.9404, lng: 108.4583, info: "Hồ Xuân Hương & Thung lũng." },
       { name: "Vũng Tàu", fullName: "Vũng Tàu & Côn Đảo", lat: 10.3460, lng: 107.0843, info: "Bãi Sau Vũng Tàu & Côn Đảo." },
-      { name: "TP.HCM", fullName: "TP. Hồ Chí Minh", lat: 10.8231, lng: 106.6297, info: "Chợ Bến Thành & Dinh Độc Lập." },
+      { name: "TP.HCM", fullName: "TP. Hồ Chí Minh", lat: 10.7769, lng: 106.7009, info: "Chợ Bến Thành & Dinh Độc Lập." },
       { name: "Cần Thơ", fullName: "Cần Thơ", lat: 10.0452, lng: 105.7469, info: "Chợ nổi Cái Răng & Ninh Kiều." },
-      { name: "An Giang", fullName: "An Giang (Châu Đốc)", lat: 10.7000, lng: 105.1167, info: "Miếu Bà Chúa Xứ & Trà Sư." },
-      { name: "Bến Tre", fullName: "Bến Tre", lat: 10.2415, lng: 106.3759, info: "Xứ dừa & Cù lao Thới Sơn." },
-      { name: "Phú Quốc", fullName: "Kiên Giang (Đảo Phú Quốc)", lat: 10.2289, lng: 103.9572, info: "Đảo ngọc & Grand World." }
+      { name: "An Giang", fullName: "An Giang", lat: 10.5216, lng: 105.1258, info: "Trà Sư & Miếu Bà Chúa Xứ." },
+      { name: "Bến Tre", fullName: "Bến Tre", lat: 10.2432, lng: 106.3758, info: "Xứ dừa & Cù lao Thới Sơn." },
+      { name: "Phú Quốc", fullName: "Kiên Giang (Phú Quốc)", lat: 10.2289, lng: 103.9572, info: "Đảo Ngọc & Grand World." }
     ];
+
+    var currentRouteLine = null;
+    var userStartMarker = null;
+    var destEndMarker = null;
+    var routeBannerEl = null;
+
+    function clearDirectionsRoute() {
+      if (currentRouteLine) { map.removeLayer(currentRouteLine); currentRouteLine = null; }
+      if (userStartMarker) { map.removeLayer(userStartMarker); userStartMarker = null; }
+      if (destEndMarker) { map.removeLayer(destEndMarker); destEndMarker = null; }
+      if (routeBannerEl) { routeBannerEl.style.display = 'none'; }
+    }
+
+    var isRoutePickerMode = false;
+    var routePickerStep = 1;
+    var pickedStartPlace = null;
+    var routePickerBannerEl = null;
+
+    function startOnMapRoutePicker() {
+      closeCustomRoutePlanner();
+      clearDirectionsRoute();
+      isRoutePickerMode = true;
+      routePickerStep = 1;
+      pickedStartPlace = null;
+
+      showRoutePickerBanner('👆 Click vào <b>điểm xuất phát</b> trên bản đồ');
+    }
+
+    function cancelOnMapRoutePicker() {
+      isRoutePickerMode = false;
+      routePickerStep = 1;
+      pickedStartPlace = null;
+      if (routePickerBannerEl) routePickerBannerEl.style.display = 'none';
+      clearDirectionsRoute();
+    }
+
+    function showRoutePickerBanner(htmlMsg) {
+      if (!routePickerBannerEl) {
+        routePickerBannerEl = document.createElement('div');
+        routePickerBannerEl.style.cssText = 'position:fixed;bottom:100px;left:12px;right:12px;z-index:2800;background:rgba(15,23,42,0.96);backdrop-filter:blur(16px);color:#fff;padding:14px 16px;border-radius:20px;box-shadow:0 -4px 30px rgba(0,0,0,0.4);border:1px solid rgba(56,189,248,0.4);display:flex;justify-content:space-between;align-items:center;gap:10px;';
+        document.body.appendChild(routePickerBannerEl);
+      }
+      routePickerBannerEl.innerHTML =
+        '<div style="display:flex;flex-direction:column;gap:2px;">' +
+          '<div style="font-size:13px;font-weight:900;color:#60a5fa;">🗺️ Chọn Điểm Trực Tiếp Trên Bản Đồ</div>' +
+          '<div style="font-size:12px;font-weight:600;color:#e2e8f0;">' + htmlMsg + '</div>' +
+        '</div>' +
+        '<button onclick="cancelOnMapRoutePicker()" style="background:#ef4444;color:#fff;border:none;padding:8px 14px;border-radius:14px;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(239,68,68,0.5);flex-none;">✕ Hủy</button>';
+      routePickerBannerEl.style.display = 'flex';
+    }
+
+    function handleLocationTapForRoute(lat, lng, name) {
+      if (!isRoutePickerMode) return false;
+
+      if (routePickerStep === 1) {
+        pickedStartPlace = { lat: lat, lng: lng, name: name };
+        routePickerStep = 2;
+
+        userStartMarker = L.marker([lat, lng], {
+          icon: L.divIcon({
+            className: 'custom-start-icon',
+            html: '<div style="background:#10b981;color:#fff;padding:6px 12px;border-radius:20px;font-weight:800;font-size:11px;box-shadow:0 4px 12px rgba(16,185,129,0.4);border:2px solid #fff;white-space:nowrap;">🚩 ' + name + '</div>',
+            iconSize: [140, 36],
+            iconAnchor: [70, 18]
+          })
+        }).addTo(map);
+
+        showRoutePickerBanner('👆 Click vào <b>điểm đến</b> trên bản đồ');
+        return true;
+      } else if (routePickerStep === 2) {
+        isRoutePickerMode = false;
+        if (routePickerBannerEl) routePickerBannerEl.style.display = 'none';
+
+        renderDirectionsRoute(pickedStartPlace.lat, pickedStartPlace.lng, pickedStartPlace.name, lat, lng, name);
+        return true;
+      }
+      return false;
+    }
+
+    function openCustomRoutePlanner() {
+      populateRoutePlannerDropdowns();
+      var modal = document.getElementById('customRouteModal');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeCustomRoutePlanner() {
+      var modal = document.getElementById('customRouteModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function swapRoutePoints() {
+      var originSel = document.getElementById('routeOriginSelect');
+      var destSel = document.getElementById('routeDestSelect');
+      if (originSel && destSel) {
+        var temp = originSel.value;
+        originSel.value = destSel.value || 'CURRENT';
+        destSel.value = temp === 'CURRENT' ? '' : temp;
+      }
+    }
+
+    function populateRoutePlannerDropdowns() {
+      var originSel = document.getElementById('routeOriginSelect');
+      var destSel = document.getElementById('routeDestSelect');
+      if (!originSel || !destSel) return;
+
+      var optionsHtml = '<option value="CURRENT">📍 Vị trí hiện tại của tôi</option>';
+      var destHtml = '';
+
+      var allPlaces = [];
+      provinces.forEach(function(p) {
+        allPlaces.push({ name: p.fullName || p.name, lat: p.lat, lng: p.lng, type: 'Province' });
+      });
+      subAttractions.forEach(function(s) {
+        allPlaces.push({ name: s.name, lat: s.lat, lng: s.lng, type: 'Attraction' });
+      });
+
+      allPlaces.forEach(function(item) {
+        var opt = '<option value="' + item.lat + ',' + item.lng + '|' + item.name.replace(/"/g, '&quot;') + '">' + (item.type === 'Province' ? '🏛️ ' : '🏞️ ') + item.name + '</option>';
+        optionsHtml += opt;
+        destHtml += opt;
+      });
+
+      originSel.innerHTML = optionsHtml;
+      destSel.innerHTML = destHtml;
+    }
+
+    function submitCustomRoutePlan() {
+      var originSel = document.getElementById('routeOriginSelect');
+      var destSel = document.getElementById('routeDestSelect');
+      if (!originSel || !destSel) return;
+
+      var originVal = originSel.value;
+      var destVal = destSel.value;
+
+      if (!destVal) {
+        alert('Vui lòng chọn Điểm Đến!');
+        return;
+      }
+
+      closeCustomRoutePlanner();
+
+      var destParts = destVal.split('|');
+      var destCoords = (destParts[0] || '').split(',');
+      var destLat = parseFloat(destCoords[0]);
+      var destLng = parseFloat(destCoords[1]);
+      var destName = destParts[1] || 'Điểm đến';
+
+      if (isNaN(destLat) || isNaN(destLng)) {
+        alert('Tọa độ điểm đến không hợp lệ!');
+        return;
+      }
+
+      if (originVal === 'CURRENT') {
+        getDirectionsTo(destLat, destLng, destName);
+      } else {
+        var origParts = originVal.split('|');
+        var origCoords = (origParts[0] || '').split(',');
+        var origLat = parseFloat(origCoords[0]);
+        var origLng = parseFloat(origCoords[1]);
+        var origName = origParts[1] || 'Điểm xuất phát';
+
+        if (isNaN(origLat) || isNaN(origLng)) {
+          getDirectionsTo(destLat, destLng, destName);
+        } else {
+          renderDirectionsRoute(origLat, origLng, origName, destLat, destLng, destName);
+        }
+      }
+    }
+
+    var outerRouteGlowLine = null;
+
+    function clearDirectionsRoute() {
+      if (currentRouteLine) { map.removeLayer(currentRouteLine); currentRouteLine = null; }
+      if (outerRouteGlowLine) { map.removeLayer(outerRouteGlowLine); outerRouteGlowLine = null; }
+      if (userStartMarker) { map.removeLayer(userStartMarker); userStartMarker = null; }
+      if (destEndMarker) { map.removeLayer(destEndMarker); destEndMarker = null; }
+      if (routeBannerEl) { routeBannerEl.style.display = 'none'; }
+
+      // Restore all map markers when ending directions
+      provinceMarkers.forEach(function(m) { if (!map.hasLayer(m)) map.addLayer(m); });
+    }
+
+    function renderDirectionsRoute(startLat, startLng, startName, destLat, destLng, destName, travelMode) {
+      clearDirectionsRoute();
+
+      // Clean Focus Mode: Hide all clutter markers on map while navigating
+      provinceMarkers.forEach(function(m) { map.removeLayer(m); });
+      subMarkers.forEach(function(item) { map.removeLayer(item.marker); });
+      if (droppedPinMarker) { map.removeLayer(droppedPinMarker); droppedPinMarker = null; }
+
+      travelMode = travelMode || 'driving';
+      var modeIcon = travelMode === 'walking' ? '🚶' : (travelMode === 'biking' ? '🏍️' : '🚗');
+
+      // Prevent 0 km flag overlap if start and end are exact same coordinates
+      if (Math.abs(startLat - destLat) < 0.005 && Math.abs(startLng - destLng) < 0.005) {
+        startLat = 21.0285;
+        startLng = 105.8542;
+        if (Math.abs(destLat - 21.0285) < 0.005) {
+          startLat = 20.8436;
+          startLng = 104.6811;
+          startName = 'Mộc Châu (Vùng ven)';
+        }
+      }
+
+      // 1. Start Marker
+      userStartMarker = L.marker([startLat, startLng], {
+        icon: L.divIcon({
+          className: 'custom-start-icon',
+          html: '<div style="background:#2563eb;color:#fff;padding:6px 14px;border-radius:20px;font-weight:900;font-size:11px;box-shadow:0 4px 14px rgba(37,99,235,0.4);border:2px solid #fff;white-space:nowrap;">🔵 ' + startName + '</div>',
+          iconSize: [140, 36],
+          iconAnchor: [70, 18]
+        })
+      }).addTo(map);
+
+      // 2. Destination Marker
+      destEndMarker = L.marker([destLat, destLng], {
+        icon: L.divIcon({
+          className: 'custom-dest-icon',
+          html: '<div style="background:#ef4444;color:#fff;padding:6px 14px;border-radius:20px;font-weight:900;font-size:11px;box-shadow:0 4px 14px rgba(239,68,68,0.4);border:2px solid #fff;white-space:nowrap;">🔴 ' + destName + '</div>',
+          iconSize: [140, 36],
+          iconAnchor: [70, 18]
+        })
+      }).addTo(map);
+
+      if (!routeBannerEl) {
+        routeBannerEl = document.createElement('div');
+        routeBannerEl.style.cssText = 'position:fixed;bottom:100px;left:12px;right:12px;z-index:2500;background:rgba(15,23,42,0.96);backdrop-filter:blur(16px);color:#fff;padding:14px 16px;border-radius:20px;box-shadow:0 -4px 30px rgba(0,0,0,0.4);border:1px solid rgba(56,189,248,0.25);display:flex;flex-direction:column;gap:8px;';
+        document.body.appendChild(routeBannerEl);
+      }
+      routeBannerEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;"><span style="color:#60a5fa;font-size:13px;font-weight:700;">⏳ Đang tìm tuyến đường...</span></div>';
+      routeBannerEl.style.display = 'flex';
+
+      var profile = travelMode === 'walking' ? 'foot' : (travelMode === 'biking' ? 'bike' : 'driving');
+      var osrmUrl = 'https://router.project-osrm.org/route/v1/' + profile + '/' + startLng + ',' + startLat + ';' + destLng + ',' + destLat + '?overview=full&geometries=geojson';
+
+      fetch(osrmUrl)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          var routeCoords = [];
+          var distKmStr = '';
+          var durStr = '';
+
+          if (data && data.routes && data.routes.length > 0) {
+            var route = data.routes[0];
+            routeCoords = route.geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
+            var km = (route.distance / 1000).toFixed(1);
+            var mins = Math.round(route.duration / 60);
+            distKmStr = km + ' km';
+            durStr = mins >= 60 ? (Math.floor(mins / 60) + ' giờ ' + (mins % 60) + ' phút') : (mins + ' phút');
+          } else {
+            routeCoords = [[startLat, startLng], [destLat, destLng]];
+            distKmStr = 'Thẳng';
+            durStr = '--';
+          }
+
+          outerRouteGlowLine = L.polyline(routeCoords, {
+            color: '#60a5fa',
+            weight: 10,
+            opacity: 0.5,
+            lineCap: 'round',
+            lineJoin: 'round'
+          }).addTo(map);
+
+          currentRouteLine = L.polyline(routeCoords, {
+            color: '#2563eb',
+            weight: 6,
+            opacity: 0.95,
+            lineCap: 'round',
+            lineJoin: 'round'
+          }).addTo(map);
+
+          routeBannerEl.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+              '<div>' +
+                '<div style="font-size:15px;font-weight:900;color:#fff;letter-spacing:-0.2px;">' + modeIcon + ' ' + durStr + ' &nbsp;<span style="font-size:12px;font-weight:700;color:#93c5fd;">(' + distKmStr + ')</span></div>' +
+                '<div style="font-size:11px;font-weight:600;color:#94a3b8;margin-top:2px;">' + startName + ' → ' + destName + '</div>' +
+              '</div>' +
+              '<button onclick="clearDirectionsRoute()" style="background:#ef4444;color:#fff;border:none;padding:8px 14px;border-radius:14px;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(239,68,68,0.5);flex-none;white-space:nowrap;">✕ Hủy</button>' +
+            '</div>';
+
+          var bounds = L.latLngBounds(routeCoords);
+          map.fitBounds(bounds, { padding: [80, 80], animate: true });
+        })
+        .catch(function(err) {
+          console.warn('OSRM route error, fallback to straight line:', err);
+          var fallbackCoords = [[startLat, startLng], [destLat, destLng]];
+
+          currentRouteLine = L.polyline(fallbackCoords, {
+            color: '#2563eb',
+            weight: 6,
+            opacity: 0.9,
+            dashArray: '10, 10'
+          }).addTo(map);
+
+          routeBannerEl.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+              '<div>' +
+                '<div style="font-size:15px;font-weight:900;color:#fff;">' + modeIcon + ' ' + startName + ' → ' + destName + '</div>' +
+                '<div style="font-size:11px;font-weight:600;color:#f87171;margin-top:2px;">⚠️ Không lấy được đường đi thực tế - hiển thị đường thẳng</div>' +
+              '</div>' +
+              '<button onclick="clearDirectionsRoute()" style="background:#ef4444;color:#fff;border:none;padding:8px 14px;border-radius:14px;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(239,68,68,0.5);flex-none;">✕ Hủy</button>' +
+            '</div>';
+
+          var bounds = L.latLngBounds(fallbackCoords);
+          map.fitBounds(bounds, { padding: [80, 80], animate: true });
+        });
+    }
+
+    function getDirectionsTo(targetLat, targetLng, placeName) {
+      if (!targetLat || !targetLng) return;
+
+      closeCamNangModal();
+      closePlaceDetailModal();
+
+      var defaultStartLat = 21.0285;
+      var defaultStartLng = 105.8542;
+      var defaultStartName = 'Hà Nội';
+
+      if (Math.abs(targetLat - 21.0285) < 0.005 && Math.abs(targetLng - 105.8542) < 0.005) {
+        defaultStartLat = 20.8436;
+        defaultStartLng = 104.6811;
+        defaultStartName = 'Mộc Châu';
+      }
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          function(pos) {
+            renderDirectionsRoute(pos.coords.latitude, pos.coords.longitude, 'Vị trí của bạn', targetLat, targetLng, placeName || 'Điểm đến', 'driving');
+          },
+          function() {
+            renderDirectionsRoute(defaultStartLat, defaultStartLng, defaultStartName, targetLat, targetLng, placeName || 'Điểm đến', 'driving');
+          },
+          { timeout: 3000 }
+        );
+      } else {
+        renderDirectionsRoute(defaultStartLat, defaultStartLng, defaultStartName, targetLat, targetLng, placeName || 'Điểm đến', 'driving');
+      }
+    }
 
     var provinceMarkers = [];
     provinces.forEach(function(prov) {
-      var m = L.marker([prov.lat, prov.lng], { icon: createPillIcon(prov.name, prov.isCapital, false) });
       var fullName = prov.fullName || prov.name;
+      var m = L.marker([prov.lat, prov.lng], { icon: createPillIcon(fullName, prov.isCapital) }).addTo(map);
 
       var popupHtml = '<div class="pretty-popup">' +
-        '<h3>📍 ' + fullName + '</h3>' +
+        '<h3>' + fullName + '</h3>' +
         '<p>' + prov.info + '</p>' +
-        '<div style="display:flex;gap:6px;margin-top:8px;">' +
-        '<button class="popup-btn" style="background:linear-gradient(135deg, #0284c7, #0369a1);" onclick="openPlaceDetail(\'' + fullName.replace(/'/g, "\\'") + '\', \'' + prov.name.replace(/'/g, "\\'") + '\')">📖 Chi tiết</button>' +
+        '<div style="display:flex;gap:4px;margin-top:8px;">' +
+        '<button class="popup-btn" style="background:linear-gradient(135deg, #0284c7, #0369a1);" onclick="fetchAndOpenCamNang(\'' + fullName.replace(/'/g, "\\'") + '\')">📖 Cẩm nang</button>' +
+        '<button class="popup-btn" style="background:linear-gradient(135deg, #10b981, #059669);" onclick="getDirectionsTo(' + prov.lat + ', ' + prov.lng + ', \'' + fullName.replace(/'/g, "\\'") + '\')">🚗 Chỉ đường</button>' +
         '<button class="popup-btn" style="background:linear-gradient(135deg, #3b82f6, #1d4ed8);" onclick="shareLocation(\'' + fullName.replace(/'/g, "\\'") + '\', \'' + prov.name.replace(/'/g, "\\'") + '\')">💬 Chia sẻ</button>' +
         '</div></div>';
 
       m.bindPopup(popupHtml);
 
-      m.on('click', function() {
+      m.on('click', function(e) {
+        if (handleLocationTapForRoute(prov.lat, prov.lng, fullName)) return;
         zoomToProvince(prov.lat, prov.lng, fullName);
         setTimeout(function() { m.openPopup(); }, 300);
       });
@@ -557,35 +1031,104 @@ const createLeafletHtml = (isDark = true) => `
 
     var subMarkers = [];
     subAttractions.forEach(function(sub) {
-      var sm = L.marker([sub.lat, sub.lng], { icon: createPillIcon(sub.name, false, true) });
+      var sm = L.marker([sub.lat, sub.lng], { icon: createPillIcon(sub.name, false, true) }).addTo(map);
       var subPopup = '<div class="pretty-popup">' +
-        '<h3>📍 ' + sub.name + '</h3>' +
+        '<h3>' + sub.name + '</h3>' +
         '<p>' + sub.info + '</p>' +
-        '<div style="display:flex;gap:6px;margin-top:8px;">' +
-        '<button class="popup-btn" style="background:linear-gradient(135deg, #0284c7, #0369a1);" onclick="openPlaceDetail(\'' + sub.name.replace(/'/g, "\\'") + '\', \'' + sub.prov.replace(/'/g, "\\'") + '\')">📖 Chi tiết</button>' +
+        '<div style="display:flex;gap:4px;margin-top:8px;">' +
+        '<button class="popup-btn" style="background:linear-gradient(135deg, #0284c7, #0369a1);" onclick="fetchAndOpenCamNang(\'' + sub.name.replace(/'/g, "\\'") + '\')">📖 Cẩm nang</button>' +
+        '<button class="popup-btn" style="background:linear-gradient(135deg, #10b981, #059669);" onclick="getDirectionsTo(' + sub.lat + ', ' + sub.lng + ', \'' + sub.name.replace(/'/g, "\\'") + '\')">🚗 Chỉ đường</button>' +
         '<button class="popup-btn" style="background:linear-gradient(135deg, #3b82f6, #1d4ed8);" onclick="shareLocation(\'' + sub.name.replace(/'/g, "\\'") + '\', \'' + sub.prov.replace(/'/g, "\\'") + '\')">💬 Chia sẻ</button>' +
         '</div></div>';
       sm.bindPopup(subPopup);
 
-      sm.on('click', function() {
-        openPlaceDetail(sub.name, sub.prov);
+      sm.on('click', function(e) {
+        if (handleLocationTapForRoute(sub.lat, sub.lng, sub.name)) return;
+        zoomToProvince(sub.lat, sub.lng, sub.name);
+        setTimeout(function() { sm.openPopup(); }, 300);
       });
 
       subMarkers.push({ prov: sub.prov, marker: sm });
     });
 
+    var droppedPinMarker = null;
+
+    map.on('click', function(e) {
+      if (isRoutePickerMode) {
+        var lat = e.latlng.lat;
+        var lng = e.latlng.lng;
+        var name = 'Vị trí đã chọn';
+        handleLocationTapForRoute(lat, lng, name);
+        return;
+      }
+
+      var lat = e.latlng.lat;
+      var lng = e.latlng.lng;
+
+      if (droppedPinMarker) map.removeLayer(droppedPinMarker);
+
+      droppedPinMarker = L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: 'custom-dropped-pin',
+          html: '<div style="background:#ef4444;color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(239,68,68,0.5);border:2.5px solid #fff;font-weight:900;font-size:12px;">📍</div>',
+          iconSize: [28, 28],
+          iconAnchor: [14, 14]
+        })
+      }).addTo(map);
+
+      var coordStr = lat.toFixed(4) + ', ' + lng.toFixed(4);
+      var popupContent = '<div class="pretty-popup" style="min-width:210px;padding:4px;">' +
+        '<div style="font-size:9.5px;font-weight:900;color:#0284c7;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">📍 VỊ TRÍ ĐÃ CHỌN TRÊN BẢN ĐỒ</div>' +
+        '<h3 id="droppedPinTitle" style="margin:0 0 8px 0;font-size:13.5px;font-weight:900;color:#0f172a;">Tọa độ: ' + coordStr + '</h3>' +
+        '<div style="display:flex;gap:6px;margin-top:8px;">' +
+        '<button class="popup-btn" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);flex:1;padding:7px;border-radius:10px;font-size:11px;font-weight:800;color:#fff;border:none;cursor:pointer;" onclick="setRouteOriginFromMap(' + lat + ', ' + lng + ', \'Vị trí ' + coordStr + '\')">🚩 Chọn Điểm Đi</button>' +
+        '<button class="popup-btn" style="background:linear-gradient(135deg,#10b981,#059669);flex:1;padding:7px;border-radius:10px;font-size:11px;font-weight:800;color:#fff;border:none;cursor:pointer;" onclick="setRouteDestFromMap(' + lat + ', ' + lng + ', \'Vị trí ' + coordStr + '\')">🏁 Chọn Điểm Đến</button>' +
+        '</div></div>';
+
+      droppedPinMarker.bindPopup(popupContent).openPopup();
+
+      fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data && data.display_name) {
+            var shortAddress = (data.address.road || data.address.suburb || data.address.city || data.address.state || data.display_name.split(',')[0]).trim();
+            var el = document.getElementById('droppedPinTitle');
+            if (el) el.innerText = shortAddress;
+          }
+        })
+        .catch(function(err) {});
+    });
+
+    function setRouteOriginFromMap(lat, lng, name) {
+      populateRoutePlannerDropdowns();
+      var originSel = document.getElementById('routeOriginSelect');
+      if (originSel) {
+        var opt = document.createElement('option');
+        opt.value = lat + ',' + lng + '|' + name;
+        opt.innerText = '📍 ' + name;
+        opt.selected = true;
+        originSel.insertBefore(opt, originSel.firstChild);
+      }
+      openCustomRoutePlanner();
+    }
+
+    function setRouteDestFromMap(lat, lng, name) {
+      populateRoutePlannerDropdowns();
+      var destSel = document.getElementById('routeDestSelect');
+      if (destSel) {
+        var opt = document.createElement('option');
+        opt.value = lat + ',' + lng + '|' + name;
+        opt.innerText = '📍 ' + name;
+        opt.selected = true;
+        destSel.insertBefore(opt, destSel.firstChild);
+      }
+      openCustomRoutePlanner();
+    }
+
     var currentSelectedPlace = null;
 
     function openPlaceDetail(placeName, provinceName) {
       currentSelectedPlace = { placeName: placeName, provinceName: provinceName };
-
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'openPlaceDetail',
-          placeName: placeName,
-          provinceName: provinceName
-        }));
-      }
 
       var subObj = subAttractions.find(function(s) { return s.name === placeName; }) || { info: 'Điểm du lịch nổi tiếng tại ' + (provinceName || 'Việt Nam') };
       document.getElementById('modalTitle').innerText = placeName;
@@ -614,6 +1157,127 @@ const createLeafletHtml = (isDark = true) => `
         shareLocation(currentSelectedPlace.placeName, currentSelectedPlace.provinceName);
       }
     }
+
+    var currentGuideData = null;
+
+    function triggerCamNangFromModal() {
+      if (currentSelectedPlace) {
+        fetchAndOpenCamNang(currentSelectedPlace.placeName);
+      }
+    }
+
+    function fetchAndOpenCamNang(placeName) {
+      var subObj = subAttractions.find(function(s) { return s.name === placeName; });
+      var provObj = provinces.find(function(p) { return p.name === placeName || p.fullName === placeName; });
+      var provName = subObj ? subObj.prov : (provObj ? provObj.name : 'Việt Nam');
+      
+      document.getElementById('cnTitle').innerText = placeName;
+      document.getElementById('cnSubtitle').innerText = '📍 ' + provName;
+
+      var heroImg = (subObj && subObj.img) ? subObj.img : 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=800&q=80';
+      document.getElementById('cnHero').style.backgroundImage = 'url("' + heroImg + '")';
+
+      var targetLat = subObj ? subObj.lat : (provObj ? provObj.lat : 21.0285);
+      var targetLng = subObj ? subObj.lng : (provObj ? provObj.lng : 105.8542);
+
+      document.getElementById('cnDirectionsBtn').onclick = function() {
+        getDirectionsTo(targetLat, targetLng, placeName);
+      };
+
+      document.getElementById('cnContent').innerHTML = '<div style="text-align:center;padding:30px;color:#64748b;font-weight:700;">Đang tải cẩm nang từ API...</div>';
+      document.getElementById('camNangModal').style.display = 'flex';
+
+      fetch('/api/camnang/location/' + encodeURIComponent(placeName))
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          currentGuideData = data;
+          renderCamNangModalContent(data);
+        })
+        .catch(function(err) {
+          console.warn('API fetch failed, loading default guide', err);
+          currentGuideData = {
+            locationName: placeName,
+            description: placeName + ' là điểm đến du lịch tuyệt vời với cảnh quan thiên nhiên trù phú và bản sắc văn hóa độc đáo.',
+            openingHours: '07:30',
+            closingHours: '17:30',
+            ticketPrice: 'Miễn phí / Vé dịch vụ',
+            areaSize: 'Quy mô địa phương',
+            history: placeName + ' có lịch sử hình thành lâu đời, trải qua nhiều thăng trầm phát triển cùng con người và vùng đất văn hóa Việt Nam.',
+            itemsToBring: ['Trang phục phù hợp thời tiết', 'Kem chống nắng & kính râm', 'Máy ảnh & sạc dự phòng']
+          };
+          renderCamNangModalContent(currentGuideData);
+        });
+    }
+
+    function closeCamNangModal() {
+      document.getElementById('camNangModal').style.display = 'none';
+    }
+
+    function renderCamNangModalContent(data) {
+      if (!data) return;
+      var html = '<div style="display:flex;flex-direction:column;gap:14px;color:#334155;">' +
+        /* 1. Stat Grid */
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#f8fafc;padding:12px;border-radius:16px;border:1px solid #e2e8f0;">' +
+        '<div style="background:#ffffff;padding:10px;border-radius:12px;border:1px solid #f1f5f9;">' +
+        '<div style="font-size:9.5px;color:#94a3b8;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;">DIỆN TÍCH</div>' +
+        '<div style="font-weight:800;color:#0f172a;margin-top:2px;font-size:12px;">' + (data.areaSize || 'Quy mô vùng') + '</div>' +
+        '</div>' +
+        '<div style="background:#ffffff;padding:10px;border-radius:12px;border:1px solid #f1f5f9;">' +
+        '<div style="font-size:9.5px;color:#94a3b8;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;">GIÁ VÉ</div>' +
+        '<div style="font-weight:800;color:#10b981;margin-top:2px;font-size:12px;">' + (data.ticketPrice || 'Miễn phí') + '</div>' +
+        '</div>' +
+        '<div style="background:#ffffff;padding:10px;border-radius:12px;border:1px solid #f1f5f9;grid-column:span 2;">' +
+        '<div style="font-size:9.5px;color:#94a3b8;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;">THỜI GIAN MỞ CỬA</div>' +
+        '<div style="font-weight:800;color:#0f172a;margin-top:2px;font-size:12px;">' + (data.openingHours || '07:00') + ' - ' + (data.closingHours || '18:00') + '</div>' +
+        '</div>' +
+        '</div>' +
+
+        /* 2. Overview */
+        '<div>' +
+        '<h4 style="font-size:14px;font-weight:800;color:#0f172a;margin:0 0 6px 0;">Thông tin địa điểm</h4>' +
+        '<p style="font-size:13px;color:#475569;line-height:1.6;margin:0;">' + (data.description || '') + '</p>' +
+        '</div>' +
+
+        /* 3. History Amber Box */
+        '<div style="background:#fffbeb;border:1px solid #fef3c7;padding:14px;border-radius:16px;">' +
+        '<h4 style="font-size:14px;font-weight:800;color:#92400e;margin:0 0 6px 0;">Lịch sử hình thành</h4>' +
+        '<p style="font-size:13px;color:#78350f;line-height:1.6;margin:0;">' + (data.history || 'Thông tin lịch sử đang được cập nhật.') + '</p>' +
+        '</div>' +
+
+        /* 4. Essentials List */
+        '<div>' +
+        '<h4 style="font-size:14px;font-weight:800;color:#0f172a;margin:0 0 8px 0;">Đồ dùng thiết yếu nên mang theo</h4>' +
+        '<div style="display:flex;flex-direction:column;gap:6px;">';
+
+      var items = Array.isArray(data.itemsToBring) ? data.itemsToBring : [];
+      if (items.length === 0 && typeof data.itemsToBring === 'string') {
+        try { items = JSON.parse(data.itemsToBring); } catch (e) {}
+      }
+      if (items.length === 0) items = ['Trang phục thoải mái', 'Kem chống nắng & mũ râm', 'Máy ảnh & sạc dự phòng'];
+
+      items.forEach(function(item) {
+        html += '<div style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#475569;line-height:1.5;">' +
+          '<span style="width:6px;height:6px;border-radius:50%;background:#10b981;margin-top:7px;flex-shrink:0;"></span>' +
+          '<span>' + item + '</span>' +
+          '</div>';
+      });
+
+      html += '</div></div>' +
+
+        /* 5. Sky Blue Best Time Box */
+        '<div style="background:#f0f9ff;border:1px solid #e0f2fe;padding:14px;border-radius:16px;">' +
+        '<h4 style="font-size:14px;font-weight:800;color:#0369a1;margin:0 0 6px 0;">Thời điểm nên đi</h4>' +
+        '<p style="font-size:13px;color:#075985;line-height:1.6;margin:0;">' + (data.bestTime || 'Nên đi từ tháng 1 đến tháng 5 và tháng 9 đến tháng 11 khi thời tiết khô ráo, thoáng mát.') + '</p>' +
+        '</div>' +
+        '</div>';
+
+      document.getElementById('cnContent').innerHTML = html;
+    }
+
+    function switchCnTab(tab) {
+      if (currentGuideData) renderCamNangModalContent(currentGuideData);
+    }
+
 
     function shareLocation(placeName, provinceName) {
       var lat = currentViewState ? currentViewState.lat : 16.047079;
@@ -814,19 +1478,21 @@ const createLeafletHtml = (isDark = true) => `
       }
     }
 
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-      startMap();
-    } else {
-      document.addEventListener('DOMContentLoaded', startMap);
-    }
-    window.onload = startMap;
-    setTimeout(startMap, 100);
+    window.addEventListener('resize', function() {
+      if (window.currentMap) window.currentMap.invalidateSize(true);
+    });
+    setTimeout(function() {
+      if (window.currentMap) window.currentMap.invalidateSize(true);
+    }, 200);
+    setTimeout(function() {
+      if (window.currentMap) window.currentMap.invalidateSize(true);
+    }, 600);
   </script>
 </body>
 </html>
 `;
 
-export function VietnamTravelWebScreen({ theme, isDarkMode, setIsDarkMode, onBack, onOpenVR, onNavigateToTour, onOpenPlaceDetail, onNavigateToProvince, onNavigateToTab, selectedPlaceRequest, onSelectedPlaceRequestHandled, ownerId, currentUser, onCheckIn, locationSharingEnabled = true }) {
+export function VietnamTravelWebScreen({ theme, isDarkMode, setIsDarkMode, onBack, onOpenVR, onNavigateToTour, onOpenPlaceDetail, onNavigateToCamNang, onNavigateToProvince, onNavigateToTab, selectedPlaceRequest, onSelectedPlaceRequestHandled, ownerId, currentUser, onCheckIn }) {
   const webViewRef = useRef(null);
   const pendingPlaceRequestRef = useRef(null);
   const [shareModalVisible, setShareModalVisible] = useState(false);
@@ -891,33 +1557,11 @@ export function VietnamTravelWebScreen({ theme, isDarkMode, setIsDarkMode, onBac
     return true;
   };
 
-  const syncShareControlVisibility = () => {
-    if (!webViewRef.current || !webViewReady) return;
-
-    webViewRef.current.injectJavaScript(`
-      (function() {
-        var enabled = ${locationSharingEnabled ? 'true' : 'false'};
-        var selectors = ['.map-share-location-btn', '#modalShareBtn'];
-        selectors.forEach(function(selector) {
-          var element = document.querySelector(selector);
-          if (!element) return;
-          element.style.display = enabled ? '' : 'none';
-        });
-      })();
-      true;
-    `);
-  };
-
   useEffect(() => {
     if (selectedPlaceRequest?.placeName) {
       requestPlaceGuide(selectedPlaceRequest);
     }
   }, [selectedPlaceRequest?.requestId, selectedPlaceRequest?.placeName, webViewReady]);
-
-  useEffect(() => {
-    syncShareControlVisibility();
-  }, [locationSharingEnabled, webViewReady]);
-
   const handleMessage = (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -928,29 +1572,19 @@ export function VietnamTravelWebScreen({ theme, isDarkMode, setIsDarkMode, onBac
         } else if (onNavigateToTour) {
           onNavigateToTour(tourId);
         }
-      } else if (data.type === 'openPlaceDetail') {
-        const queued = requestPlaceGuide({
-          requestId: Date.now(),
-          placeName: data.placeName,
-          address: data.address || data.province || '',
-          mapsLink: data.mapsLink || '',
-          openGuide: true,
-        });
-        if (!queued && onOpenPlaceDetail) {
-          onOpenPlaceDetail(data.placeName);
+      } else if (data.type === 'openProvince') {
+        const provName = data.provinceName || data.placeName || data.address || 'Hà Nội';
+        if (onNavigateToProvince) {
+          onNavigateToProvince(provName);
         }
+      } else if (data.type === 'openDirections') {
+        const url = data.url || `https://www.google.com/maps/dir/?api=1&destination=${data.lat},${data.lng}`;
+        Linking.openURL(url).catch(err => console.warn('Cannot open directions URL:', err));
       } else if (data.type === 'goBack') {
         if (onBack) {
           onBack();
         }
       } else if (data.type === 'shareLocation' || data.type === 'sharePlace') {
-        if (!locationSharingEnabled) {
-          Alert.alert(
-            'Location sharing is off',
-            'Enable location sharing in Settings before sending places into chat.'
-          );
-          return;
-        }
         const formattedPrice = data.unitPrice
           ? (Number(data.unitPrice) > 0 ? `${Number(data.unitPrice).toLocaleString('vi-VN')}đ/người` : 'Miễn phí / Tự túc')
           : 'Miễn phí / Tự túc';
@@ -980,12 +1614,19 @@ export function VietnamTravelWebScreen({ theme, isDarkMode, setIsDarkMode, onBac
     return hostUri ? hostUri.split(':')[0] : 'localhost';
   }, []);
 
-  const mapServerUrl = useMemo(
-    () => process.env.EXPO_PUBLIC_TRAVEL_MAP_URL || `http://${expoHost}:3000/travel-map/?view=map&isApp=1`,
-    [expoHost]
-  );
-  const webViewSource = useMemo(() => ({ uri: mapServerUrl }), [mapServerUrl]);
- 
+  const [useFallbackHtml, setUseFallbackHtml] = useState(false);
+
+  const htmlContent = useMemo(() => createLeafletHtml(isDarkMode), [isDarkMode]);
+  const webViewSource = useMemo(() => {
+    if (useFallbackHtml) {
+      return { html: htmlContent, baseUrl: 'https://unpkg.com/' };
+    }
+    if (process.env.EXPO_PUBLIC_TRAVEL_MAP_URL) {
+      return { uri: process.env.EXPO_PUBLIC_TRAVEL_MAP_URL };
+    }
+    return { uri: `http://${expoHost}:3005?view=map&isApp=1` };
+  }, [expoHost, htmlContent, useFallbackHtml, isDarkMode]);
+
   const containerStyle = useMemo(() => [
     styles.container,
     {
@@ -1011,10 +1652,13 @@ export function VietnamTravelWebScreen({ theme, isDarkMode, setIsDarkMode, onBac
         mixedContentMode="always"
         startInLoadingState={false}
         onLoadStart={() => setWebViewReady(false)}
-        onLoadEnd={() => {
-          setWebViewReady(true);
-          flushPendingPlaceRequest();
-          syncShareControlVisibility();
+        onLoadEnd={() => { setWebViewReady(true); flushPendingPlaceRequest(); }}
+        onError={() => {
+          console.warn('Cannot reach Web Map server at port 3005, falling back to offline HTML map');
+          setUseFallbackHtml(true);
+        }}
+        onHttpError={() => {
+          setUseFallbackHtml(true);
         }}
       />
 
