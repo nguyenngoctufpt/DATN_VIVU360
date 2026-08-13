@@ -2992,11 +2992,3 @@ const styles = StyleSheet.create({
   },
   leaveGroupText: { color: '#ef4444', fontSize: 12.5, fontWeight: '900' },
 });
-
-
-
-
-
-
-
-
