@@ -1,39 +1,61 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Animated, ActivityIndicator, LogBox } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
-  Home,
-  Globe,
-  Scan,
-  Map as MapIcon,
-  User,
-  MessageSquare,
-  Newspaper,
-} from 'lucide-react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import {createNativeStackNavigator} from '@react-navigation/native-stack'
-import {
-  HomeScreen,
-  ExploreScreen,
-  CameraScreen,
-  ProfileScreen,
-  CamNangDetailScreen,
-} from './screens';
+  Appearance,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  LogBox,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Globe, Home, Map as MapIcon, User } from 'lucide-react-native';
+import * as Notifications from 'expo-notifications';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './auth/firebaseConfig';
+import { LoginScreen, RegisterScreen } from './auth';
+import { registerForPushNotificationsAsync } from './auth/notificationHelper';
+import { ChatScreen } from './chat';
+import { MapScreen, ProvinceGalleryScreen, TicketDetailScreen, TicketListScreen, VirtualTourScreen } from './map';
 import AllDiaDiem from './screens/AllDiaDiem';
 import DiaDiemDetails from './screens/DiaDiemDetails';
-import { MapScreen, VietnamTravelWebScreen, VirtualTourScreen, ProvinceGalleryScreen, TicketDetailScreen, TicketListScreen } from './map';
-import { SocialScreen } from './social';
-import { ChatScreen } from './chat';
-import { EditProfileScreen, MembershipTiersScreen, TravelChallengesScreen } from './settings';
-import { LoginScreen, RegisterScreen } from './auth';
-import { AITripPlannerScreen } from './screens/ai/AITripPlannerScreen';
 import { AIItineraryPreviewScreen } from './screens/ai/AIItineraryPreviewScreen';
+import { AITripPlannerScreen } from './screens/ai/AITripPlannerScreen';
 import { ReplaceActivityScreen } from './screens/ai/ReplaceActivityScreen';
-import { auth } from './auth/firebaseConfig';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import * as Notifications from 'expo-notifications';
-import { registerForPushNotificationsAsync } from './auth/notificationHelper';
+import { CameraScreen, ExploreScreen, ProfileScreen } from './screens';
+import {
+  AIRecommendationSettingsScreen,
+  BlockedUsersScreen,
+  ChangePasswordScreen,
+  EditProfileScreen,
+  FeedbackScreen,
+  HelpCenterScreen,
+  LocationAccessScreen,
+  LoginDevicesScreen,
+  MembershipTiersScreen,
+  PrivacySecurityScreen,
+  SettingsScreen,
+  StaticContentScreen,
+  TravelChallengesScreen,
+  TravelPreferencesScreen,
+} from './settings';
+import { SocialScreen } from './social';
+import { getTheme } from './data';
 import { loadAppData, saveAppData } from './services/appDataService';
+import {
+  buildCurrentDeviceSession,
+  DEFAULT_USER_SETTINGS,
+  getDevicePreferenceSubset,
+  loadDevicePreferenceCache,
+  loadUserSettings,
+  mergeUserSettings,
+  persistDevicePreferenceCache,
+  registerCurrentDeviceSession,
+  resolveIsDarkMode,
+  saveUserSettings,
+} from './services/settingsService';
 import { syncUser } from './services/userService';
 
 Notifications.setNotificationHandler({
@@ -46,15 +68,105 @@ Notifications.setNotificationHandler({
 
 LogBox.ignoreLogs(['@firebase/auth: Auth']);
 
-import {
-  banners,
-  allCategories,
-  getTheme,
-} from './data';
+const FULL_SCREEN_ROUTES = new Set([
+  'editProfile',
+  'settings',
+  'changePassword',
+  'travelPreferences',
+  'aiRecommendationSettings',
+  'privacySecurity',
+  'locationAccess',
+  'blockedUsers',
+  'loginDevices',
+  'helpCenter',
+  'feedback',
+  'privacyPolicy',
+  'termsOfUse',
+  'aboutVivu360',
+  'membershipTiers',
+  'travelChallenges',
+  'virtualTour',
+  'provinceGallery',
+  'ticketDetail',
+  'ticketList',
+  'map',
+  'social',
+  'chat',
+  'aiTripPlanner',
+  'aiItineraryPreview',
+  'replaceActivity',
+]);
+
+const HIDE_BOTTOM_NAV_ROUTES = new Set([
+  'editProfile',
+  'settings',
+  'changePassword',
+  'travelPreferences',
+  'aiRecommendationSettings',
+  'privacySecurity',
+  'locationAccess',
+  'blockedUsers',
+  'loginDevices',
+  'helpCenter',
+  'feedback',
+  'privacyPolicy',
+  'termsOfUse',
+  'aboutVivu360',
+  'membershipTiers',
+  'travelChallenges',
+  'virtualTour',
+  'provinceGallery',
+  'ticketDetail',
+  'ticketList',
+  'chat',
+  'aiTripPlanner',
+  'aiItineraryPreview',
+  'replaceActivity',
+]);
+
+const SETTINGS_ROUTES = new Set([
+  'settings',
+  'changePassword',
+  'travelPreferences',
+  'aiRecommendationSettings',
+  'privacySecurity',
+  'locationAccess',
+  'blockedUsers',
+  'loginDevices',
+  'helpCenter',
+  'feedback',
+  'privacyPolicy',
+  'termsOfUse',
+  'aboutVivu360',
+]);
+
+const INITIAL_BOOKED_TICKETS = [
+  {
+    code: 'VV360-HL4829',
+    title: 'Vịnh Hạ Long',
+    region: 'Quảng Ninh',
+    date: '2026-06-18',
+    guests: 2,
+    price: '2.500.000đ',
+    status: 'Đã xác nhận',
+  },
+];
+
+const INITIAL_USER_INFO = {
+  name: 'Bạn',
+  email: '',
+  avatar: 'https://i.pravatar.cc/150?img=68',
+  phone: '',
+  bio: 'Thích tìm hiểu lịch sử, danh lam thắng cảnh. Thích trải nghiệm tham quan ảo AR 360 độ trên Vivu360!',
+  level: 'Cấp 1',
+  points: 0,
+  checkedIn: [],
+};
 
 export default function App() {
   const [activeNav, setActiveNav] = useState('social');
   const [prevNav, setPrevNav] = useState('social');
+  const [settingsReturnNav, setSettingsReturnNav] = useState('social');
   const [directChatGroupId, setDirectChatGroupId] = useState(null);
   const [mapGuideRequest, setMapGuideRequest] = useState(null);
   const [aiPlannerContext, setAiPlannerContext] = useState(null);
@@ -62,6 +174,94 @@ export default function App() {
   const [replaceActivityContext, setReplaceActivityContext] = useState(null);
   const [ticketFlowSource, setTicketFlowSource] = useState('profile');
   const activeNavRef = React.useRef(activeNav);
+
+  const [selectedDiaDiem, setSelectedDiaDiem] = useState(null);
+  const [exploreTag, setExploreTag] = useState('all');
+  const [exploreSearch, setExploreSearch] = useState('');
+  const [selectedTourId, setSelectedTourId] = useState(1);
+  const [selectedSpotIdx, setSelectedSpotIdx] = useState(0);
+  const [selectedProvinceName, setSelectedProvinceName] = useState('');
+  const [selectedTicketCode, setSelectedTicketCode] = useState(null);
+
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authRoute, setAuthRoute] = useState('login');
+  const [dataOwnerId, setDataOwnerId] = useState(null);
+  const [appDataLoaded, setAppDataLoaded] = useState(false);
+
+  const [bookedTickets, setBookedTickets] = useState([
+    {
+      code: 'VV360-HL4829',
+      title: 'Vịnh Hạ Long',
+      region: 'Quảng Ninh',
+      date: '2026-06-18',
+      guests: 2,
+      price: '2.500.000đ',
+      status: 'Đã xác nhận',
+    },
+  ]);
+
+  const [systemColorScheme, setSystemColorScheme] = useState(Appearance.getColorScheme() || 'dark');
+  const [userSettings, setUserSettings] = useState(DEFAULT_USER_SETTINGS);
+  const settingsRef = React.useRef(DEFAULT_USER_SETTINGS);
+  const [currentDeviceId, setCurrentDeviceId] = useState('');
+  const isDarkMode = useMemo(
+    () => resolveIsDarkMode(userSettings.theme, systemColorScheme),
+    [userSettings.theme, systemColorScheme]
+  );
+  const theme = useMemo(() => getTheme(isDarkMode), [isDarkMode]);
+
+  const [userInfo, setUserInfo] = useState({
+    name: 'Bạn',
+    email: '',
+    avatar: 'https://i.pravatar.cc/150?img=68',
+    phone: '',
+    bio: 'Thích tìm hiểu lịch sử, danh lam thắng cảnh. Thích trải nghiệm tham quan ảo AR 360 độ trên Vivu360!',
+    level: 'Cấp 1',
+    points: 0,
+    checkedIn: [],
+  });
+
+  const lastOffsetY = React.useRef(0);
+  const isNavVisible = React.useRef(true);
+  const translateY = React.useRef(new Animated.Value(0)).current;
+
+  const blockedUserIds = useMemo(
+    () => (userSettings.blockedUsers || []).map((item) => item.firebaseUid),
+    [userSettings.blockedUsers]
+  );
+  const navigationLabels = userSettings.language === 'en'
+    ? { home: 'Home', explore: 'Explore', map: 'Map', profile: 'Profile' }
+    : { home: 'Trang chủ', explore: 'Khám phá', map: 'Bản đồ', profile: 'Cá nhân' };
+
+  const resetAuthenticatedState = () => {
+    const nextSettings = mergeUserSettings(
+      DEFAULT_USER_SETTINGS,
+      getDevicePreferenceSubset(settingsRef.current)
+    );
+
+    settingsRef.current = nextSettings;
+    setUserSettings(nextSettings);
+    setCurrentDeviceId('');
+    setUserInfo(INITIAL_USER_INFO);
+    setBookedTickets(INITIAL_BOOKED_TICKETS);
+    setDirectChatGroupId(null);
+    setMapGuideRequest(null);
+    setAiPlannerContext(null);
+    setAiPreviewContext(null);
+    setReplaceActivityContext(null);
+    setSelectedDiaDiem(null);
+    setExploreTag('all');
+    setExploreSearch('');
+    setSelectedTourId(1);
+    setSelectedSpotIdx(0);
+    setSelectedProvinceName('');
+    setSelectedTicketCode(null);
+    setTicketFlowSource('profile');
+    setPrevNav('social');
+    setSettingsReturnNav('social');
+    setActiveNav('social');
+  };
 
   useEffect(() => {
     if (activeNavRef.current !== activeNav) {
@@ -75,57 +275,6 @@ export default function App() {
     }
   }, [activeNav]);
 
-  const [currentBanner, setCurrentBanner] = useState(0);
-  const [expandedCategories, setExpandedCategories] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-//Lưu chọn địa điểm
-  const [selectedDiaDiem, setSelectedDiaDiem] = useState(null);
-  const [selectedCamNangPlace, setSelectedCamNangPlace] = useState(null);
-  // Search & Navigation sync states
-  const [exploreTag, setExploreTag] = useState('all');
-  const [exploreSearch, setExploreSearch] = useState('');
-
-  // Tour navigation states
-  const [selectedTourId, setSelectedTourId] = useState(1);
-  const [selectedSpotIdx, setSelectedSpotIdx] = useState(0);
-
-  // Province gallery navigation states
-  const [selectedProvinceName, setSelectedProvinceName] = useState('');
-
-  // Ticket selection state
-  const [selectedTicketCode, setSelectedTicketCode] = useState(null);
-
-  // Auth navigation states
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [authRoute, setAuthRoute] = useState('login'); // 'login' | 'register'
-  const [dataOwnerId, setDataOwnerId] = useState(null);
-  const [appDataLoaded, setAppDataLoaded] = useState(false);
-
-  // Booked tickets state
-  const [bookedTickets, setBookedTickets] = useState([
-    {
-      code: 'VV360-HL4829',
-      title: 'Vịnh Hạ Long',
-      region: 'Quảng Ninh',
-      date: '2026-06-18',
-      guests: 2,
-      price: '2.500.000đ',
-      status: 'Đã xác nhận'
-    }
-  ]);
-
-  // Light/Dark Theme State
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const theme = useMemo(() => getTheme(isDarkMode), [isDarkMode]);
-
-  // Bottom navigation show/hide scroll anim state
-  const lastOffsetY = React.useRef(0);
-  const isNavVisible = React.useRef(true);
-  const translateY = React.useRef(new Animated.Value(0)).current;
-
-  // Track activeNav change to reset bottom nav visibility
   useEffect(() => {
     isNavVisible.current = true;
     Animated.timing(translateY, {
@@ -133,26 +282,165 @@ export default function App() {
       duration: 150,
       useNativeDriver: true,
     }).start();
-  }, [activeNav]);
+  }, [activeNav, translateY]);
+
+  useEffect(() => {
+    settingsRef.current = userSettings;
+  }, [userSettings]);
+
+  useEffect(() => {
+    let active = true;
+    const appearanceSubscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setSystemColorScheme(colorScheme || 'dark');
+    });
+
+    loadDevicePreferenceCache()
+      .then((cached) => {
+        if (!active) return;
+        const next = mergeUserSettings(DEFAULT_USER_SETTINGS, cached);
+        settingsRef.current = next;
+        setUserSettings(next);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+      appearanceSubscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setIsLoggedIn(true);
+        setAppDataLoaded(false);
+        setDataOwnerId(user.uid);
+        setUserInfo((prev) => ({
+          ...prev,
+          name: user.displayName || user.email?.split('@')[0] || prev.name,
+          email: user.email || prev.email,
+        }));
+      } else {
+        setDataOwnerId(null);
+        setAppDataLoaded(false);
+        setIsLoggedIn(false);
+        resetAuthenticatedState();
+      }
+      setAuthLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (!dataOwnerId) return undefined;
+    let active = true;
+
+    (async () => {
+      try {
+        const remoteSettings = await loadUserSettings(dataOwnerId);
+        const deviceSession = await buildCurrentDeviceSession();
+        if (!active) return;
+
+        setCurrentDeviceId(deviceSession.deviceId);
+        const nextSettings = registerCurrentDeviceSession(
+          mergeUserSettings(settingsRef.current, remoteSettings),
+          deviceSession
+        );
+        settingsRef.current = nextSettings;
+        setUserSettings(nextSettings);
+
+        await saveUserSettings(dataOwnerId, nextSettings).catch((error) => {
+          console.warn('Không thể đồng bộ cài đặt:', error.message);
+        });
+      } catch (error) {
+        console.warn('Không thể tải cài đặt người dùng:', error.message);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [dataOwnerId]);
+
+  useEffect(() => {
+    if (!dataOwnerId) return undefined;
+    let active = true;
+
+    loadAppData(dataOwnerId, 'main')
+      .then((saved) => {
+        if (!active || !saved) return;
+        if (saved.userInfo) setUserInfo(saved.userInfo);
+        if (Array.isArray(saved.bookedTickets)) setBookedTickets(saved.bookedTickets);
+      })
+      .catch((error) => console.warn('Không thể tải dữ liệu MongoDB:', error.message))
+      .finally(() => active && setAppDataLoaded(true));
+
+    return () => {
+      active = false;
+    };
+  }, [dataOwnerId]);
+
+  useEffect(() => {
+    if (!dataOwnerId || !appDataLoaded) return undefined;
+    const timer = setTimeout(() => {
+      saveAppData(dataOwnerId, 'main', { userInfo, bookedTickets })
+        .catch((error) => console.warn('Không thể lưu dữ liệu MongoDB:', error.message));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [dataOwnerId, appDataLoaded, userInfo, bookedTickets]);
+
+  useEffect(() => {
+    if (!dataOwnerId || !userInfo.email || !userInfo.name) return undefined;
+    const timer = setTimeout(() => {
+      syncUser({
+        firebaseUid: dataOwnerId,
+        email: userInfo.email,
+        name: userInfo.name,
+        phone: userInfo.phone,
+        avatar: userInfo.avatar,
+        bio: userInfo.bio,
+        points: userInfo.points,
+        level: userInfo.level,
+        checkedIn: userInfo.checkedIn,
+      }).catch((error) => console.warn('Không thể đồng bộ người dùng:', error.message));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [dataOwnerId, userInfo]);
+
+  useEffect(() => {
+    if (settingsRef.current.notificationsEnabled !== false) {
+      registerForPushNotificationsAsync().catch(() => undefined);
+    }
+
+    const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
+      console.log('Nhận thông báo:', notification);
+    });
+    const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log('Nhấn mở thông báo:', response);
+    });
+
+    return () => {
+      Notifications.removeNotificationSubscription(notificationListener);
+      Notifications.removeNotificationSubscription(responseListener);
+    };
+  }, []);
 
   const handleScroll = (event) => {
     const currentOffsetY = event.nativeEvent.contentOffset.y;
     const diffY = currentOffsetY - lastOffsetY.current;
 
-    // Minimum scroll movement to change visibility
     if (Math.abs(diffY) > 15) {
       if (diffY > 0 && currentOffsetY > 100) {
-        // Scroll down -> Hide bottom bar
         if (isNavVisible.current) {
           isNavVisible.current = false;
           Animated.timing(translateY, {
-            toValue: 120, // Slide down completely
+            toValue: 120,
             duration: 220,
             useNativeDriver: true,
           }).start();
         }
       } else if (diffY < 0 || currentOffsetY <= 30) {
-        // Scroll up or close to top -> Show bottom bar
         if (!isNavVisible.current) {
           isNavVisible.current = true;
           Animated.timing(translateY, {
@@ -166,116 +454,44 @@ export default function App() {
     }
   };
 
-  // Global User Info State (synchronized across all views)
-  const [userInfo, setUserInfo] = useState({
-    name: 'Bạn',
-    email: '',
-    avatar: 'https://i.pravatar.cc/150?img=68',
-    phone: '',
-    bio: 'Thích tìm hiểu lịch sử, danh lam thắng cảnh. Thích trải nghiệm tham quan ảo AR 360 độ trên Vivu360! 🌐🎒',
-    level: 'Cấp 1',
-    points: 0,
-    checkedIn: [],
-  });
+  const updateAppSettings = async (patch) => {
+    const nextSettings = mergeUserSettings(settingsRef.current, patch);
+    settingsRef.current = nextSettings;
+    setUserSettings(nextSettings);
+    await persistDevicePreferenceCache(nextSettings);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setAppDataLoaded(false);
-        setDataOwnerId(user.uid);
-        setUserInfo(prev => ({
-          ...prev,
-          name: user.displayName || user.email.split('@')[0],
-          email: user.email,
-        }));
-      } else {
-        setDataOwnerId(null);
-        setAppDataLoaded(false);
-        setIsLoggedIn(false);
+    let syncError = null;
+    if (dataOwnerId) {
+      try {
+        await saveUserSettings(dataOwnerId, nextSettings);
+      } catch (error) {
+        console.warn('Không thể lưu cài đặt người dùng:', error.message);
+        syncError = error;
       }
-      setAuthLoading(false);
-    });
-    return unsubscribe;
-  }, []);
+    }
 
-  useEffect(() => {
-    if (!dataOwnerId) return;
-    let active = true;
+    return { settings: nextSettings, syncError };
+  };
 
-    loadAppData(dataOwnerId, 'main')
-      .then(saved => {
-        if (!active || !saved) return;
-        if (saved.userInfo) setUserInfo(saved.userInfo);
-        if (Array.isArray(saved.bookedTickets)) setBookedTickets(saved.bookedTickets);
-        if (typeof saved.isDarkMode === 'boolean') setIsDarkMode(saved.isDarkMode);
-      })
-      .catch(error => console.warn('Không thể tải dữ liệu MongoDB:', error.message))
-      .finally(() => active && setAppDataLoaded(true));
-
-    return () => { active = false; };
-  }, [dataOwnerId]);
-
-  useEffect(() => {
-    if (!dataOwnerId || !appDataLoaded) return;
-    const timer = setTimeout(() => {
-      saveAppData(dataOwnerId, 'main', { userInfo, bookedTickets, isDarkMode })
-        .catch(error => console.warn('Không thể lưu dữ liệu MongoDB:', error.message));
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [dataOwnerId, appDataLoaded, userInfo, bookedTickets, isDarkMode]);
-
-  useEffect(() => {
-    if (!dataOwnerId || !userInfo.email || !userInfo.name) return;
-    const timer = setTimeout(() => {
-      syncUser({
-        firebaseUid: dataOwnerId,
-        email: userInfo.email,
-        name: userInfo.name,
-        phone: userInfo.phone,
-        avatar: userInfo.avatar,
-        bio: userInfo.bio,
-        points: userInfo.points,
-        level: userInfo.level,
-        checkedIn: userInfo.checkedIn,
-      }).catch(error => console.warn('Không thể đồng bộ người dùng:', error.message));
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [dataOwnerId, userInfo]);
-
-  useEffect(() => {
-    // Đăng ký nhận thông báo đẩy
-    registerForPushNotificationsAsync();
-
-    // Lắng nghe khi có thông báo đến trong khi app đang mở
-    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Nhận thông báo:', notification);
-    });
-
-    // Lắng nghe khi người dùng nhấn mở thông báo
-    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Nhấn mở thông báo:', response);
-    });
-
-    return () => {
-      Notifications.removeNotificationSubscription(notificationListener);
-      Notifications.removeNotificationSubscription(responseListener);
-    };
-  }, []);
+  const setIsDarkMode = (valueOrUpdater) => {
+    const nextValue = typeof valueOrUpdater === 'function' ? valueOrUpdater(isDarkMode) : valueOrUpdater;
+    updateAppSettings({ theme: nextValue ? 'dark' : 'light' }).catch(() => undefined);
+  };
 
   const handleAddPoints = (amount) => {
-    setUserInfo(prev => {
+    setUserInfo((prev) => {
       const newPoints = prev.points + amount;
       const newLevelNum = Math.floor(newPoints / 1000) + 1;
       return {
         ...prev,
         points: newPoints,
-        level: `Cấp ${newLevelNum}`
+        level: `Cấp ${newLevelNum}`,
       };
     });
   };
 
   const handleCheckIn = (placeId, xpAmount) => {
-    setUserInfo(prev => {
+    setUserInfo((prev) => {
       const alreadyChecked = prev.checkedIn || [];
       if (alreadyChecked.includes(placeId)) return prev;
       const newPoints = prev.points + xpAmount;
@@ -284,7 +500,7 @@ export default function App() {
         ...prev,
         points: newPoints,
         level: `Cấp ${newLevelNum}`,
-        checkedIn: [...alreadyChecked, placeId]
+        checkedIn: [...alreadyChecked, placeId],
       };
     });
   };
@@ -294,7 +510,7 @@ export default function App() {
       .then(() => {
         setIsLoggedIn(false);
         setAuthRoute('login');
-        setActiveNav('social');
+        resetAuthenticatedState();
         Alert.alert('Đăng xuất', 'Đã đăng xuất tài khoản thành công!');
       })
       .catch(() => {
@@ -302,28 +518,16 @@ export default function App() {
       });
   };
 
-  // Category list size calculator
-  const displayedCategories = useMemo(() => {
-    return expandedCategories ? allCategories : allCategories.slice(0, 8);
-  }, [expandedCategories]);
-
-  // Update clock widget
-  useEffect(() => {
-    const t = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(t);
-  }, []);
-
-  // Slide banners loop
-  useEffect(() => {
-    const t = setInterval(() => {
-      setCurrentBanner((prev) => (prev + 1) % banners.length);
-    }, 5000);
-    return () => clearInterval(t);
-  }, []);
-
-  const banner = banners[currentBanner];
-
   const handleGlobalNavigation = (tab, payload) => {
+    if (tab === 'settings') {
+      const sourceRoute = activeNavRef.current;
+      if (!SETTINGS_ROUTES.has(sourceRoute)) {
+        setSettingsReturnNav(sourceRoute === 'home' ? 'social' : sourceRoute);
+      }
+      setActiveNav('settings');
+      return;
+    }
+
     if (tab === 'map' && payload?.placeName) {
       setMapGuideRequest({ ...payload, requestId: payload.requestId || Date.now() });
       setActiveNav('map');
@@ -360,30 +564,43 @@ export default function App() {
     setActiveNav(tab);
   };
 
-  // Helper render active tab screen
-  const renderScreenContent = () => {
-    switch (activeNav) {
-      case "allDiaDiem":
-    return (
-        <AllDiaDiem
-            theme={theme}
-            isDarkMode={isDarkMode}
-            onBack={() => setActiveNav("home")}
-             onSelectDiaDiem={(item) => {
-        setSelectedDiaDiem(item);
-        setActiveNav("diaDiemDetail");
-    }}
-        />
-    );
-    case "diaDiemDetail":
-  return (
-    <DiaDiemDetails
-      theme={theme}
+  const renderSocialScreen = () => (
+    <SocialScreen
+      ownerId={dataOwnerId}
       isDarkMode={isDarkMode}
-      diaDiem={selectedDiaDiem}
-      onBack={() => setActiveNav("allDiaDiem")}
+      setIsDarkMode={setIsDarkMode}
+      theme={theme}
+      currentUser={userInfo}
+      onNavigateToTab={handleGlobalNavigation}
+      onLogout={handleLogout}
+      language={userSettings.language}
+      blockedUserIds={blockedUserIds}
     />
   );
+
+  const renderScreenContent = () => {
+    switch (activeNav) {
+      case 'allDiaDiem':
+        return (
+          <AllDiaDiem
+            theme={theme}
+            isDarkMode={isDarkMode}
+            onBack={() => setActiveNav('home')}
+            onSelectDiaDiem={(item) => {
+              setSelectedDiaDiem(item);
+              setActiveNav('diaDiemDetail');
+            }}
+          />
+        );
+      case 'diaDiemDetail':
+        return (
+          <DiaDiemDetails
+            theme={theme}
+            isDarkMode={isDarkMode}
+            diaDiem={selectedDiaDiem}
+            onBack={() => setActiveNav('allDiaDiem')}
+          />
+        );
       case 'explore':
         return (
           <ExploreScreen
@@ -395,14 +612,24 @@ export default function App() {
             searchQuery={exploreSearch}
             setSearchQuery={setExploreSearch}
             onBookSuccess={(newTicket) => {
-              setBookedTickets(prev => [newTicket, ...prev]);
+              setBookedTickets((prev) => [newTicket, ...prev]);
             }}
           />
         );
       case 'social':
-        return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab, groupId) => { if (tab === 'chat') setDirectChatGroupId(groupId || null); setActiveNav(tab); }} onLogout={handleLogout} />;
+        return renderSocialScreen();
       case 'chat':
-        return <ChatScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={handleGlobalNavigation} prevScreen={['aiTripPlanner', 'aiItineraryPreview', 'replaceActivity'].includes(prevNav) ? 'social' : prevNav} initialGroupId={directChatGroupId} />;
+        return (
+          <ChatScreen
+            ownerId={dataOwnerId}
+            isDarkMode={isDarkMode}
+            theme={theme}
+            currentUser={userInfo}
+            onNavigateToTab={handleGlobalNavigation}
+            prevScreen={['aiTripPlanner', 'aiItineraryPreview', 'replaceActivity'].includes(prevNav) ? 'social' : prevNav}
+            initialGroupId={directChatGroupId}
+          />
+        );
       case 'aiTripPlanner':
         return (
           <AITripPlannerScreen
@@ -411,6 +638,7 @@ export default function App() {
             ownerId={dataOwnerId}
             currentUser={userInfo}
             context={aiPlannerContext}
+            userSettings={userSettings}
             onBack={() => setActiveNav('chat')}
             onNavigateToPreview={(payload) => {
               setAiPreviewContext(payload);
@@ -458,9 +686,7 @@ export default function App() {
               setSelectedSpotIdx(spotIdx !== undefined ? spotIdx : 0);
               setActiveNav('virtualTour');
             }}
-            onNavigateToTab={(tab) => {
-              setActiveNav(tab);
-            }}
+            onNavigateToTab={handleGlobalNavigation}
             onViewTicket={(ticketCode) => {
               setSelectedTicketCode(ticketCode);
               setActiveNav('ticketDetail');
@@ -469,7 +695,7 @@ export default function App() {
         );
       case 'map':
         return (
-          <VietnamTravelWebScreen
+          <MapScreen
             isDarkMode={isDarkMode}
             setIsDarkMode={setIsDarkMode}
             theme={theme}
@@ -478,10 +704,9 @@ export default function App() {
             ownerId={dataOwnerId}
             onCheckIn={handleCheckIn}
             selectedPlaceRequest={mapGuideRequest}
-            onSelectedPlaceRequestHandled={(requestId) => { if (mapGuideRequest?.requestId === requestId) setMapGuideRequest(null); }}
-            onNavigateToCamNang={(placeName, provinceName) => {
-              setSelectedCamNangPlace({ placeName, provinceName });
-              setActiveNav('camNangDetail');
+            locationSharingEnabled={userSettings.locationSharing}
+            onSelectedPlaceRequestHandled={(requestId) => {
+              if (mapGuideRequest?.requestId === requestId) setMapGuideRequest(null);
             }}
             onNavigateToTour={(tourId, spotIdx) => {
               setSelectedTourId(tourId);
@@ -492,28 +717,7 @@ export default function App() {
               setSelectedProvinceName(provName);
               setActiveNav('provinceGallery');
             }}
-            onNavigateToTab={(tab, groupId) => {
-              if (tab === 'chat' && groupId) setDirectChatGroupId(groupId);
-              setActiveNav(tab);
-            }}
-          />
-        );
-      case 'camNangDetail':
-        return (
-          <CamNangDetailScreen
-            theme={theme}
-            isDarkMode={isDarkMode}
-            placeName={selectedCamNangPlace?.placeName}
-            provinceName={selectedCamNangPlace?.provinceName}
-            onBack={() => setActiveNav(prevNav || 'map')}
-            onOpenMapDirections={(placeName) => {
-              handleGlobalNavigation('map', { placeName, openGuide: false, openDirections: true });
-            }}
-            onNavigateToTour={(tourId, spotIdx) => {
-              setSelectedTourId(tourId);
-              setSelectedSpotIdx(spotIdx !== undefined ? spotIdx : 0);
-              setActiveNav('virtualTour');
-            }}
+            onNavigateToTab={handleGlobalNavigation}
           />
         );
       case 'virtualTour':
@@ -525,7 +729,7 @@ export default function App() {
             startSpotIdx={selectedSpotIdx}
             onBack={() => setActiveNav('map')}
             onBookSuccess={(newTicket) => {
-              setBookedTickets(prev => [newTicket, ...prev]);
+              setBookedTickets((prev) => [newTicket, ...prev]);
             }}
           />
         );
@@ -536,9 +740,6 @@ export default function App() {
             isDarkMode={isDarkMode}
             provinceName={selectedProvinceName}
             onBack={() => setActiveNav('map')}
-            onOpenMapDirections={(placeName) => {
-              handleGlobalNavigation('map', { placeName, openGuide: false, openDirections: true });
-            }}
             onNavigateToTour={(tourId, spotIdx) => {
               setSelectedTourId(tourId);
               setSelectedSpotIdx(spotIdx !== undefined ? spotIdx : 0);
@@ -581,13 +782,25 @@ export default function App() {
           <TicketDetailScreen
             theme={theme}
             isDarkMode={isDarkMode}
-            ticket={bookedTickets.find(t => t.code === selectedTicketCode)}
+            ticket={bookedTickets.find((item) => item.code === selectedTicketCode)}
             onBack={() => setActiveNav('ticketList')}
             onCancelTicket={(ticketCode) => {
-              setBookedTickets(prev => prev.filter(t => t.code !== ticketCode));
+              setBookedTickets((prev) => prev.filter((item) => item.code !== ticketCode));
               setActiveNav('ticketList');
               Alert.alert('Thành công', 'Đã hủy vé điện tử thành công và hoàn trả số tiền (nếu có)!');
             }}
+          />
+        );
+      case 'settings':
+        return (
+          <SettingsScreen
+            theme={theme}
+            language={userSettings.language}
+            settings={userSettings}
+            onBack={() => setActiveNav(settingsReturnNav || 'social')}
+            onNavigate={(route) => setActiveNav(route)}
+            onUpdateSettings={updateAppSettings}
+            onLogout={handleLogout}
           />
         );
       case 'editProfile':
@@ -596,8 +809,124 @@ export default function App() {
             theme={theme}
             isDarkMode={isDarkMode}
             currentUser={userInfo}
-            onBack={() => setActiveNav('profile')}
-            onSave={(data) => setUserInfo({ ...userInfo, ...data })}
+            ownerId={dataOwnerId}
+            onBack={() => setActiveNav(prevNav === 'settings' ? 'settings' : 'profile')}
+            onSave={(data) => setUserInfo((prev) => ({ ...prev, ...data }))}
+          />
+        );
+      case 'changePassword':
+        return (
+          <ChangePasswordScreen
+            theme={theme}
+            language={userSettings.language}
+            onBack={() => setActiveNav('settings')}
+          />
+        );
+      case 'travelPreferences':
+        return (
+          <TravelPreferencesScreen
+            theme={theme}
+            language={userSettings.language}
+            settings={userSettings}
+            onBack={() => setActiveNav('settings')}
+            onUpdateSettings={updateAppSettings}
+          />
+        );
+      case 'aiRecommendationSettings':
+        return (
+          <AIRecommendationSettingsScreen
+            theme={theme}
+            language={userSettings.language}
+            settings={userSettings}
+            onBack={() => setActiveNav('settings')}
+            onUpdateSettings={updateAppSettings}
+          />
+        );
+      case 'privacySecurity':
+        return (
+          <PrivacySecurityScreen
+            theme={theme}
+            language={userSettings.language}
+            settings={userSettings}
+            onBack={() => setActiveNav('settings')}
+            onUpdateSettings={updateAppSettings}
+          />
+        );
+      case 'locationAccess':
+        return (
+          <LocationAccessScreen
+            theme={theme}
+            language={userSettings.language}
+            settings={userSettings}
+            onBack={() => setActiveNav('settings')}
+            onUpdateSettings={updateAppSettings}
+          />
+        );
+      case 'blockedUsers':
+        return (
+          <BlockedUsersScreen
+            theme={theme}
+            language={userSettings.language}
+            ownerId={dataOwnerId}
+            settings={userSettings}
+            onBack={() => setActiveNav('settings')}
+            onUpdateSettings={updateAppSettings}
+          />
+        );
+      case 'loginDevices':
+        return (
+          <LoginDevicesScreen
+            theme={theme}
+            language={userSettings.language}
+            settings={userSettings}
+            currentDeviceId={currentDeviceId}
+            onBack={() => setActiveNav('settings')}
+            onUpdateSettings={updateAppSettings}
+          />
+        );
+      case 'helpCenter':
+        return (
+          <HelpCenterScreen
+            theme={theme}
+            language={userSettings.language}
+            onBack={() => setActiveNav('settings')}
+            onNavigate={(route) => setActiveNav(route)}
+          />
+        );
+      case 'feedback':
+        return (
+          <FeedbackScreen
+            theme={theme}
+            language={userSettings.language}
+            ownerId={dataOwnerId}
+            onBack={() => setActiveNav('settings')}
+          />
+        );
+      case 'privacyPolicy':
+        return (
+          <StaticContentScreen
+            theme={theme}
+            language={userSettings.language}
+            articleKey="privacyPolicy"
+            onBack={() => setActiveNav('settings')}
+          />
+        );
+      case 'termsOfUse':
+        return (
+          <StaticContentScreen
+            theme={theme}
+            language={userSettings.language}
+            articleKey="termsOfUse"
+            onBack={() => setActiveNav('settings')}
+          />
+        );
+      case 'aboutVivu360':
+        return (
+          <StaticContentScreen
+            theme={theme}
+            language={userSettings.language}
+            articleKey="about"
+            onBack={() => setActiveNav('settings')}
           />
         );
       case 'membershipTiers':
@@ -617,20 +946,18 @@ export default function App() {
             userInfo={userInfo}
             onBack={() => setActiveNav('profile')}
             onAddPoints={handleAddPoints}
-            onNavigateToTab={(tab) => {
-              setActiveNav(tab);
-            }}
+            onNavigateToTab={handleGlobalNavigation}
           />
         );
       case 'home':
       default:
-        return <SocialScreen ownerId={dataOwnerId} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} theme={theme} currentUser={userInfo} onNavigateToTab={(tab, groupId) => { if (tab === 'chat') setDirectChatGroupId(groupId || null); setActiveNav(tab); }} onLogout={handleLogout} />;
+        return renderSocialScreen();
     }
   };
 
   if (authLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#0f0a1c' : theme.background }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
         <ActivityIndicator size="large" color="#3b82f6" />
       </View>
     );
@@ -644,27 +971,27 @@ export default function App() {
           isDarkMode={isDarkMode}
           onRegisterPress={() => setAuthRoute('register')}
           onLoginSuccess={(user) => {
-            setUserInfo({ ...userInfo, ...user });
+            setUserInfo((prev) => ({ ...prev, ...user }));
             setActiveNav('social');
             setIsLoggedIn(true);
           }}
         />
       );
-    } else {
-      return (
-        <RegisterScreen
-          theme={theme}
-          isDarkMode={isDarkMode}
-          onBackPress={() => setAuthRoute('login')}
-          onRegisterSuccess={() => setAuthRoute('login')}
-        />
-      );
     }
+
+    return (
+      <RegisterScreen
+        theme={theme}
+        isDarkMode={isDarkMode}
+        onBackPress={() => setAuthRoute('login')}
+        onRegisterSuccess={() => setAuthRoute('login')}
+      />
+    );
   }
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      {activeNav === 'camNangDetail' || activeNav === 'editProfile' || activeNav === 'membershipTiers' || activeNav === 'travelChallenges' || activeNav === 'virtualTour' || activeNav === 'provinceGallery' || activeNav === 'ticketDetail' || activeNav === 'ticketList' || activeNav === 'map' || activeNav === 'social' || activeNav === 'chat' || activeNav === 'aiTripPlanner' || activeNav === 'aiItineraryPreview' || activeNav === 'replaceActivity' ? (
+      {FULL_SCREEN_ROUTES.has(activeNav) ? (
         renderScreenContent()
       ) : (
         <ScrollView
@@ -677,61 +1004,70 @@ export default function App() {
         </ScrollView>
       )}
 
-      {/* FLOATING BOTTOM NAV BAR */}
-      {activeNav !== 'camNangDetail' && activeNav !== 'editProfile' && activeNav !== 'membershipTiers' && activeNav !== 'travelChallenges' && activeNav !== 'virtualTour' && activeNav !== 'provinceGallery' && activeNav !== 'ticketDetail' && activeNav !== 'ticketList' && activeNav !== 'chat' && activeNav !== 'aiTripPlanner' && activeNav !== 'aiItineraryPreview' && activeNav !== 'replaceActivity' && (
-        <Animated.View style={[
-          styles.bottomNav, 
-          { 
-            backgroundColor: theme.navBg, 
-            borderColor: theme.navBorder,
-            transform: [{ translateY }] 
-          }
-        ]}>
+      {!HIDE_BOTTOM_NAV_ROUTES.has(activeNav) && (
+        <Animated.View
+          style={[
+            styles.bottomNav,
+            {
+              backgroundColor: theme.navBg,
+              borderColor: theme.navBorder,
+              transform: [{ translateY }],
+            },
+          ]}
+        >
           <Pressable
             style={({ pressed }) => [
               styles.navItem,
-              pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 }
+              pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 },
             ]}
             onPress={() => setActiveNav('social')}
           >
             <Home size={20} color={activeNav === 'social' ? '#3b82f6' : theme.textSecondary} />
-            <Text style={[styles.navText, { color: activeNav === 'social' ? '#3b82f6' : theme.textSecondary }]}>Trang chủ</Text>
+            <Text style={[styles.navText, { color: activeNav === 'social' ? '#3b82f6' : theme.textSecondary }]}>
+              {navigationLabels.home}
+            </Text>
             {activeNav === 'social' && <View style={styles.activeDot} />}
           </Pressable>
 
           <Pressable
             style={({ pressed }) => [
               styles.navItem,
-              pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 }
+              pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 },
             ]}
             onPress={() => setActiveNav('explore')}
           >
             <Globe size={20} color={activeNav === 'explore' ? '#3b82f6' : theme.textSecondary} />
-            <Text style={[styles.navText, { color: activeNav === 'explore' ? '#3b82f6' : theme.textSecondary }]}>Khám phá</Text>
+            <Text style={[styles.navText, { color: activeNav === 'explore' ? '#3b82f6' : theme.textSecondary }]}>
+              {navigationLabels.explore}
+            </Text>
             {activeNav === 'explore' && <View style={styles.activeDot} />}
           </Pressable>
 
           <Pressable
             style={({ pressed }) => [
               styles.navItem,
-              pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 }
+              pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 },
             ]}
             onPress={() => setActiveNav('map')}
           >
             <MapIcon size={20} color={activeNav === 'map' ? '#3b82f6' : theme.textSecondary} />
-            <Text style={[styles.navText, { color: activeNav === 'map' ? '#3b82f6' : theme.textSecondary }]}>Bản đồ</Text>
+            <Text style={[styles.navText, { color: activeNav === 'map' ? '#3b82f6' : theme.textSecondary }]}>
+              {navigationLabels.map}
+            </Text>
             {activeNav === 'map' && <View style={styles.activeDot} />}
           </Pressable>
 
           <Pressable
             style={({ pressed }) => [
               styles.navItem,
-              pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 }
+              pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 },
             ]}
             onPress={() => setActiveNav('profile')}
           >
             <User size={20} color={activeNav === 'profile' ? '#3b82f6' : theme.textSecondary} />
-            <Text style={[styles.navText, { color: activeNav === 'profile' ? '#3b82f6' : theme.textSecondary }]}>Cá nhân</Text>
+            <Text style={[styles.navText, { color: activeNav === 'profile' ? '#3b82f6' : theme.textSecondary }]}>
+              {navigationLabels.profile}
+            </Text>
             {activeNav === 'profile' && <View style={styles.activeDot} />}
           </Pressable>
         </Animated.View>
@@ -741,11 +1077,12 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  // Main Container
-  screen: { flex: 1 },
-  scrollContent: { paddingBottom: 94 },
-
-  // Bottom Docked Navigation
+  screen: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 94,
+  },
   bottomNav: {
     position: 'absolute',
     left: 0,
@@ -765,15 +1102,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     zIndex: 9999,
   },
-  navItem: { 
-    flex: 1, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
+  navItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     height: '100%',
     paddingTop: 8,
   },
-  navItemActive: {},
-  navText: { fontSize: 9.5, fontWeight: '700', marginTop: 4, letterSpacing: 0.1, textAlign: 'center' },
+  navText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    marginTop: 4,
+    letterSpacing: 0.1,
+    textAlign: 'center',
+  },
   activeDot: {
     width: 4,
     height: 4,

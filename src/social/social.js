@@ -41,7 +41,7 @@ import {
 
 import { UserProfileModal } from './userProfile';
 import { getSafeAvatarSource, getSafeImageSource, hasImageUri } from '../utils/image';
-
+const EMPTY_BLOCKED_USER_IDS = [];
 const getUserRankColors = (name) => {
   const lvl = getUserLevelByName(name);
   const levelNum = parseInt(lvl.replace(/[^0-9]/g, ''), 10) || 1;
@@ -236,7 +236,16 @@ const initialPosts = [];
 
 const initialGroups = [];
 
-export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, onLogout, language = 'vi', blockedUserIds = [] }) {
+export function SocialScreen({
+  ownerId,
+  isDarkMode,
+  theme,
+  currentUser,
+  onNavigateToTab,
+  onLogout,
+  language = 'vi',
+  blockedUserIds = EMPTY_BLOCKED_USER_IDS
+}) {
   const [posts, setPosts] = useState(initialPosts);
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
   const [menuVisible, setMenuVisible] = useState(false);
