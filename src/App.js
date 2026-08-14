@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Globe, Home, Map as MapIcon, User } from 'lucide-react-native';
+import { ClipboardList, Globe, Home, Map as MapIcon, User } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './auth/firebaseConfig';
@@ -24,7 +24,7 @@ import DiaDiemDetails from './screens/DiaDiemDetails';
 import { AIItineraryPreviewScreen } from './screens/ai/AIItineraryPreviewScreen';
 import { AITripPlannerScreen } from './screens/ai/AITripPlannerScreen';
 import { ReplaceActivityScreen } from './screens/ai/ReplaceActivityScreen';
-import { CameraScreen, ExploreScreen, ProfileScreen } from './screens';
+import { CameraScreen, ExploreScreen, PackingListScreen, ProfileScreen } from './screens';
 import {
   AIRecommendationSettingsScreen,
   BlockedUsersScreen,
@@ -44,6 +44,12 @@ import {
 import { SocialScreen } from './social';
 import { getTheme } from './data';
 import { loadAppData, saveAppData } from './services/appDataService';
+
+import {
+  loadPackingList,
+  savePackingList,
+  getPackingSuggestions,
+} from './services/packingListService';
 import {
   buildCurrentDeviceSession,
   DEFAULT_USER_SETTINGS,
@@ -188,6 +194,19 @@ export default function App() {
   const [authRoute, setAuthRoute] = useState('login');
   const [dataOwnerId, setDataOwnerId] = useState(null);
   const [appDataLoaded, setAppDataLoaded] = useState(false);
+  const [packingItems, setPackingItems] = useState([]);
+const [packingItemsLoaded, setPackingItemsLoaded] = useState(false);
+
+const handleGetPackingSuggestions = async () => {
+  if (!dataOwnerId) {
+    throw new Error('Chưa xác định được người dùng');
+  }
+
+  return getPackingSuggestions(
+    dataOwnerId,
+    packingItems.map(item => item.title)
+  );
+};
 
   const [bookedTickets, setBookedTickets] = useState([
     {
@@ -209,6 +228,57 @@ export default function App() {
     () => resolveIsDarkMode(userSettings.theme, systemColorScheme),
     [userSettings.theme, systemColorScheme]
   );
+
+  useEffect(() => {
+  let cancelled = false;
+
+  const fetchPackingList = async () => {
+    if (!dataOwnerId) {
+      setPackingItems([]);
+      setPackingItemsLoaded(false);
+      return;
+    }
+
+    try {
+      setPackingItemsLoaded(false);
+
+      const items = await loadPackingList(dataOwnerId);
+
+      if (!cancelled) {
+        setPackingItems(Array.isArray(items) ? items : []);
+        setPackingItemsLoaded(true);
+      }
+    } catch (error) {
+      console.warn('Không thể tải Packing List:', error);
+
+      if (!cancelled) {
+        setPackingItems([]);
+        setPackingItemsLoaded(true);
+      }
+    }
+  };
+
+  fetchPackingList();
+
+  return () => {
+    cancelled = true;
+  };
+}, [dataOwnerId]);
+// ===== PACKING LIST: AUTO SAVE =====
+useEffect(() => {
+  if (!dataOwnerId || !packingItemsLoaded) {
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    savePackingList(dataOwnerId, packingItems).catch(error => {
+      console.warn('Không thể lưu Packing List:', error);
+    });
+  }, 500);
+
+  return () => clearTimeout(timer);
+}, [dataOwnerId, packingItems, packingItemsLoaded]);
+
   const theme = useMemo(() => getTheme(isDarkMode), [isDarkMode]);
 
   const [userInfo, setUserInfo] = useState({
@@ -601,7 +671,7 @@ export default function App() {
             onBack={() => setActiveNav('allDiaDiem')}
           />
         );
-      case 'explore':
+        case 'explore':
         return (
           <ExploreScreen
             isDarkMode={isDarkMode}
@@ -616,6 +686,15 @@ export default function App() {
             }}
           />
         );
+        case 'packing':
+  return (
+    <PackingListScreen
+      theme={theme}
+      packingItems={packingItems}
+      setPackingItems={setPackingItems}
+      onGetSuggestions={handleGetPackingSuggestions}
+    />
+  );
       case 'social':
         return renderSocialScreen();
       case 'chat':
@@ -1030,18 +1109,33 @@ export default function App() {
           </Pressable>
 
           <Pressable
-            style={({ pressed }) => [
-              styles.navItem,
-              pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 },
-            ]}
-            onPress={() => setActiveNav('explore')}
-          >
-            <Globe size={20} color={activeNav === 'explore' ? '#3b82f6' : theme.textSecondary} />
-            <Text style={[styles.navText, { color: activeNav === 'explore' ? '#3b82f6' : theme.textSecondary }]}>
-              {navigationLabels.explore}
-            </Text>
-            {activeNav === 'explore' && <View style={styles.activeDot} />}
-          </Pressable>
+  style={({ pressed }) => [
+    styles.navItem,
+    pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 },
+  ]}
+  onPress={() => setActiveNav('packing')}
+>
+  <ClipboardList
+    size={20}
+    color={activeNav === 'packing' ? '#3b82f6' : theme.textSecondary}
+  />
+
+  <Text
+    style={[
+      styles.navText,
+      {
+        color:
+          activeNav === 'packing'
+            ? '#3b82f6'
+            : theme.textSecondary,
+      },
+    ]}
+  >
+    Đồ dùng
+  </Text>
+
+  {activeNav === 'packing' && <View style={styles.activeDot} />}
+</Pressable>
 
           <Pressable
             style={({ pressed }) => [
