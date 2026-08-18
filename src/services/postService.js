@@ -12,6 +12,16 @@ export async function createPost(userId, post) {
   return response.data.data;
 }
 
+export async function editPost(userId, postId, postData) {
+  const response = await api.put(`/posts/${postId}`, postData, auth(userId));
+  return response.data.data;
+}
+
+export async function deletePost(userId, postId) {
+  const response = await api.delete(`/posts/${postId}`, auth(userId));
+  return response.data;
+}
+
 export async function togglePostLike(userId, postId) {
   const response = await api.post(`/posts/${postId}/like`, {}, auth(userId));
   return response.data.data;
