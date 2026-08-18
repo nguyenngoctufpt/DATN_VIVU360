@@ -6,3 +6,4 @@ export { PlaceDetailScreen } from './placeDetail';
 export { default as AllDiaDiem } from './AllDiaDiem';
 export { default as DiaDiemDetails } from './DiaDiemDetails';
 export { ProfileFeedScreen } from './ProfileFeed';
+export { SmartPlannerScreen } from './SmartPlanner';

@@ -11,6 +11,7 @@ const chatRouter = require("./routes/chat");
 const postsRouter = require("./routes/posts");
 const friendshipsRouter = require("./routes/friendships");
 const notificationsRouter = require("./routes/notifications");
+const articlesRouter = require("./routes/articles");
 const socialNotificationsRouter = require("./routes/socialNotifications");
 
 const app = express();
@@ -33,6 +34,7 @@ app.use("/api/posts", postsRouter);
 app.use("/api/friendships", friendshipsRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/social-notifications", socialNotificationsRouter);
+app.use("/api/articles", articlesRouter);
 
 app.use((req, res) => res.status(404).json({ success: false, message: "Endpoint kh\u00f4ng t\u1ed3n t\u1ea1i" }));
 app.use((error, req, res, next) => {
@@ -44,13 +46,18 @@ app.use((error, req, res, next) => {
 });
 
 async function start() {
-  try {
-    await connectDatabase();
-    app.listen(port, () => console.log(`Vivu360 API listening on http://localhost:${port}`));
-  } catch (error) {
-    console.error(`Startup failed: ${error.message}`);
-    process.exit(1);
-  }
+  const server = app.listen(port, () => {
+    console.log(`🚀 Vivu360 API listening on http://localhost:${port}`);
+  });
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      console.log(`⚡ Vivu360 API đã hoạt động sẵn tại http://localhost:${port}`);
+    } else {
+      console.error(err);
+    }
+  });
+
+  await connectDatabase();
 }
 
 start();

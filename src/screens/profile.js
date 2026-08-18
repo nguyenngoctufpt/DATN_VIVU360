@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import {
   View, Text, Image, Pressable, ScrollView, Alert, Animated, StyleSheet, Modal, Switch, Platform, Dimensions, TextInput, ActivityIndicator
 } from 'react-native';
@@ -11,7 +11,8 @@ import {
   Users, CheckCircle, Search, Send, UserCheck, MessageSquare
 } from 'lucide-react-native';
 import { getRankDetails } from '../data';
-import { searchFriends } from '../services/userService';
+import { searchFriends, getUserStats } from '../services/userService';
+import { getFriendships } from '../services/friendshipService';
 const { width } = Dimensions.get('window');
 
 export function ProfileScreen({
@@ -39,6 +40,33 @@ export function ProfileScreen({
   const [isSearchingFriends, setIsSearchingFriends] = useState(false);
   const [selectedBadge, setSelectedBadge] = useState(null);
   const [badgeModalVisible, setBadgeModalVisible] = useState(false);
+  const [actualFriendsCount, setActualFriendsCount] = useState(0);
+  const [realStats, setRealStats] = useState({ posts: 0, followers: 0, following: 0 });
+
+  const fetchRealStats = useCallback(() => {
+    const currentUid = userInfo?.firebaseUid || userInfo?.id;
+    if (!currentUid) return;
+
+    getUserStats(currentUid)
+      .then(st => {
+        if (st) setRealStats(st);
+      })
+      .catch(() => {});
+
+    getFriendships(currentUid, 'accepted')
+      .then(friends => {
+        if (Array.isArray(friends)) {
+          setActualFriendsCount(friends.length);
+        }
+      })
+      .catch(() => {});
+  }, [userInfo?.firebaseUid, userInfo?.id]);
+
+  useEffect(() => {
+    fetchRealStats();
+    const timer = setInterval(fetchRealStats, 5000);
+    return () => clearInterval(timer);
+  }, [fetchRealStats]);
 
   useEffect(() => {
     const query = friendSearchText.trim();
@@ -130,7 +158,14 @@ export function ProfileScreen({
 
   const settingsMenu = [
     {
-      icon: User, label: 'Chỉnh sửa thông tin', color: '#3b82f6',
+      icon: Award, label: 'Gói VIP Pass Premium 👑', color: '#f59e0b',
+      right: <View style={{ backgroundColor: 'rgba(245,158,11,0.2)', borderWidth: 1, borderColor: '#facc15', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
+        <Text style={{ color: '#facc15', fontSize: 9, fontWeight: '900' }}>VIP PASS</Text>
+      </View>,
+      onPress: onViewTiers,
+    },
+    {
+      icon: User, label: 'Chỉnh sửa thông tin cá nhân', color: '#3b82f6',
       right: null, onPress: onEditProfile,
     },
     {
@@ -175,15 +210,15 @@ export function ProfileScreen({
       </View>
 
       {/* B. LUXURY PASSPORT CARD */}
-      <View style={[profStyles.passportCard, { backgroundColor: isDarkMode ? '#13111c' : '#ffffff', borderColor: isDarkMode ? '#2d2742' : '#e2e8f0' }]}>
+      <View style={[profStyles.passportCard, { backgroundColor: isDarkMode ? '#11131c' : '#ffffff', borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.35)' : 'rgba(220, 38, 38, 0.25)' }]}>
         {/* Cover Photo Header */}
         <View style={profStyles.passportCoverContainer}>
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=80' }}
+            source={{ uri: userInfo.cover || 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=80' }}
             style={profStyles.passportCoverImg}
           />
           <LinearGradient
-            colors={['rgba(0,0,0,0.3)', 'transparent', isDarkMode ? '#13111c' : '#ffffff']}
+            colors={['rgba(0,0,0,0.5)', 'rgba(17,19,28,0.3)', isDarkMode ? '#11131c' : '#ffffff']}
             style={profStyles.passportCoverGradient}
           />
         </View>
@@ -197,18 +232,18 @@ export function ProfileScreen({
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <View style={[profStyles.avatarInner, { backgroundColor: isDarkMode ? '#18181b' : '#fff' }]}>
-                <Image source={{ uri: userInfo.avatar }} style={profStyles.avatarImage} />
+              <View style={[profStyles.avatarInner, { backgroundColor: isDarkMode ? '#11131c' : '#fff' }]}>
+                <Image source={{ uri: userInfo?.avatar || 'https://i.pravatar.cc/150?img=68' }} style={profStyles.avatarImage} />
               </View>
             </LinearGradient>
 
             <View style={profStyles.passportMeta}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={[profStyles.displayName, { color: theme.textPrimary }]}>{userInfo.name}</Text>
-                <CheckCircle size={16} color="#3b82f6" fill="#3b82f6" />
+                <CheckCircle size={17} color="#fff" fill="#f59e0b" />
               </View>
               {isExperimentMember ? (
-                <Text style={{ fontSize: 10, color: '#bef264', fontWeight: '850', marginTop: 1 }}>
+                <Text style={{ fontSize: 10.5, color: '#f59e0b', fontWeight: '850', marginTop: 2 }}>
                   Hội viên thử nghiệm 🧪
                 </Text>
               ) : (
@@ -218,50 +253,43 @@ export function ProfileScreen({
               )}
 
               <View style={profStyles.rankRow}>
-                <LinearGradient
-                  colors={rank.colors}
-                  style={profStyles.rankPill}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  <AwardIcon size={10} color="#0f172a" fill="#0f172a" />
-                  <Text style={profStyles.rankPillText}>{rank.rankName}</Text>
-                </LinearGradient>
-                <View style={[profStyles.levelBadge, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.04)' }]}>
-                  <Text style={[profStyles.levelText, { color: theme.textSecondary }]}>{displayLevel}</Text>
+                <View style={[profStyles.levelBadge, { backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.18)' : 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.4)', borderWidth: 1 }]}>
+                  <Text style={[profStyles.levelText, { color: '#f59e0b' }]}>{displayLevel}</Text>
                 </View>
               </View>
             </View>
 
-            <Pressable onPress={onEditProfile} style={[profStyles.pencilBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.05)' }]}>
-              <Pencil size={13} color={theme.textPrimary} />
+            <Pressable onPress={onEditProfile} style={[profStyles.pencilBtn, { backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.1)', borderColor: '#f59e0b', borderWidth: 1.2 }]}>
+              <Pencil size={15} color="#f59e0b" />
             </Pressable>
           </View>
 
           {/* Bio capsule block */}
-          {userInfo.bio && (
-            <View style={[profStyles.bioCapsule, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.03)' : 'rgba(15, 23, 42, 0.03)', borderColor: theme.border }]}>
+          {userInfo?.bio && (
+            <View style={[profStyles.bioCapsule, { backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.05)' : 'rgba(245, 158, 11, 0.03)', borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.18)' }]}>
               <Text style={[profStyles.bioText, { color: theme.textSecondary }]}>"{userInfo.bio}"</Text>
             </View>
           )}
 
           {/* Followers & Following Stats Bar */}
-          <View style={profStyles.followStatsContainer}>
+          <View style={[profStyles.followStatsContainer, { backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.05)', borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)' }]}>
             <View style={profStyles.followStatItem}>
-              <Text style={[profStyles.followStatVal, { color: theme.textPrimary }]}>12</Text>
-              <Text style={profStyles.followStatLabel}>Chuyến đi</Text>
+              <Text style={[profStyles.followStatVal, { color: '#f59e0b' }]}>
+                {realStats.posts ?? 0}
+              </Text>
+              <Text style={profStyles.followStatLabel}>Bài viết</Text>
             </View>
-            <View style={[profStyles.followStatDivider, { backgroundColor: theme.border }]} />
+            <View style={[profStyles.followStatDivider, { backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.2)' }]} />
             <View style={profStyles.followStatItem}>
-              <Text style={[profStyles.followStatVal, { color: theme.textPrimary }]}>
-                {userInfo?.followersCount !== undefined ? userInfo.followersCount : 256}
+              <Text style={[profStyles.followStatVal, { color: '#f59e0b' }]}>
+                {realStats.followers ?? actualFriendsCount}
               </Text>
               <Text style={profStyles.followStatLabel}>Người theo dõi</Text>
             </View>
-            <View style={[profStyles.followStatDivider, { backgroundColor: theme.border }]} />
+            <View style={[profStyles.followStatDivider, { backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.2)' }]} />
             <View style={profStyles.followStatItem}>
-              <Text style={[profStyles.followStatVal, { color: theme.textPrimary }]}>
-                {userInfo?.followingCount !== undefined ? userInfo.followingCount : 42}
+              <Text style={[profStyles.followStatVal, { color: '#f59e0b' }]}>
+                {realStats.following ?? actualFriendsCount}
               </Text>
               <Text style={profStyles.followStatLabel}>Đang theo dõi</Text>
             </View>
@@ -269,100 +297,9 @@ export function ProfileScreen({
         </View>
       </View>
 
-      {/* INSTAGRAM STYLE TABS FOR PASS PORT SCREEN */}
-      <View style={[profStyles.tabBarContainer, { borderBottomColor: theme.border }]}>
-        <Pressable onPress={() => setActiveTab('grid')} style={[profStyles.tabBarItem, activeTab === 'grid' && { borderBottomColor: theme.textPrimary }]}>
-          <ImageIcon size={20} color={activeTab === 'grid' ? theme.textPrimary : theme.textMuted} />
-        </Pressable>
-        <Pressable onPress={() => setActiveTab('reels')} style={[profStyles.tabBarItem, activeTab === 'reels' && { borderBottomColor: theme.textPrimary }]}>
-          <Play size={20} color={activeTab === 'reels' ? theme.textPrimary : theme.textMuted} />
-        </Pressable>
-        <Pressable onPress={() => setActiveTab('friends')} style={[profStyles.tabBarItem, activeTab === 'friends' && { borderBottomColor: theme.textPrimary }]}>
-          <Users size={20} color={activeTab === 'friends' ? theme.textPrimary : theme.textMuted} />
-        </Pressable>
-        <Pressable onPress={() => setActiveTab('settings')} style={[profStyles.tabBarItem, activeTab === 'settings' && { borderBottomColor: theme.textPrimary }]}>
-          <Settings size={20} color={activeTab === 'settings' ? theme.textPrimary : theme.textMuted} />
-        </Pressable>
-      </View>
+      {/* C. STATS & SETTINGS SECTION */}
+      <View style={{ marginTop: 12 }}>
 
-      {activeTab === 'grid' && (
-        <View style={profStyles.gridContainer}>
-          <View style={profStyles.gridRow}>
-            {gridPhotos.map((url, index) => (
-              <Pressable key={index} style={profStyles.gridItem} onPress={() => Alert.alert('Bài đăng', 'Ảnh lưu niệm hành trình của bạn!')}>
-                <Image source={{ uri: url }} style={profStyles.gridImage} />
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {activeTab === 'reels' && (
-        <View style={profStyles.gridContainer}>
-          <View style={profStyles.gridRow}>
-            {userReels.map((reel) => (
-              <Pressable key={reel.id} style={profStyles.gridItem} onPress={() => Alert.alert('Video Reels', `Phát video: ${reel.title}`)}>
-                <Image source={{ uri: reel.cover }} style={profStyles.gridImage} />
-                <View style={profStyles.playOverlay}>
-                  <Play size={12} color="#fff" fill="#fff" />
-                  <Text style={profStyles.playOverlayText}>{reel.views}</Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {activeTab === 'friends' && (
-        <View style={{ paddingHorizontal: 16, paddingTop: 15 }}>
-          <Text style={{ fontSize: 16, fontWeight: '900', color: theme.textPrimary, marginBottom: 12 }}>
-            Bạn đồng hành
-          </Text>
-          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 50 }}>
-            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.08)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-              <Users size={34} color="#3b82f6" />
-            </View>
-            <Text style={{ color: theme.textPrimary, fontSize: 15, fontWeight: '800', marginBottom: 6 }}>Chưa có bạn đồng hành</Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 12, textAlign: 'center', lineHeight: 18, paddingHorizontal: 20 }}>
-              Tìm bạn bè qua tên, email hoặc số điện thoại để cùng tạo nhóm du lịch 360°.
-            </Text>
-            <Pressable
-              style={{ marginTop: 18, backgroundColor: '#3b82f6', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
-              onPress={() => setShowFindFriendsModal(true)}
-            >
-              <Users size={14} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>Tìm bạn đồng hành</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
-
-      {activeTab === 'settings' && (
-        <View style={{ marginTop: 12 }}>
-          {/* D. BORDERLESS CIRCULAR STATS GRID (Matching Categories grid) */}
-          <View style={profStyles.sectionHeader}>
-            <Text style={[profStyles.sectionTitleText, { color: theme.textPrimary }]}>Thống kê cá nhân</Text>
-          </View>
-          <View style={profStyles.statsRowGrid}>
-            {userStats.map((s, i) => {
-              const SIcon = s.icon;
-              return (
-                <Pressable
-                  key={i}
-                  style={[profStyles.statCardCell, { backgroundColor: theme.card, borderColor: theme.border }]}
-                  onPress={s.action}
-                >
-                  <View style={[profStyles.statIconCircle, { backgroundColor: s.bg }]}>
-                    <SIcon size={16} color={s.color} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[profStyles.statLabelCellText, { color: theme.textSecondary }]}>{s.label}</Text>
-                    <Text style={[profStyles.statValueCellText, { color: theme.textPrimary }]}>{s.val}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
 
           {/* F. SETTINGS MENU CARD (Instagram style rows) */}
           <View style={profStyles.sectionHeader}>
@@ -397,16 +334,22 @@ export function ProfileScreen({
           {/* LOGOUT BUTTON */}
           <Pressable
             style={({ pressed }) => [
-              profStyles.logoutBtn,
-              pressed && { opacity: 0.8 }
+              profStyles.logoutBtnWrap,
+              pressed && { opacity: 0.85 }
             ]}
             onPress={onLogout}
           >
-            <LogOut size={16} color="#fff" />
-            <Text style={profStyles.logoutBtnText}>Đăng xuất tài khoản</Text>
+            <LinearGradient
+              colors={['#dc2626', '#b91c1c', '#f59e0b']}
+              style={profStyles.logoutBtnGrad}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <LogOut size={16} color="#fff" />
+              <Text style={profStyles.logoutBtnText}>Đăng xuất tài khoản</Text>
+            </LinearGradient>
           </Pressable>
         </View>
-      )}
 
 
 
@@ -704,9 +647,9 @@ const profStyles = StyleSheet.create({
     fontWeight: '900',
   },
   pencilBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -727,9 +670,10 @@ const profStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(148, 163, 184, 0.15)',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   followStatItem: {
     alignItems: 'center',
@@ -923,21 +867,29 @@ const profStyles = StyleSheet.create({
     height: 1,
     marginHorizontal: 16,
   },
-  logoutBtn: {
-    height: 48,
+  logoutBtnWrap: {
     borderRadius: 16,
-    backgroundColor: '#ef4444',
+    overflow: 'hidden',
+    marginTop: 14,
+    marginBottom: 30,
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  logoutBtnGrad: {
+    height: 50,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 10,
-    marginBottom: 30,
   },
   logoutBtnText: {
     color: '#fff',
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.3,
   },
   modalBackdrop: {
     flex: 1,

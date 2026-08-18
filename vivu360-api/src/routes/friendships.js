@@ -39,19 +39,16 @@ router.post("/requests", async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Khong tim thay nguoi dung" });
     }
     const users = [requesterId, receiverId].sort();
-    const existing = await Friendship.findOne({ pairKey: users.join("::") });
-    if (existing) return res.json({ success: true, data: existing, alreadyExists: true });
-    const friendship = await Friendship.create({ users, requesterId });
-    res.status(201).json({ success: true, data: friendship });
-  } catch (error) {
-    if (error?.code === 11000) {
-      const users = [req.user.firebaseUid, String(req.body.userId || "").trim()].sort();
-      const existing = await Friendship.findOne({ pairKey: users.join("::") });
-      if (existing) return res.json({ success: true, data: existing, alreadyExists: true });
-      return res.status(409).json({ success: false, message: "Dang dong bo trang thai ket ban" });
+    let friendship = await Friendship.findOne({ pairKey: users.join("::") });
+    if (friendship) {
+      friendship.status = "accepted";
+      friendship.acceptedAt = new Date();
+      await friendship.save();
+    } else {
+      friendship = await Friendship.create({ users, requesterId, status: "accepted", acceptedAt: new Date() });
     }
-    next(error);
-  }
+    res.status(201).json({ success: true, data: friendship });
+  } catch (error) { next(error); }
 });
 
 router.patch("/:id/accept", async (req, res, next) => {

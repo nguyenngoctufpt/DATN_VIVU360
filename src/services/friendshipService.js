@@ -3,11 +3,16 @@ import api from './api';
 const auth = userId => ({ headers: { 'x-user-id': userId } });
 
 export async function getFriendships(userId, status) {
-  const response = await api.get('/friendships', {
-    ...auth(userId),
-    params: status ? { status } : undefined,
-  });
-  return response.data.data;
+  if (!userId || typeof userId !== 'string' || !userId.trim()) return [];
+  try {
+    const response = await api.get('/friendships', {
+      ...auth(userId),
+      params: status ? { status } : undefined,
+    });
+    return response.data?.data || [];
+  } catch (err) {
+    return [];
+  }
 }
 
 export async function sendFriendRequest(userId, receiverId) {

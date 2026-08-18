@@ -31,8 +31,20 @@ import {
   X,
   MessageSquare,
   CornerUpLeft,
+  Edit3,
+  BarChart3,
+  Lock,
+  CheckCircle2,
 } from 'lucide-react-native';
-import { sendTypingStatus, getTypingStatus } from '../services/chatService';
+import {
+  sendTypingStatus,
+  getTypingStatus,
+  editChatMessage,
+  createGroupPoll,
+  voteGroupPoll,
+  closeGroupPoll,
+} from '../services/chatService';
+import { CreatePollModal } from './createPollModal';
 
 const { width } = Dimensions.get('window');
 
@@ -116,14 +128,89 @@ export function GroupChatTab({
   theme,
   isDarkMode,
   onNavigateToMapWithPlace,
+  onEditMessage,
+  onCreatePoll,
+  onVotePoll,
+  onClosePoll,
 }) {
   const scrollViewRef = useRef(null);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
   const [reactionsMap, setReactionsMap] = useState({});
   const [replyToMsg, setReplyToMsg] = useState(null);
+  const [editingMsg, setEditingMsg] = useState(null);
+  const [createPollModalVisible, setCreatePollModalVisible] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [typingUser, setTypingUser] = useState(null);
+
+  const handleStartEditMessage = (msg) => {
+    setEditingMsg(msg);
+    setMessageText(msg.text || msg.content || '');
+    setReplyToMsg(null);
+  };
+
+  const handleCancelEditMessage = () => {
+    setEditingMsg(null);
+    setMessageText('');
+  };
+
+  const handleSaveEditMessage = async () => {
+    if (!editingMsg || !messageText.trim()) return;
+    const msgId = editingMsg.id || editingMsg._id;
+    const newText = messageText.trim();
+    setEditingMsg(null);
+    setMessageText('');
+
+    if (onEditMessage) {
+      onEditMessage(msgId, newText);
+    } else if (selectedGroup?.id && ownerId) {
+      try {
+        const gId = selectedGroup._id || selectedGroup.id;
+        await editChatMessage(gId, msgId, ownerId, newText);
+      } catch (err) {
+        console.warn("Edit message failed:", err.message);
+      }
+    }
+  };
+
+  const handleCreatePoll = async ({ question, options, multipleChoice }) => {
+    if (onCreatePoll) {
+      await onCreatePoll({ question, options, multipleChoice });
+    } else if (selectedGroup?.id && ownerId) {
+      try {
+        const gId = selectedGroup._id || selectedGroup.id;
+        await createGroupPoll(gId, ownerId, question, options, multipleChoice);
+      } catch (err) {
+        console.warn("Create poll failed:", err.message);
+      }
+    }
+  };
+
+  const handleVotePoll = async (messageId, optionId) => {
+    if (onVotePoll) {
+      await onVotePoll(messageId, optionId);
+    } else if (selectedGroup?.id && ownerId) {
+      try {
+        const gId = selectedGroup._id || selectedGroup.id;
+        await voteGroupPoll(gId, messageId, optionId, ownerId);
+      } catch (err) {
+        console.warn("Vote poll failed:", err.message);
+      }
+    }
+  };
+
+  const handleClosePoll = async (messageId) => {
+    if (onClosePoll) {
+      await onClosePoll(messageId);
+    } else if (selectedGroup?.id && ownerId) {
+      try {
+        const gId = selectedGroup._id || selectedGroup.id;
+        await closeGroupPoll(gId, messageId, ownerId);
+      } catch (err) {
+        console.warn("Close poll failed:", err.message);
+      }
+    }
+  };
 
   // Real-time MongoDB typing status & continuous fallback loop
   useEffect(() => {
@@ -223,31 +310,6 @@ export function GroupChatTab({
     >
       {/* Dark purple BG — fills entire tab */}
       <View style={styles.root}>
-
-        {/* Sleek Floating Glassmorphic Members Capsule */}
-        {membersLabel &&
-        !selectedGroup?.isDirect &&
-        selectedGroup?.type !== 'direct' &&
-        !selectedGroup?.isPrivate &&
-        (selectedGroup?.membersList?.length || 0) > 2 ? (
-          <View style={styles.memberBarContainer}>
-            <View style={styles.memberPill}>
-              <View style={styles.avatarStack}>
-                {(selectedGroup?.membersList || []).slice(0, 3).map((m, idx) => (
-                  <Image
-                    key={`m-stack-${idx}`}
-                    source={{ uri: m.avatar || getUserAvatarByName(m.name) }}
-                    style={[styles.stackAvatar, { marginLeft: idx > 0 ? -7 : 0 }]}
-                  />
-                ))}
-              </View>
-              <View style={styles.memberDot} />
-              <Text style={styles.memberBarText} numberOfLines={1}>
-                {membersLabel} · {selectedGroup?.membersList?.length || 4} thành viên
-              </Text>
-            </View>
-          </View>
-        ) : null}
 
         {/* ── Messages ─────────────────────────────────────────────────── */}
         <ScrollView
@@ -373,6 +435,98 @@ export function GroupChatTab({
               const hasReaction = reactionsMap[msgKey];
               const isShowingReactions = activeReactionMsgId === msgKey;
 
+              // --- 📊 RENDER BÌNH CHỌN (POLL CARD) ---
+              if (msg.type === 'poll' || msg.poll) {
+                const poll = msg.poll || {};
+                const totalVotes = (poll.options || []).reduce((sum, o) => sum + (Array.isArray(o.voters) ? o.voters.length : 0), 0);
+                const isOwnerOrDeputy = (selectedGroup?.ownerId === ownerId || selectedGroup?.creatorId === ownerId || (Array.isArray(selectedGroup?.deputyIds) && selectedGroup.deputyIds.includes(ownerId)));
+
+                return (
+                  <View key={`poll-${msgKey}`} style={[isMe ? styles.myRow : styles.otherRow, isSameSenderAsPrev && { marginTop: 2 }]}>
+                    {!isMe && (
+                      isSameSenderAsPrev ? <View style={{ width: 32 }} /> : <Image source={{ uri: avatarUri }} style={styles.otherAvatar} />
+                    )}
+                    <View style={isMe ? styles.myCol : styles.otherCol}>
+                      {!isMe && !isSameSenderAsPrev && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <Text style={styles.otherName}>{senderName}</Text>
+                        </View>
+                      )}
+                      
+                      <View style={styles.pollCardContainer}>
+                        <LinearGradient
+                          colors={['#1e1b4b', '#311b92', '#1e1035']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.pollCardGradient}
+                        >
+                          <View style={styles.pollCardHeader}>
+                            <View style={styles.pollHeaderIconBox}>
+                              <BarChart3 size={16} color="#c084fc" />
+                            </View>
+                            <Text style={styles.pollHeaderTitle}>BÌNH CHỌN NHÓM</Text>
+                            {poll.closed && (
+                              <View style={styles.pollClosedBadge}>
+                                <Text style={styles.pollClosedText}>Đã khóa</Text>
+                              </View>
+                            )}
+                          </View>
+
+                          <Text style={styles.pollQuestionText}>{poll.question || msg.text}</Text>
+                          <Text style={styles.pollSubInfo}>
+                            {poll.multipleChoice ? '• Được chọn nhiều phương án' : '• Chọn 1 phương án'} · {totalVotes} lượt bình chọn
+                          </Text>
+
+                          <View style={styles.pollOptionsList}>
+                            {(poll.options || []).map((opt) => {
+                              const voters = Array.isArray(opt.voters) ? opt.voters : [];
+                              const count = voters.length;
+                              const percent = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+                              const hasVoted = voters.includes(ownerId);
+
+                              return (
+                                <Pressable
+                                  key={opt.id || opt.text}
+                                  style={[styles.pollOptRow, hasVoted && styles.pollOptRowVoted]}
+                                  onPress={() => !poll.closed && handleVotePoll(msg.id || msgKey, opt.id)}
+                                  disabled={poll.closed}
+                                >
+                                  <View style={[styles.pollOptProgress, { width: `${percent}%` }]} />
+                                  <View style={styles.pollOptContent}>
+                                    <View style={styles.pollOptCheckCircle}>
+                                      {hasVoted ? (
+                                        <CheckCircle2 size={16} color="#c084fc" />
+                                      ) : (
+                                        <View style={styles.pollOptUnchecked} />
+                                      )}
+                                    </View>
+                                    <Text style={[styles.pollOptText, hasVoted && { fontWeight: '700', color: '#fff' }]}>
+                                      {opt.text}
+                                    </Text>
+                                    <Text style={styles.pollOptVotes}>{count} ({percent}%)</Text>
+                                  </View>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+
+                          {!poll.closed && isOwnerOrDeputy && (
+                            <Pressable style={styles.closePollBtn} onPress={() => handleClosePoll(msg.id || msgKey)}>
+                              <Lock size={12} color="#f43f5e" />
+                              <Text style={styles.closePollBtnText}>Khóa bài bình chọn này</Text>
+                            </Pressable>
+                          )}
+                        </LinearGradient>
+                      </View>
+
+                      <View style={isMe ? styles.myMeta : { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                        <Text style={styles.metaTime}>{msg.time || ''}</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              }
+
               if (isMe) {
                 return (
                   <View key={`msg-${msgKey}`} style={styles.myRow}>
@@ -388,6 +542,16 @@ export function GroupChatTab({
                               <Text style={{ fontSize: 19 }}>{emoji}</Text>
                             </Pressable>
                           ))}
+                          <Pressable
+                            style={styles.actionEditBtn}
+                            onPress={() => {
+                              setActiveReactionMsgId(null);
+                              handleStartEditMessage(msg);
+                            }}
+                          >
+                            <Edit3 size={14} color="#38bdf8" />
+                            <Text style={styles.actionEditText}>Sửa</Text>
+                          </Pressable>
                         </View>
                       )}
                       <Pressable
@@ -400,7 +564,7 @@ export function GroupChatTab({
                           end={{ x: 1, y: 1 }}
                           style={styles.bubbleMe}
                         >
-                          <Text style={styles.bubbleTextMe}>{msg.text}</Text>
+                          <Text style={styles.bubbleTextMe}>{msg.text || msg.content}</Text>
                         </LinearGradient>
                       </Pressable>
                       {hasReaction && (
@@ -409,6 +573,7 @@ export function GroupChatTab({
                         </View>
                       )}
                       <View style={styles.myMeta}>
+                        {msg.isEdited && <Text style={styles.editedTag}>(đã sửa)</Text>}
                         <Pressable onPress={() => setReplyToMsg(msg)} style={{ marginRight: 4 }}>
                           <CornerUpLeft size={10} color="rgba(255,255,255,0.4)" />
                         </Pressable>
@@ -577,6 +742,19 @@ export function GroupChatTab({
                 style={styles.metaGridItem}
                 onPress={() => {
                   setShowQuickReplies(false);
+                  setCreatePollModalVisible(true);
+                }}
+              >
+                <View style={[styles.metaIconBg, { backgroundColor: '#8b5cf6' }]}>
+                  <BarChart3 size={16} color="#fff" />
+                </View>
+                <Text style={styles.metaLabel}>Bình chọn</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.metaGridItem}
+                onPress={() => {
+                  setShowQuickReplies(false);
                   handleSendQuickText('⏰ Mấy giờ cả nhóm xuất phát nhỉ?');
                 }}
               >
@@ -611,6 +789,20 @@ export function GroupChatTab({
               <Text style={styles.replyBannerText} numberOfLines={1}>{replyToMsg.text}</Text>
             </View>
             <Pressable onPress={() => setReplyToMsg(null)} style={styles.closeReplyBtn}>
+              <X size={16} color="#b0b3b8" />
+            </Pressable>
+          </View>
+        )}
+
+        {/* Editing Message Banner */}
+        {editingMsg && (
+          <View style={[styles.replyBannerContainer, { borderLeftColor: '#38bdf8' }]}>
+            <View style={[styles.replyBarIndicator, { backgroundColor: '#38bdf8' }]} />
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <Text style={[styles.replyBannerTitle, { color: '#38bdf8' }]}>✏️ Đang chỉnh sửa tin nhắn</Text>
+              <Text style={styles.replyBannerText} numberOfLines={1}>{editingMsg.text || editingMsg.content}</Text>
+            </View>
+            <Pressable onPress={handleCancelEditMessage} style={styles.closeReplyBtn}>
               <X size={16} color="#b0b3b8" />
             </Pressable>
           </View>
@@ -661,11 +853,15 @@ export function GroupChatTab({
             <Pressable
               style={styles.sendBtn}
               onPress={() => {
-                if (selectedGroup?.id && ownerId) {
-                  const gId = selectedGroup._id || selectedGroup.id;
-                  sendTypingStatus(gId, ownerId, currentUser?.name || '', currentUser?.avatar || '', false);
+                if (editingMsg) {
+                  handleSaveEditMessage();
+                } else {
+                  if (selectedGroup?.id && ownerId) {
+                    const gId = selectedGroup._id || selectedGroup.id;
+                    sendTypingStatus(gId, ownerId, currentUser?.name || '', currentUser?.avatar || '', false);
+                  }
+                  onSendMessage();
                 }
-                onSendMessage();
               }}
             >
               <LinearGradient
@@ -722,6 +918,14 @@ export function GroupChatTab({
             </View>
           </View>
         </Modal>
+
+        {/* Modal Tạo Bình Chọn Nhanh */}
+        <CreatePollModal
+          visible={createPollModalVisible}
+          onClose={() => setCreatePollModalVisible(false)}
+          onCreatePoll={handleCreatePoll}
+          isDarkMode={isDarkMode}
+        />
       </View>
     </KeyboardAvoidingView>
   );
@@ -1338,5 +1542,167 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
+  },
+
+  // Edit Action Button & Tag
+  actionEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 4,
+  },
+  actionEditText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#38bdf8',
+  },
+  editedTag: {
+    fontSize: 9.5,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+    marginRight: 4,
+  },
+
+  // Poll Card Styles
+  pollCardContainer: {
+    marginVertical: 4,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.35)',
+    shadowColor: '#8b5cf6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
+    width: width * 0.76,
+  },
+  pollCardGradient: {
+    padding: 14,
+  },
+  pollCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  pollHeaderIconBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(192, 132, 252, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pollHeaderTitle: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#c084fc',
+    letterSpacing: 0.8,
+    flex: 1,
+  },
+  pollClosedBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: '#ef4444',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  pollClosedText: {
+    fontSize: 9.5,
+    color: '#ef4444',
+    fontWeight: '800',
+  },
+  pollQuestionText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#ffffff',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  pollSubInfo: {
+    fontSize: 11,
+    color: '#a78bfa',
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  pollOptionsList: {
+    gap: 8,
+  },
+  pollOptRow: {
+    position: 'relative',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    overflow: 'hidden',
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  pollOptRowVoted: {
+    borderColor: '#a855f7',
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+  },
+  pollOptProgress: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(168, 85, 247, 0.35)',
+    borderRadius: 12,
+  },
+  pollOptContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    zIndex: 2,
+  },
+  pollOptCheckCircle: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pollOptUnchecked: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  pollOptText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#e2e8f0',
+    fontWeight: '500',
+  },
+  pollOptVotes: {
+    fontSize: 11,
+    color: '#c084fc',
+    fontWeight: '700',
+  },
+  closePollBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+  },
+  closePollBtnText: {
+    fontSize: 11,
+    color: '#f43f5e',
+    fontWeight: '700',
   },
 });

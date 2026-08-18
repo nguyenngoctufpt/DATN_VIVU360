@@ -27,56 +27,119 @@ export function ChiTienModal({
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.modalBackdrop}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={[styles.modalCard, { backgroundColor: theme.background || '#fff', borderColor: theme.border }]}>
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalHeaderTitle, { color: theme.textPrimary }]}>Ghi nhận chi tiêu</Text>
-              <Pressable style={styles.closeModalBtn} onPress={onClose}>
-                <X size={22} color={theme.textPrimary} />
-              </Pressable>
-            </View>
-
-            {/* Form */}
-            <View style={styles.formContainer}>
-              <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Tên khoản chi</Text>
-              <View style={[styles.formInputGroup, { backgroundColor: theme.searchBg }]}>
-                <ShoppingBag size={18} color="#f43f5e" style={styles.icon} />
-                <TextInput
-                  placeholder="Ví dụ: Vé máy bay"
-                  placeholderTextColor={theme.textMuted}
-                  value={fundExpenseTitle}
-                  onChangeText={setFundExpenseTitle}
-                  style={[styles.formTextInput, { color: theme.textPrimary }]}
-                />
-              </View>
-
-              <Text style={[styles.inputLabel, { color: theme.textMuted, marginTop: 20 }]}>Số tiền (đ)</Text>
-              <View style={[styles.formInputGroup, { backgroundColor: theme.searchBg }]}>
-                <Coins size={18} color="#f43f5e" style={styles.icon} />
-                <TextInput
-                  placeholder="0"
-                  placeholderTextColor={theme.textMuted}
-                  value={fundExpenseInput}
-                  onChangeText={setFundExpenseInput}
-                  keyboardType="numeric"
-                  style={[styles.formTextInput, { color: theme.textPrimary, fontSize: 16 }]}
-                />
-              </View>
-            </View>
-
-            {/* Footer */}
-            <Pressable style={styles.modalSubmitBtn} onPress={onSubmit}>
-              <LinearGradient colors={['#fb7185', '#f43f5e']} style={styles.modalSubmitGradient}>
-                <Minus size={18} color="#fff" />
-                <Text style={styles.modalSubmitText}>Xác nhận chi tiêu</Text>
-              </LinearGradient>
+        <View style={[styles.modalCard, { backgroundColor: theme.background || '#fff', borderColor: theme.border }]}>
+          {/* Header */}
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalHeaderTitle, { color: theme.textPrimary }]}>Ghi nhận chi tiêu từ quỹ</Text>
+            <Pressable style={styles.closeModalBtn} onPress={onClose}>
+              <X size={22} color={theme.textPrimary} />
             </Pressable>
           </View>
-        </TouchableWithoutFeedback>
+
+          {/* Form */}
+          <View style={styles.formContainer}>
+            {/* Danh mục chọn nhanh khoản chi */}
+            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Gợi ý danh mục khoản chi</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              {[
+                '🏨 Homestay / Khách sạn',
+                '🚕 Tiền xe / Di chuyển',
+                '🍜 Tiền ăn uống',
+                '🎟️ Vé tham quan',
+                '🛒 Sắm đồ chung',
+                '💡 Khác',
+              ].map(cat => (
+                <Pressable
+                  key={cat}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 12,
+                    backgroundColor: fundExpenseTitle === cat ? 'rgba(239, 68, 68, 0.15)' : theme.searchBg,
+                    borderWidth: 1,
+                    borderColor: fundExpenseTitle === cat ? '#ef4444' : theme.border,
+                  }}
+                  onPress={() => setFundExpenseTitle(cat)}
+                >
+                  <Text style={{ fontSize: 11.5, fontWeight: '750', color: fundExpenseTitle === cat ? '#ef4444' : theme.textPrimary }}>
+                    {cat}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Tên / Nội dung khoản chi</Text>
+            <View style={[styles.formInputGroup, { backgroundColor: theme.searchBg }]}>
+              <ShoppingBag size={18} color="#ef4444" style={styles.icon} />
+              <TextInput
+                placeholder="Ví dụ: Cọc Homestay 50%..."
+                placeholderTextColor={theme.textMuted}
+                value={fundExpenseTitle}
+                onChangeText={setFundExpenseTitle}
+                style={[styles.formTextInput, { color: theme.textPrimary }]}
+              />
+            </View>
+
+            <Text style={[styles.inputLabel, { color: theme.textMuted, marginTop: 16 }]}>Số tiền chi từ quỹ (đ)</Text>
+            <View style={[styles.formInputGroup, { backgroundColor: theme.searchBg }]}>
+              <Coins size={18} color="#ef4444" style={styles.icon} />
+              <TextInput
+                placeholder="Nhập số tiền (VD: 2.500.000)"
+                placeholderTextColor={theme.textMuted}
+                value={fundExpenseInput}
+                onChangeText={setFundExpenseInput}
+                keyboardType="numeric"
+                style={[styles.formTextInput, { color: theme.textPrimary, fontSize: 16, fontWeight: '800' }]}
+              />
+              {Number(fundExpenseInput) > 0 && (
+                <Text style={{ fontSize: 12, fontWeight: '850', color: '#ef4444' }}>
+                  {Number(fundExpenseInput).toLocaleString('vi-VN')} đ
+                </Text>
+              )}
+            </View>
+
+            {/* Presets chọn nhanh số tiền chi */}
+            <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+              {[
+                { label: '100k', value: '100000' },
+                { label: '300k', value: '300000' },
+                { label: '500k', value: '500000' },
+                { label: '1Tr', value: '1000000' },
+                { label: '2.5Tr', value: '2500000' },
+                { label: '5Tr', value: '5000000' },
+              ].map(preset => (
+                <Pressable
+                  key={preset.label}
+                  style={{
+                    flex: 1,
+                    alignItems: 'center',
+                    paddingVertical: 6,
+                    borderRadius: 10,
+                    backgroundColor: fundExpenseInput === preset.value ? 'rgba(239, 68, 68, 0.15)' : theme.searchBg,
+                    borderWidth: 1,
+                    borderColor: fundExpenseInput === preset.value ? '#ef4444' : theme.border,
+                  }}
+                  onPress={() => setFundExpenseInput(preset.value)}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '850', color: fundExpenseInput === preset.value ? '#ef4444' : theme.textPrimary }}>
+                    {preset.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {/* Footer */}
+          <Pressable style={styles.modalSubmitBtn} onPress={onSubmit}>
+            <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.modalSubmitGradient}>
+              <Minus size={18} color="#fff" />
+              <Text style={styles.modalSubmitText}>Xác nhận chi tiêu</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );

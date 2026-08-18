@@ -92,7 +92,7 @@ export function HomeScreen({
       { key: 'map', label: 'Bản đồ 3D', Icon: MapIcon, colors: ['#3b82f6', '#1d4ed8'], type: 'tab' },
       { key: 'camera', label: 'Quét AR', Icon: Scan, colors: ['#ef4444', '#b91c1c'], type: 'tab' },
     ];
-    
+
     const secondary = [
       { key: 'social', label: 'Bảng tin', Icon: Newspaper, colors: ['#f59e0b', '#b45309'], type: 'tab' },
       { key: 'chat', label: 'Nhóm chat', Icon: MessageSquare, colors: ['#8b5cf6', '#6d28d9'], type: 'tab' },
@@ -238,7 +238,7 @@ export function HomeScreen({
     if (!searchQuery.trim()) return { features: [] };
     const query = searchQuery.toLowerCase().trim();
 
-    const matchedFeatures = searchableFeatures.filter(feature => 
+    const matchedFeatures = searchableFeatures.filter(feature =>
       feature.label.toLowerCase().includes(query) ||
       feature.description.toLowerCase().includes(query)
     );
@@ -303,7 +303,7 @@ export function HomeScreen({
               >
                 <View style={[styles.headerAvatarInner, { backgroundColor: theme.background }]}>
                   <Image
-                    source={{ uri: currentUser.avatar }}
+                    source={{ uri: currentUser?.avatar || 'https://i.pravatar.cc/150?img=68' }}
                     style={styles.avatarImage}
                   />
                 </View>
@@ -343,7 +343,7 @@ export function HomeScreen({
               <Pressable
                 onPress={() => setIsDarkMode(!isDarkMode)}
                 style={[
-                  styles.hudIconBtn, 
+                  styles.hudIconBtn,
                   { backgroundColor: theme.cardGlass, borderColor: theme.border }
                 ]}
               >
@@ -390,149 +390,149 @@ export function HomeScreen({
 
       {/* Search Box */}
       <View style={{ position: 'relative', zIndex: 999, marginTop: -26, marginHorizontal: 16 }}>
-            <LinearGradient
-              colors={['#3b82f6', '#60a5fa']}
-              style={styles.searchContainerBorderGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <View style={[styles.searchContainer, { backgroundColor: theme.cardGlass, borderWidth: 0 }]}>
-                <Search size={18} color={theme.textSecondary} />
-                <TextInput
-                  placeholder="Tìm kiếm tính năng (Bản đồ, Vé, Khách sạn...)..."
-                  placeholderTextColor="#9ca3af"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  onFocus={() => setSearchFocused(true)}
-                  style={[styles.searchInput, { color: theme.textPrimary }]}
-                />
-                {searchQuery.length > 0 && (
-                  <Pressable onPress={() => { setSearchQuery(''); setSearchFocused(false); }} style={{ padding: 8 }}>
-                    <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '700' }}>Xóa</Text>
-                  </Pressable>
-                )}
-              </View>
-            </LinearGradient>
-
-            {/* Search Focus Suggestions (when focused but empty) */}
-            {searchFocused && searchQuery.trim().length === 0 && (
-              <View style={[styles.searchDropdown, { backgroundColor: theme.card, borderColor: theme.border, padding: 14, maxHeight: 350 }]}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '900', color: theme.textSecondary }}>TÌM KIẾM GẦN ĐÂY</Text>
-                  {recentSearches.length > 0 && (
-                    <Pressable onPress={() => setRecentSearches([])} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Trash2 size={11} color="#ef4444" />
-                      <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#ef4444' }}>Xóa hết</Text>
-                    </Pressable>
-                  )}
-                </View>
-
-                {recentSearches.length === 0 ? (
-                  <Text style={{ fontSize: 11, color: theme.textMuted, fontStyle: 'italic', marginBottom: 16 }}>Lịch sử trống</Text>
-                ) : (
-                  <View style={{ gap: 8, marginBottom: 16 }}>
-                    {recentSearches.map((hist, idx) => (
-                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Pressable 
-                          onPress={() => {
-                            setSearchQuery(hist);
-                          }}
-                          style={{ flex: 1 }}
-                        >
-                          <Text style={{ fontSize: 12, color: theme.textPrimary, fontWeight: '600' }}>🎒 {hist}</Text>
-                        </Pressable>
-                        <Pressable 
-                          onPress={() => setRecentSearches(prev => prev.filter((_, i) => i !== idx))}
-                          style={{ padding: 4 }}
-                        >
-                          <X size={13} color={theme.textMuted} />
-                        </Pressable>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                <Text style={{ fontSize: 10, fontWeight: '900', color: theme.textSecondary, marginBottom: 8 }}>ĐỀ XUẤT CHO BẠN</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-                  {[
-                    'Bản đồ 3D',
-                    'Vé của tôi',
-                    'Quét AR',
-                    'Bảng tin',
-                    'Khách sạn',
-                  ].map((pop, idx) => (
-                    <Pressable
-                      key={idx}
-                      onPress={() => {
-                        setSearchQuery(pop);
-                      }}
-                      style={{ backgroundColor: theme.searchBg, borderWidth: 1, borderColor: theme.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 }}
-                    >
-                      <Text style={{ fontSize: 10.5, fontWeight: '800', color: theme.textPrimary }}>#{pop}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Pressable
-                  onPress={() => setSearchFocused(false)}
-                  style={{ alignSelf: 'center', paddingVertical: 6, marginTop: 4 }}
-                >
-                  <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#3b82f6' }}>Đóng bảng gợi ý</Text>
-                </Pressable>
-              </View>
-            )}
-
-            {/* Structured Search Results Dropdown */}
-            {searchQuery.trim().length > 0 && (
-              <View style={[styles.searchDropdown, { backgroundColor: theme.card, borderColor: theme.border, maxHeight: 380 }]}>
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  {/* Category: App Features / Tabs & Booking Utilities */}
-                  {globalSearchResults.features.length > 0 && (
-                    <View style={{ borderBottomWidth: 1, borderBottomColor: theme.border }}>
-                      <Text style={{ fontSize: 9, fontWeight: '900', color: theme.textMuted, marginLeft: 14, marginTop: 8 }}>TÍNH NĂNG & DỊCH VỤ</Text>
-                      {globalSearchResults.features.map((res) => {
-                        const Icon = res.Icon;
-                        return (
-                          <Pressable
-                            key={res.key}
-                            onPress={() => {
-                              if (searchQuery.trim() && !recentSearches.includes(searchQuery.trim())) {
-                                setRecentSearches(prev => [searchQuery.trim(), ...prev].slice(0, 5));
-                              }
-                              setSearchQuery('');
-                              setSearchFocused(false);
-                              res.action();
-                            }}
-                            style={styles.searchResultItem}
-                          >
-                            <LinearGradient
-                              colors={res.colors}
-                              style={styles.searchResultIconWrap}
-                            >
-                              <Icon size={14} color="#fff" />
-                            </LinearGradient>
-                            <View style={{ flex: 1, marginLeft: 12 }}>
-                              <Text style={[styles.searchResultLabel, { color: theme.textPrimary }]}>{res.label}</Text>
-                              <Text style={[styles.searchResultDesc, { color: theme.textSecondary }]} numberOfLines={1}>{res.description}</Text>
-                            </View>
-                            <ChevronRight size={14} color={theme.textMuted} />
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  )}
-
-                  {!hasGlobalResults && (
-                    <View style={{ padding: 16, alignItems: 'center' }}>
-                      <Text style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600', textAlign: 'center' }}>
-                        Không tìm thấy tính năng tương ứng.
-                      </Text>
-                    </View>
-                  )}
-                </ScrollView>
-              </View>
+        <LinearGradient
+          colors={['#3b82f6', '#60a5fa']}
+          style={styles.searchContainerBorderGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <View style={[styles.searchContainer, { backgroundColor: theme.cardGlass, borderWidth: 0 }]}>
+            <Search size={18} color={theme.textSecondary} />
+            <TextInput
+              placeholder="Tìm kiếm tính năng (Bản đồ, Vé, Khách sạn...)..."
+              placeholderTextColor="#9ca3af"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onFocus={() => setSearchFocused(true)}
+              style={[styles.searchInput, { color: theme.textPrimary }]}
+            />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => { setSearchQuery(''); setSearchFocused(false); }} style={{ padding: 8 }}>
+                <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '700' }}>Xóa</Text>
+              </Pressable>
             )}
           </View>
+        </LinearGradient>
+
+        {/* Search Focus Suggestions (when focused but empty) */}
+        {searchFocused && searchQuery.trim().length === 0 && (
+          <View style={[styles.searchDropdown, { backgroundColor: theme.card, borderColor: theme.border, padding: 14, maxHeight: 350 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={{ fontSize: 10, fontWeight: '900', color: theme.textSecondary }}>TÌM KIẾM GẦN ĐÂY</Text>
+              {recentSearches.length > 0 && (
+                <Pressable onPress={() => setRecentSearches([])} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Trash2 size={11} color="#ef4444" />
+                  <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#ef4444' }}>Xóa hết</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {recentSearches.length === 0 ? (
+              <Text style={{ fontSize: 11, color: theme.textMuted, fontStyle: 'italic', marginBottom: 16 }}>Lịch sử trống</Text>
+            ) : (
+              <View style={{ gap: 8, marginBottom: 16 }}>
+                {recentSearches.map((hist, idx) => (
+                  <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Pressable
+                      onPress={() => {
+                        setSearchQuery(hist);
+                      }}
+                      style={{ flex: 1 }}
+                    >
+                      <Text style={{ fontSize: 12, color: theme.textPrimary, fontWeight: '600' }}>🎒 {hist}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setRecentSearches(prev => prev.filter((_, i) => i !== idx))}
+                      style={{ padding: 4 }}
+                    >
+                      <X size={13} color={theme.textMuted} />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <Text style={{ fontSize: 10, fontWeight: '900', color: theme.textSecondary, marginBottom: 8 }}>ĐỀ XUẤT CHO BẠN</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+              {[
+                'Bản đồ 3D',
+                'Vé của tôi',
+                'Quét AR',
+                'Bảng tin',
+                'Khách sạn',
+              ].map((pop, idx) => (
+                <Pressable
+                  key={idx}
+                  onPress={() => {
+                    setSearchQuery(pop);
+                  }}
+                  style={{ backgroundColor: theme.searchBg, borderWidth: 1, borderColor: theme.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 }}
+                >
+                  <Text style={{ fontSize: 10.5, fontWeight: '800', color: theme.textPrimary }}>#{pop}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable
+              onPress={() => setSearchFocused(false)}
+              style={{ alignSelf: 'center', paddingVertical: 6, marginTop: 4 }}
+            >
+              <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#3b82f6' }}>Đóng bảng gợi ý</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Structured Search Results Dropdown */}
+        {searchQuery.trim().length > 0 && (
+          <View style={[styles.searchDropdown, { backgroundColor: theme.card, borderColor: theme.border, maxHeight: 380 }]}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Category: App Features / Tabs & Booking Utilities */}
+              {globalSearchResults.features.length > 0 && (
+                <View style={{ borderBottomWidth: 1, borderBottomColor: theme.border }}>
+                  <Text style={{ fontSize: 9, fontWeight: '900', color: theme.textMuted, marginLeft: 14, marginTop: 8 }}>TÍNH NĂNG & DỊCH VỤ</Text>
+                  {globalSearchResults.features.map((res) => {
+                    const Icon = res.Icon;
+                    return (
+                      <Pressable
+                        key={res.key}
+                        onPress={() => {
+                          if (searchQuery.trim() && !recentSearches.includes(searchQuery.trim())) {
+                            setRecentSearches(prev => [searchQuery.trim(), ...prev].slice(0, 5));
+                          }
+                          setSearchQuery('');
+                          setSearchFocused(false);
+                          res.action();
+                        }}
+                        style={styles.searchResultItem}
+                      >
+                        <LinearGradient
+                          colors={res.colors}
+                          style={styles.searchResultIconWrap}
+                        >
+                          <Icon size={14} color="#fff" />
+                        </LinearGradient>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={[styles.searchResultLabel, { color: theme.textPrimary }]}>{res.label}</Text>
+                          <Text style={[styles.searchResultDesc, { color: theme.textSecondary }]} numberOfLines={1}>{res.description}</Text>
+                        </View>
+                        <ChevronRight size={14} color={theme.textMuted} />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+
+              {!hasGlobalResults && (
+                <View style={{ padding: 16, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600', textAlign: 'center' }}>
+                    Không tìm thấy tính năng tương ứng.
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        )}
+      </View>
 
 
 
@@ -723,15 +723,15 @@ export function HomeScreen({
           <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>Trải nghiệm tham quan thực tế ảo sinh động tại chỗ</Text>
         </View>
       </View>
-      
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.trendingScroll}
       >
         {vrHighlights.map((item) => (
-          <Pressable 
-            key={item.id} 
+          <Pressable
+            key={item.id}
             style={[styles.vrCard, { borderColor: theme.border }]}
             onPress={() => onNavigateToTour && onNavigateToTour(item.id, 0)}
           >
@@ -854,7 +854,7 @@ export function ExploreScreen({
   // Detail & Booking Modal State
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  
+
   // Booking Form State
   const [bookingDate, setBookingDate] = useState('2026-06-20');
   const [quantity, setQuantity] = useState(1);
@@ -1032,9 +1032,9 @@ export function ExploreScreen({
                 </Pressable>
               )}
             </View>
-            <Pressable 
+            <Pressable
               style={[
-                styles.exploreFilterBtn, 
+                styles.exploreFilterBtn,
                 { backgroundColor: theme.cardGlass, borderColor: theme.border },
                 hasActiveFilters && { borderColor: '#3b82f6', borderWidth: 1.5 }
               ]}
@@ -1103,10 +1103,10 @@ export function ExploreScreen({
           </View>
         ) : (
           filteredItems.map((item) => (
-            <Pressable 
-              key={item.id} 
+            <Pressable
+              key={item.id}
               style={({ pressed }) => [
-                styles.exploreListItem, 
+                styles.exploreListItem,
                 { backgroundColor: theme.card, borderColor: theme.border },
                 pressed && { opacity: 0.95, transform: [{ scale: 0.985 }] }
               ]}
@@ -1147,7 +1147,7 @@ export function ExploreScreen({
                     <Text style={[styles.priceValText, { color: '#3b82f6' }]}>{item.price}</Text>
                   </View>
 
-                  <Pressable 
+                  <Pressable
                     style={styles.bookNowBtnContainer}
                     onPress={() => handleOpenItemDetail(item)}
                   >
@@ -1306,14 +1306,14 @@ export function ExploreScreen({
                   <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: 6, textAlign: 'center', lineHeight: 18 }}>
                     Cảm ơn bạn đã lựa chọn Vivu360. Dịch vụ của bạn đã được khởi tạo và gửi trực tiếp vào danh sách vé điện tử.
                   </Text>
-                  
+
                   {/* Generated Ticket Info card */}
                   <View style={[styles.successTicketCard, { backgroundColor: theme.searchBg, borderColor: theme.border, width: '100%', marginTop: 24 }]}>
                     <Text style={{ fontSize: 9, fontWeight: '800', color: theme.textMuted }}>MÃ ĐẶT CHỖ</Text>
                     <Text style={{ fontSize: 18, fontWeight: '900', color: '#3b82f6', marginTop: 2 }}>{generatedTicketCode}</Text>
-                    
+
                     <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 12 }} />
-                    
+
                     <Text style={{ fontSize: 13, fontWeight: '800', color: theme.textPrimary }}>{selectedItem.title}</Text>
                     <Text style={{ fontSize: 11, color: theme.textSecondary, marginTop: 4 }}>📍 {selectedItem.location}</Text>
                     <Text style={{ fontSize: 11, color: theme.textSecondary, marginTop: 4 }}>📅 Khởi hành: {bookingDate} - {quantity} khách</Text>
@@ -1376,7 +1376,7 @@ export function ExploreScreen({
                     {/* Booking Form Card */}
                     <View style={[styles.successTicketCard, { backgroundColor: theme.statusBg, borderColor: theme.border, padding: 16, borderRadius: 16 }]}>
                       <Text style={{ fontSize: 13, fontWeight: '900', color: theme.textPrimary, marginBottom: 14 }}>Thông tin đặt dịch vụ</Text>
-                      
+
                       {/* Name Input */}
                       <Text style={[styles.inputLabel, { color: theme.textSecondary, marginBottom: 6 }]}>TÊN HÀNH KHÁCH / LIÊN HỆ</Text>
                       <TextInput
@@ -1413,7 +1413,7 @@ export function ExploreScreen({
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.inputLabel, { color: theme.textSecondary, marginBottom: 6 }]}>SỐ LƯỢNG</Text>
                           <View style={{ flexDirection: 'row', height: 42, borderWidth: 1, borderColor: theme.border, borderRadius: 12, backgroundColor: theme.card, overflow: 'hidden' }}>
-                            <Pressable 
+                            <Pressable
                               onPress={() => setQuantity(prev => Math.max(1, prev - 1))}
                               style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}
                             >
@@ -1422,7 +1422,7 @@ export function ExploreScreen({
                             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                               <Text style={{ color: theme.textPrimary, fontSize: 13, fontWeight: '800' }}>{quantity}</Text>
                             </View>
-                            <Pressable 
+                            <Pressable
                               onPress={() => setQuantity(prev => prev + 1)}
                               style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}
                             >
@@ -1506,9 +1506,9 @@ export function ExploreScreen({
                     </View>
 
                     {/* Submit Action */}
-                    <Pressable 
+                    <Pressable
                       style={({ pressed }) => [
-                        styles.enterVRBtn, 
+                        styles.enterVRBtn,
                         { marginTop: 20 },
                         pressed && { opacity: 0.8 }
                       ]}
@@ -1534,12 +1534,12 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
   const [flashOn, setFlashOn] = useState(false);
   const [cameraFacing, setCameraFacing] = useState('back');
   const [isCameraTransitioning, setIsCameraTransitioning] = useState(false);
-  
+
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [scanStepText, setScanStepText] = useState('[AR] Hệ thống sẵn sàng');
   const [scanResult, setScanResult] = useState(null);
-  
+
   // Rotating 3D Object Simulator Modal state
   const [showObject3DModal, setShowObject3DModal] = useState(false);
   const [objectRotation, setObjectRotation] = useState(0);
@@ -1624,7 +1624,7 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
         clearInterval(interval);
         setIsScanning(false);
         setScanProgress(100);
-        
+
         if (scanMode === 'scene') {
           setScanResult({
             title: 'Vịnh Hạ Long - Động Thiên Cung',
@@ -1667,7 +1667,7 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
     { x: '80%', y: '65%' }, { x: '10%', y: '75%' }, { x: '50%', y: '30%' }
   ];
 
-  const cameraBgImage = scanMode === 'scene' 
+  const cameraBgImage = scanMode === 'scene'
     ? 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=800&q=80'
     : 'https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?auto=format&fit=crop&w=800&q=80';
 
@@ -1678,7 +1678,7 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
 
       {/* SCAN MODES SEGMENTED TABS */}
       <View style={[styles.arModeTabRow, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
-        <Pressable 
+        <Pressable
           style={[styles.arModeTabBtn, scanMode === 'scene' && styles.arModeTabBtnActive]}
           onPress={() => handleSelectMode('scene')}
         >
@@ -1686,7 +1686,7 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
           <Text style={[styles.arModeTabText, { color: scanMode === 'scene' ? '#fff' : theme.textSecondary }]}>Địa danh</Text>
         </Pressable>
 
-        <Pressable 
+        <Pressable
           style={[styles.arModeTabBtn, scanMode === 'object' && styles.arModeTabBtnActive]}
           onPress={() => handleSelectMode('object')}
         >
@@ -1702,12 +1702,12 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
           source={{ uri: cameraBgImage }}
           blurRadius={isCameraTransitioning ? 15 : 0}
           style={[
-            styles.viewfinderBg, 
+            styles.viewfinderBg,
             cameraFacing === 'front' && { transform: [{ scaleX: -1 }] }
           ]}
           resizeMode="cover"
         />
-        
+
         {/* HUD grid lines */}
         <View style={styles.gridOverlay} />
 
@@ -1724,13 +1724,13 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
               // Show point gradually based on progress
               const isPointVisible = !isScanning || (idx / MOCK_POINTS_CLOUD.length) < (scanProgress / 100);
               return (
-                <View 
-                  key={idx} 
+                <View
+                  key={idx}
                   style={[
-                    styles.lidarMeshDot, 
+                    styles.lidarMeshDot,
                     { left: pt.x, top: pt.y, opacity: isPointVisible ? (isScanning ? 0.9 : 0.45) : 0 },
                     isScanning && { transform: [{ scale: 1.3 }] }
-                  ]} 
+                  ]}
                 />
               );
             })}
@@ -1754,15 +1754,15 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
 
         {/* HUD UTILITIES OVERLAYS */}
         <View style={styles.hudTopLeftUtils}>
-          <Pressable 
-            style={[styles.hudUtilBtn, flashOn && { backgroundColor: '#facc15' }]} 
+          <Pressable
+            style={[styles.hudUtilBtn, flashOn && { backgroundColor: '#facc15' }]}
             onPress={handleToggleFlash}
           >
             <Zap size={14} color={flashOn ? '#000' : '#fff'} />
           </Pressable>
 
-          <Pressable 
-            style={styles.hudUtilBtn} 
+          <Pressable
+            style={styles.hudUtilBtn}
             onPress={handleFlipCamera}
           >
             <RefreshCw size={14} color="#fff" />
@@ -1776,7 +1776,7 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
 
         <View style={styles.hudBottomLeft}>
           <Text style={styles.hudSubText}>GPS: {gpsCoords.lat.toFixed(6)} N, {gpsCoords.lng.toFixed(6)} E</Text>
-          <Text style={styles.hudSubText}>ALT: 124m | TILT: {isScanning ? (12.5 + Math.sin(scanProgress)*3).toFixed(1) : 12.5}°</Text>
+          <Text style={styles.hudSubText}>ALT: 124m | TILT: {isScanning ? (12.5 + Math.sin(scanProgress) * 3).toFixed(1) : 12.5}°</Text>
           <Text style={styles.hudSubText}>HEADING: 184° S | FPS: 60</Text>
         </View>
 
@@ -1847,7 +1847,7 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
             ))}
 
             {scanResult.type === 'scene' && (
-              <Pressable 
+              <Pressable
                 style={styles.enterVRBtn}
                 onPress={() => onNavigateToTour && onNavigateToTour(scanResult.tourId, scanResult.spotIdx)}
               >
@@ -1857,7 +1857,7 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
             )}
 
             {scanResult.type === 'object' && (
-              <Pressable 
+              <Pressable
                 style={styles.enterVRBtn}
                 onPress={() => setShowObject3DModal(true)}
               >
@@ -1887,10 +1887,10 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
 
             {/* Simulated 3D Renderer area */}
             <View style={{ height: 240, backgroundColor: isDarkMode ? '#09090b' : '#f8fafc', borderRadius: 16, borderStyle: 'dashed', borderWidth: 1.5, borderColor: '#3b82f6', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-              
+
               {/* Circular rotation dial bg */}
               <View style={{ width: 180, height: 180, borderRadius: 90, borderWidth: 1, borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)', position: 'absolute' }} />
-              
+
               {/* Rotating Wireframe/Graphic Container */}
               <View style={{ transform: [{ rotate: `${objectRotation}deg` }], alignItems: 'center', justifyContent: 'center' }}>
                 {/* Visual mesh design: a double rock shape or glowing polygon */}
@@ -1923,7 +1923,7 @@ export function CameraScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTou
               </Text>
             </View>
 
-            <Pressable 
+            <Pressable
               style={[styles.enterVRBtn, { marginTop: 24 }]}
               onPress={() => setShowObject3DModal(false)}
             >
@@ -1976,7 +1976,7 @@ export function ProfileScreen({ isDarkMode, setIsDarkMode, theme, userInfo, setU
               >
                 <View style={[styles.profileAvatarInner, { backgroundColor: theme.card }]}>
                   <Image
-                    source={{ uri: userInfo.avatar }}
+                    source={{ uri: userInfo?.avatar || 'https://i.pravatar.cc/150?img=68' }}
                     style={styles.profileAvatarImage}
                   />
                 </View>
@@ -1987,7 +1987,7 @@ export function ProfileScreen({ isDarkMode, setIsDarkMode, theme, userInfo, setU
             <View style={styles.profileInfoColumn}>
               <Text style={[styles.profileName, { color: theme.textPrimary }]} numberOfLines={1}>{userInfo.name}</Text>
               <Text style={[styles.profileEmail, { color: theme.textSecondary }]} numberOfLines={1}>{userInfo.email}</Text>
-              
+
               <View style={[styles.rankBadgePill, { backgroundColor: isDarkMode ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.08)' }]}>
                 <Award size={10} color="#3b82f6" fill="#3b82f6" style={{ marginRight: 2 }} />
                 <Text style={[styles.rankBadgeText, { color: '#3b82f6' }]}>{rank.rankName}</Text>
@@ -1996,9 +1996,9 @@ export function ProfileScreen({ isDarkMode, setIsDarkMode, theme, userInfo, setU
           </View>
 
           {/* Explorer Level progress bar directly integrated */}
-          <Pressable 
+          <Pressable
             style={({ pressed }) => [
-              styles.levelProgressCardNew, 
+              styles.levelProgressCardNew,
               { backgroundColor: theme.statusBg, borderColor: theme.border },
               pressed && { opacity: 0.85 }
             ]}
@@ -2063,9 +2063,9 @@ export function ProfileScreen({ isDarkMode, setIsDarkMode, theme, userInfo, setU
 
       {/* UPCOMING TRIPS / BOOKED ITEMS LINK CARD */}
       <Text style={[styles.profileSecTitle, { color: theme.textPrimary }]}>Hành trình của tôi</Text>
-      <Pressable 
+      <Pressable
         style={({ pressed }) => [
-          styles.profileActionItem, 
+          styles.profileActionItem,
           { backgroundColor: theme.card, borderColor: theme.border, marginBottom: 12, paddingVertical: 14 },
           pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }
         ]}
@@ -2086,7 +2086,7 @@ export function ProfileScreen({ isDarkMode, setIsDarkMode, theme, userInfo, setU
       {/* PROFILE SETTINGS MENU GROUP CARD */}
       <Text style={[styles.profileSecTitle, { color: theme.textPrimary }]}>Cài đặt tài khoản</Text>
       <View style={[styles.settingsGroupCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        
+
         {/* LIGHT/DARK THEME TOGGLE SWITCH */}
         <Pressable
           style={styles.menuRowItem}
@@ -2147,10 +2147,10 @@ export function ProfileScreen({ isDarkMode, setIsDarkMode, theme, userInfo, setU
       {/* LOGOUT BUTTON - RENDERED AS SEPARATE PREMIUM ROW CARD */}
       <Pressable
         style={({ pressed }) => [
-          styles.logoutCardBtn, 
-          { 
-            backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.05)', 
-            borderColor: 'rgba(239, 68, 68, 0.2)' 
+          styles.logoutCardBtn,
+          {
+            backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.05)',
+            borderColor: 'rgba(239, 68, 68, 0.2)'
           },
           pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }
         ]}
@@ -2403,6 +2403,94 @@ export const styles = StyleSheet.create({
   },
   seeAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   seeAllText: { color: '#3b82f6', fontWeight: '700', fontSize: 12 },
+
+  // Unified Travel Widget Card Styles
+  travelWidgetCard: {
+    marginHorizontal: 16,
+    marginVertical: 12,
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1.2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  weatherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  weatherIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weatherTitleText: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  liveGreenDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#22c55e',
+  },
+  weatherSubText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  widgetDivider: {
+    height: 1,
+    marginVertical: 10,
+  },
+  voucherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  voucherTagGradient: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  voucherTagText: {
+    color: '#ffffff',
+    fontSize: 9.5,
+    fontWeight: '900',
+    letterSpacing: 0.2,
+  },
+  voucherMainText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  voucherCodeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  voucherActionBtn: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  voucherActionBtnGradient: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voucherActionBtnText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
 
   trendingScroll: { paddingLeft: 16, gap: 14, paddingVertical: 12 },
   destCard: {
@@ -2919,7 +3007,7 @@ export const styles = StyleSheet.create({
   mapPinWrapper: { position: 'absolute', alignItems: 'center' },
   pinCircleGlowContainer: { alignItems: 'center', justifyContent: 'center' },
   pinPulseCircle: { position: 'absolute', width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(59, 130, 246, 0.25)' },
-  pinPulseCircleActive:  { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(59, 130, 246, 0.45)' },
+  pinPulseCircleActive: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(59, 130, 246, 0.45)' },
   pinDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#4b5563', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#fff' },
   pinDotActive: { backgroundColor: '#3b82f6' },
   pinLabelCard: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3, marginTop: 4 },

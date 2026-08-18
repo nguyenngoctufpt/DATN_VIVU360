@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   StyleSheet,
   Pressable,
   Alert,
+  Image,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -20,6 +22,11 @@ import {
   Plane,
   Bed,
   ChevronRight,
+  Sparkles,
+  CreditCard,
+  Eye,
+  X,
+  FileCheck,
 } from 'lucide-react-native';
 
 export function GroupFundTab({
@@ -32,11 +39,28 @@ export function GroupFundTab({
   ownerId,
   currentUser,
 }) {
+  const [previewBillData, setPreviewBillData] = useState(null);
+  // Kiểm tra quyền Trưởng nhóm (Leader)
+  const currentUserId = ownerId || (currentUser && currentUser.id) || (currentUser && currentUser.firebaseUid) || (currentUser && currentUser.email) || (currentUser && currentUser.name);
+  const groupLeaderId = (selectedGroup && selectedGroup.leaderId) || (selectedGroup && selectedGroup.creatorId) || (selectedGroup && selectedGroup.ownerId);
+
+  const isLeader = Boolean(
+    !selectedGroup || 
+    !groupLeaderId ||
+    String(currentUserId) === String(groupLeaderId) ||
+    String(ownerId) === String(groupLeaderId)
+  );
+
   // Lấy và định dạng động dữ liệu quỹ thực tế từ selectedGroup
-  const contributions = (selectedGroup?.fund?.contributions || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-  const expenses = (selectedGroup?.fund?.expenses || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const fundData = (selectedGroup && selectedGroup.fund) || {};
+  const memberList = (selectedGroup && selectedGroup.membersList) || [];
+  const contributionsList = Array.isArray(fundData.contributions) ? fundData.contributions : [];
+  const expensesList = Array.isArray(fundData.expenses) ? fundData.expenses : [];
+
+  const contributions = contributionsList.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const expenses = expensesList.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   const balance = contributions - expenses;
-  const goal = Number(selectedGroup?.fund?.goal) || 15000000; // Mặc định 15 triệu nếu chưa cài mục tiêu
+  const goal = Number(fundData.goal) || 15000000; // Mặc định 15 triệu nếu chưa cài mục tiêu
 
   const balanceText = balance >= 1000 ? `${(balance / 1000).toLocaleString('vi-VN')}k` : `${balance} đ`;
   const totalCollect = `${contributions.toLocaleString('vi-VN')} đ`;
@@ -44,12 +68,12 @@ export function GroupFundTab({
   const progress = goal > 0 ? Math.min(balance / goal, 1) : 0;
 
   // Tính tình trạng nộp quỹ định mức cho từng thành viên
-  const quota = selectedGroup?.fund?.goal && selectedGroup?.membersList?.length
-    ? Math.round(selectedGroup.fund.goal / selectedGroup.membersList.length)
+  const quota = fundData.goal && memberList.length
+    ? Math.round(fundData.goal / memberList.length)
     : 3000000; // Mặc định 3 triệu/người
 
-  const membersStatus = (selectedGroup?.membersList || []).map(m => {
-    const totalContributed = (selectedGroup?.fund?.contributions || [])
+  const membersStatus = memberList.map(m => {
+    const totalContributed = contributionsList
       .filter(c => String(c.memberId) === String(m.id))
       .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
       
@@ -68,12 +92,13 @@ export function GroupFundTab({
       code,
       status: isDone ? 'done' : 'debt',
       label: isDone ? 'Đã xong' : `Nợ ${(debtAmount / 1000).toLocaleString('vi-VN')}k`,
+      contributed: totalContributed,
     };
   });
 
   // Gộp các giao dịch đóng góp và chi tiêu thật, sắp xếp theo thời gian mới nhất
   const transactions = [];
-  (selectedGroup?.fund?.contributions || []).forEach(item => {
+  contributionsList.forEach(item => {
     transactions.push({
       id: item.id || `c-${Date.now()}-${Math.random()}`,
       title: item.note || 'Đóng góp quỹ',
@@ -82,11 +107,14 @@ export function GroupFundTab({
       amount: `+ ${(Number(item.amount) || 0).toLocaleString('vi-VN')} đ`,
       type: 'collect',
       color: '#10b981', // xanh lá
+      stk: item.stk || null,
+      billImage: item.billImage || null,
+      isAiVerified: true,
       createdAt: item.createdAt || Date.now()
     });
   });
   
-  (selectedGroup?.fund?.expenses || []).forEach(item => {
+  expensesList.forEach(item => {
     transactions.push({
       id: item.id || `e-${Date.now()}-${Math.random()}`,
       title: item.title || 'Chi tiêu quỹ',
@@ -95,6 +123,8 @@ export function GroupFundTab({
       amount: `- ${(Number(item.amount) || 0).toLocaleString('vi-VN')} đ`,
       type: 'expense',
       color: '#ef4444', // đỏ
+      stk: item.stk || null,
+      billImage: item.billImage || null,
       createdAt: item.createdAt || Date.now()
     });
   });
@@ -105,12 +135,15 @@ export function GroupFundTab({
   const displayTransactions = hasActualData ? transactions : [
     {
       id: 't-mock-1',
-      title: 'Vé máy bay khứ hồi (6 ng)',
+      title: 'Hải nộp quỹ chuyến đi (Chuyển Trưởng nhóm)',
       date: '24/08',
-      meta: 'Alice chi từ Quỹ chung',
-      amount: '- 6.000.000 đ',
-      type: 'flight',
-      color: '#ef4444',
+      meta: 'Hải nộp quỹ · Ghi chú: CK cho B (STK: 999888777)',
+      amount: '+ 3.000.000 đ',
+      type: 'collect',
+      color: '#10b981',
+      stk: 'STK người B: 999888777 (Vietcombank)',
+      billImage: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600',
+      isAiVerified: true,
       createdAt: Date.now() - 100000
     },
     {
@@ -122,15 +155,18 @@ export function GroupFundTab({
       type: 'hotel',
       color: '#ef4444',
       repayLabel: 'CẦN HOÀN TRẢ CHO BÌNH ĐẶNG',
+      stk: 'STK Bình Đặng: 0123456789 (MBBank)',
+      billImage: 'https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=600',
+      isAiVerified: true,
       createdAt: Date.now() - 200000
     }
   ];
 
   const displayMembers = membersStatus.length > 0 ? membersStatus : [
-    { id: 'm-mock-1', name: 'Alice', code: 'AL', status: 'done', label: 'Đã xong' },
-    { id: 'm-mock-2', name: 'Bình Đặng', code: 'BD', status: 'done', label: 'Đã xong' },
-    { id: 'm-mock-3', name: 'David', code: 'DA', status: 'debt', label: 'Nợ 3.000k' },
-    { id: 'm-mock-4', name: 'Châu', code: 'CH', status: 'debt', label: 'Nợ 3.000k' },
+    { id: 'm-mock-1', name: 'Alice', code: 'AL', status: 'done', label: 'Đã xong', contributed: 3000000 },
+    { id: 'm-mock-2', name: 'Bình Đặng', code: 'BD', status: 'done', label: 'Đã xong', contributed: 3000000 },
+    { id: 'm-mock-3', name: 'David', code: 'DA', status: 'debt', label: 'Nợ 3.000k', contributed: 0 },
+    { id: 'm-mock-4', name: 'Châu', code: 'CH', status: 'debt', label: 'Nợ 3.000k', contributed: 0 },
   ];
 
   const getTxIcon = (type) => {
@@ -235,44 +271,72 @@ export function GroupFundTab({
                 <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Tình trạng nộp quỹ</Text>
                 <Text style={[styles.sectionSubtitle, { color: theme.textMuted }]}>Mức thu: {quota.toLocaleString('vi-VN')} đ/người</Text>
               </View>
-              <Pressable
-                style={[styles.remindBtn, { backgroundColor: 'rgba(249, 115, 22, 0.08)' }]}
-                onPress={() => Alert.alert('Nhắc nợ', 'Đã gửi tin nhắn nhắc nợ đến các thành viên chưa nộp quỹ.')}
-              >
-                <Bell size={13} color="#f97316" />
-                <Text style={styles.remindBtnText}>Nhắc nợ</Text>
-              </Pressable>
+              {isLeader && (
+                <Pressable
+                  style={[styles.remindBtn, { backgroundColor: 'rgba(249, 115, 22, 0.08)' }]}
+                  onPress={() => Alert.alert('Nhắc nợ', 'Đã gửi tin nhắn nhắc nợ đến các thành viên chưa nộp quỹ.')}
+                >
+                  <Bell size={13} color="#f97316" />
+                  <Text style={styles.remindBtnText}>Nhắc nợ</Text>
+                </Pressable>
+              )}
             </View>
 
-            {/* List Members Grid */}
-            <View style={styles.membersGrid}>
-              {displayMembers.map((m) => {
+            {/* Danh sách Tình trạng nộp quỹ dạng list */}
+            <View style={styles.membersListContainer}>
+              {displayMembers.map((m, index) => {
                 const isDone = m.status === 'done';
+                const isLast = index === displayMembers.length - 1;
+                const contributedText = m.contributed !== undefined 
+                  ? `${m.contributed.toLocaleString('vi-VN')} đ` 
+                  : (isDone ? `${quota.toLocaleString('vi-VN')} đ` : '0 đ');
+
                 return (
-                  <View key={m.id} style={[styles.memberItemCard, { backgroundColor: theme.searchBg, borderColor: theme.border }]}>
-                    <View style={styles.avatarWrapper}>
-                      <LinearGradient
-                        colors={isDone ? ['#10b981', '#059669'] : ['#f43f5e', '#e11d48']}
-                        style={styles.memberAvatarFrame}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                      >
-                        <View style={[styles.memberAvatarInner, { backgroundColor: theme.card }]}>
-                          <Text style={[styles.memberAvatarText, { color: isDone ? '#10b981' : '#f43f5e' }]}>
-                            {m.code}
-                          </Text>
+                  <View 
+                    key={m.id} 
+                    style={[
+                      styles.memberRow, 
+                      { borderBottomColor: theme.border },
+                      isLast && { borderBottomWidth: 0 }
+                    ]}
+                  >
+                    <View style={styles.memberLeftInfo}>
+                      <View style={styles.avatarWrapper}>
+                        <LinearGradient
+                          colors={isDone ? ['#10b981', '#059669'] : ['#f43f5e', '#e11d48']}
+                          style={styles.memberAvatarFrame}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                        >
+                          <View style={[styles.memberAvatarInner, { backgroundColor: theme.card }]}>
+                            <Text style={[styles.memberAvatarText, { color: isDone ? '#10b981' : '#f43f5e' }]}>
+                              {m.code}
+                            </Text>
+                          </View>
+                        </LinearGradient>
+                        <View style={[styles.statusDotBg, { backgroundColor: isDone ? '#10b981' : '#ef4444' }]}>
+                          {isDone ? (
+                            <CheckCircle size={8} color="#fff" />
+                          ) : (
+                            <AlertCircle size={8} color="#fff" />
+                          )}
                         </View>
-                      </LinearGradient>
-                      <View style={[styles.statusDotBg, { backgroundColor: isDone ? '#10b981' : '#ef4444' }]}>
-                        {isDone ? (
-                          <CheckCircle size={8} color="#fff" />
-                        ) : (
-                          <AlertCircle size={8} color="#fff" />
-                        )}
+                      </View>
+
+                      <View style={styles.memberTextContainer}>
+                        <Text numberOfLines={1} style={[styles.memberName, { color: theme.textPrimary }]}>
+                          {m.name}
+                        </Text>
+                        <Text style={[styles.memberSubtext, { color: theme.textSecondary }]}>
+                          Đã nộp: {contributedText}
+                        </Text>
                       </View>
                     </View>
-                    <Text numberOfLines={1} style={[styles.memberName, { color: theme.textPrimary }]}>{m.name}</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: isDone ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)' }]}>
+
+                    <View style={[
+                      styles.statusBadge, 
+                      { backgroundColor: isDone ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)' }
+                    ]}>
                       <Text style={[styles.statusBadgeText, { color: isDone ? '#10b981' : '#ef4444' }]}>
                         {m.label}
                       </Text>
@@ -303,10 +367,26 @@ export function GroupFundTab({
                   {getTxIcon(tx.type)}
                   
                   <View style={styles.txInfo}>
-                    <Text style={[styles.txTitle, { color: theme.textPrimary }]}>{tx.title}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.txTitle, { color: theme.textPrimary, flex: 1 }]}>{tx.title}</Text>
+                      {tx.isAiVerified && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(139, 92, 246, 0.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                          <Sparkles size={10} color="#8b5cf6" />
+                          <Text style={{ fontSize: 9, fontWeight: '850', color: '#8b5cf6' }}>AI Verified</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={[styles.txMeta, { color: theme.textSecondary }]}>
                       {tx.date} · {tx.meta}
                     </Text>
+
+                    {tx.stk && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                        <CreditCard size={11} color="#3b82f6" />
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#3b82f6' }}>{tx.stk}</Text>
+                      </View>
+                    )}
+
                     {tx.repayLabel && (
                       <View style={[styles.repayBadge, { backgroundColor: 'rgba(249, 115, 22, 0.1)' }]}>
                         <Text style={styles.repayBadgeText}>🔄 {tx.repayLabel}</Text>
@@ -314,7 +394,22 @@ export function GroupFundTab({
                     )}
                   </View>
 
-                  <Text style={[styles.txAmount, { color: tx.color }]}>{tx.amount}</Text>
+                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                    <Text style={[styles.txAmount, { color: tx.color }]}>{tx.amount}</Text>
+
+                    {/* Hình ảnh bill hiện diện */}
+                    {tx.billImage && (
+                      <Pressable 
+                        style={styles.billThumbnailBox}
+                        onPress={() => setPreviewBillData(tx)}
+                      >
+                        <Image source={{ uri: tx.billImage }} style={styles.billThumbnailImg} />
+                        <View style={styles.billOverlayBadge}>
+                          <Eye size={10} color="#fff" />
+                        </View>
+                      </Pressable>
+                    )}
+                  </View>
                 </View>
               ))}
             </View>
@@ -323,6 +418,38 @@ export function GroupFundTab({
         </View>
 
       </View>
+
+      {/* MODAL XEM CHI TIẾT MINH CHỨNG BILL CHUYỂN KHOẢN */}
+      <Modal animationType="fade" transparent visible={Boolean(previewBillData)} onRequestClose={() => setPreviewBillData(null)}>
+        <View style={styles.billModalBackdrop}>
+          <View style={[styles.billModalCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.billModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <FileCheck size={18} color="#10b981" />
+                <Text style={[styles.billModalTitle, { color: theme.textPrimary }]}>Minh chứng chuyển khoản</Text>
+              </View>
+              <Pressable style={styles.closeModalBtn} onPress={() => setPreviewBillData(null)}>
+                <X size={20} color={theme.textPrimary} />
+              </Pressable>
+            </View>
+
+            {previewBillData && (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, alignItems: 'center' }}>
+                <Image source={{ uri: previewBillData.billImage }} style={styles.fullBillImage} resizeMode="contain" />
+                
+                <View style={styles.billMetaBox}>
+                  <Text style={[styles.billMetaTitle, { color: theme.textPrimary }]}>{previewBillData.title}</Text>
+                  <Text style={[styles.billMetaAmount, { color: previewBillData.color }]}>{previewBillData.amount}</Text>
+                  <Text style={[styles.billMetaText, { color: theme.textSecondary }]}>Thời gian: {previewBillData.date}</Text>
+                  {previewBillData.stk && (
+                    <Text style={[styles.billMetaStk, { color: '#3b82f6' }]}>💳 {previewBillData.stk}</Text>
+                  )}
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -476,22 +603,24 @@ const styles = StyleSheet.create({
     fontWeight: '850',
     color: '#f97316',
   },
-  membersGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  membersListContainer: {
+    marginTop: 2,
   },
-  memberItemCard: {
-    flex: 1,
-    minWidth: '45%',
-    borderRadius: 12,
-    borderWidth: 0.5,
-    padding: 10,
+  memberRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 0.5,
+  },
+  memberLeftInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    paddingRight: 10,
   },
   avatarWrapper: {
     position: 'relative',
-    marginBottom: 8,
   },
   memberAvatarFrame: {
     width: 38,
@@ -524,20 +653,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  memberTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
   memberName: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
-    textAlign: 'center',
+  },
+  memberSubtext: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   statusBadgeText: {
-    fontSize: 9,
-    fontWeight: '900',
+    fontSize: 11,
+    fontWeight: '850',
   },
   filterBtn: {
     flexDirection: 'row',
@@ -595,5 +731,85 @@ const styles = StyleSheet.create({
   txAmount: {
     fontSize: 13,
     fontWeight: '950',
+  },
+  billThumbnailBox: {
+    position: 'relative',
+    width: 42,
+    height: 30,
+    borderRadius: 6,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: 'rgba(0,0,0,0.1)',
+    marginTop: 2,
+  },
+  billThumbnailImg: {
+    width: '100%',
+    height: '100%',
+  },
+  billOverlayBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 3,
+    paddingVertical: 2,
+    borderTopLeftRadius: 4,
+  },
+  billModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  billModalCard: {
+    width: '100%',
+    maxHeight: '85%',
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  billModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(0,0,0,0.08)',
+  },
+  billModalTitle: {
+    fontSize: 14.5,
+    fontWeight: '900',
+  },
+  fullBillImage: {
+    width: '100%',
+    height: 260,
+    borderRadius: 14,
+  },
+  billMetaBox: {
+    width: '100%',
+    marginTop: 14,
+    alignItems: 'center',
+  },
+  billMetaTitle: {
+    fontSize: 15,
+    fontWeight: '850',
+    textAlign: 'center',
+  },
+  billMetaAmount: {
+    fontSize: 18,
+    fontWeight: '950',
+    marginTop: 4,
+  },
+  billMetaText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  billMetaStk: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    marginTop: 6,
   },
 });

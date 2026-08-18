@@ -7,7 +7,7 @@ const requireUser = require("../middleware/requireUser");
 const { getFriendIds, canViewUser } = require("../services/friendshipService");
 
 const router = express.Router();
-const editableFields = ["content", "images", "location", "category"];
+const editableFields = ["content", "images", "location", "category", "privacy"];
 router.use(requireUser);
 router.param("id", (req, res, next, id) => {
   if (!mongoose.isValidObjectId(id)) return res.status(404).json({ success: false, message: "Khong tim thay bai viet" });
@@ -39,24 +39,42 @@ router.get("/feed", async (req, res, next) => {
   try {
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
-    const authorIds = [req.user.firebaseUid, ...await getFriendIds(req.user.firebaseUid)];
-    const filter = { authorId: { $in: authorIds } };
+    const viewerId = req.user.firebaseUid;
+
+
+
+    // Stream all posts except other users' private posts
+    const filter = {
+      $or: [
+        { authorId: viewerId },
+        { privacy: { $ne: "private" } },
+      ],
+    };
+
     const [posts, total] = await Promise.all([
       Post.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       Post.countDocuments(filter),
     ]);
-    res.json({ success: true, data: await attachAuthors(posts, req.user.firebaseUid), pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+    res.json({ success: true, data: await attachAuthors(posts, viewerId), pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
   } catch (error) { next(error); }
 });
 
 router.get("/user/:userId", async (req, res, next) => {
   try {
+    const viewerId = req.user.firebaseUid;
     const ownerId = String(req.params.userId);
-    if (!await canViewUser(req.user.firebaseUid, ownerId)) {
-      return res.status(403).json({ success: false, message: "Chi ban be moi xem duoc bai viet cua nhau" });
-    }
-    const posts = await Post.find({ authorId: ownerId }).sort({ createdAt: -1 }).limit(100).lean();
-    res.json({ success: true, data: await attachAuthors(posts, req.user.firebaseUid) });
+    const isMe = viewerId === ownerId;
+    const isFriend = !isMe && await canViewUser(viewerId, ownerId);
+
+    let allowedPrivacy = ["public"];
+    if (isMe) allowedPrivacy = ["public", "friends", "private"];
+    else if (isFriend) allowedPrivacy = ["public", "friends"];
+
+    const posts = await Post.find({ authorId: ownerId, privacy: { $in: allowedPrivacy } })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+    res.json({ success: true, data: await attachAuthors(posts, viewerId) });
   } catch (error) { next(error); }
 });
 
@@ -73,7 +91,8 @@ router.get("/:id", async (req, res, next) => {
 router.post("/", async (req, res, next) => {
   try {
     const post = await Post.create({ ...pick(req.body), authorId: req.user.firebaseUid });
-    res.status(201).json({ success: true, data: post });
+    const formatted = (await attachAuthors([post.toObject()], req.user.firebaseUid))[0];
+    res.status(201).json({ success: true, data: formatted });
   } catch (error) { next(error); }
 });
 

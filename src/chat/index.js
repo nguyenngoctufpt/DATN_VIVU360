@@ -11,3 +11,4 @@ export { EditActivityModal } from './editActivityModal';
 export { SplitBillModal } from './splitBillModal';
 export { GroupSettingsModal } from './groupSettingsModal';
 export { DirectChatSettingsModal } from './directChatSettingsModal';
+export { CreatePollModal } from './createPollModal';

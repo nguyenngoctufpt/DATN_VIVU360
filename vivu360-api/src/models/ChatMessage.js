@@ -6,9 +6,12 @@ const chatMessageSchema = new mongoose.Schema(
     groupId: { type: mongoose.Schema.Types.ObjectId, ref: "ChatGroup", required: true, index: true },
     senderId: { type: String, required: true, trim: true, index: true },
     content: { type: String, default: "", trim: true, maxlength: 5000 },
-    type: { type: String, enum: ["text", "image", "video", "file", "system"], default: "text" },
+    type: { type: String, enum: ["text", "image", "video", "file", "system", "poll", "assistant", "task_reminder"], default: "text" },
     mediaUrl: { type: String, default: "", trim: true },
+    poll: { type: mongoose.Schema.Types.Mixed, default: undefined },
     readBy: { type: [String], default: [] },
+    isEdited: { type: Boolean, default: false },
+    editedAt: { type: Date },
   },
   { timestamps: true }
 );
@@ -19,9 +22,12 @@ chatMessageSchema.pre("validate", function validatePayload() {
   if (this.type === "system") {
     this.content = normalizeSystemAnnouncementText(this.content);
   }
-  if (!this.content && !this.mediaUrl) this.invalidate("content", "Tin nh\u1eafn ph\u1ea3i c\u00f3 n\u1ed9i dung ho\u1eb7c t\u1ec7p \u0111\u00ednh k\u00e8m");
+  if (this.type === "poll" && !this.poll) {
+    this.invalidate("poll", "Tin nhắn dạng bình chọn phải có dữ liệu poll");
+  }
+  if (!this.content && !this.mediaUrl && !this.poll) this.invalidate("content", "Tin nhắn phải có nội dung, tệp đính kèm hoặc dữ liệu bình chọn");
   if (["image", "video", "file"].includes(this.type) && !this.mediaUrl) {
-    this.invalidate("mediaUrl", "Tin nh\u1eafn \u0111a ph\u01b0\u01a1ng ti\u1ec7n c\u1ea7n mediaUrl");
+    this.invalidate("mediaUrl", "Tin nhắn đa phương tiện cần mediaUrl");
   }
   this.readBy = [...new Set([this.senderId, ...(this.readBy || [])].filter(Boolean))];
 });

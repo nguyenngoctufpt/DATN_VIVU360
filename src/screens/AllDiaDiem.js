@@ -1,10 +1,10 @@
 import { StyleSheet, Text, View, ActivityIndicator, FlatList, Image, ScrollView, Pressable, TextInput } from 'react-native'
 import React, { useEffect, useState, useMemo } from "react";
 import { getDiaDiem } from '../services/diaDiemService';
-import { Heart, Flame, MapPin, Search } from 'lucide-react-native';
+import { Heart, Flame, MapPin, Search, ChevronLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const AllDiaDiem = ({ theme,onSelectDiaDiem }) => {
+const AllDiaDiem = ({ theme, isDarkMode, onBack, onSelectDiaDiem }) => {
   //Địa điểm
   const [diaDiem, setDiaDiem] = useState([]);
   //Tìm kiếm bằng text
@@ -126,31 +126,44 @@ const AllDiaDiem = ({ theme,onSelectDiaDiem }) => {
   });
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
 
-      <View
-        style={[
-          styles.searchContainer,
-          {
-            backgroundColor: theme.card,
-            borderColor: theme.border,
-          },
-        ]}
-      >
-        <Search size={20} color={theme.textSecondary} />
+      {/* Top Header Row with Back Button */}
+      <View style={styles.topHeaderRow}>
+        {onBack && (
+          <Pressable
+            onPress={onBack}
+            style={[styles.backBtn, { backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.18)' : 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.35)', borderWidth: 1.2 }]}
+            hitSlop={{ top: 25, bottom: 25, left: 25, right: 25 }}
+          >
+            <ChevronLeft size={22} color="#f59e0b" />
+          </Pressable>
+        )}
 
-        <TextInput
-          placeholder="Tìm địa điểm..."
-          placeholderTextColor={theme.textSecondary}
-          value={searchText}
-          onChangeText={setSearchText}
+        <View
           style={[
-            styles.searchInput,
+            styles.searchContainer,
             {
-              color: theme.textPrimary,
+              backgroundColor: theme.card,
+              borderColor: theme.border,
             },
           ]}
-        />
+        >
+          <Search size={18} color={theme.textSecondary} />
+
+          <TextInput
+            placeholder="Tìm kiếm địa điểm..."
+            placeholderTextColor={theme.textSecondary}
+            value={searchText}
+            onChangeText={setSearchText}
+            style={[
+              styles.searchInput,
+              {
+                color: theme.textPrimary,
+              },
+            ]}
+          />
+        </View>
       </View>
 
       <ScrollView
@@ -292,14 +305,27 @@ const styles = StyleSheet.create({
   destRatingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   ratingStars: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   ratingReviews: { fontSize: 9.5, fontWeight: '600' },
+  topHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginTop: 44,
+    gap: 10,
+  },
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   searchContainer: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    margin: 15,
-    marginTop: 48,
     paddingHorizontal: 15,
-    height: 50,
-    borderRadius: 15,
+    height: 48,
+    borderRadius: 16,
     borderWidth: 1,
   },
 

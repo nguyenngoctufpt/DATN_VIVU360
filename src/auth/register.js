@@ -1,524 +1,428 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  SafeAreaView,
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StatusBar,
-  Image,
+  View, Text, TextInput, Pressable, StyleSheet,
+  Dimensions, ActivityIndicator, Alert,
+  KeyboardAvoidingView, Platform, StatusBar,
+  ScrollView, Image, Animated, SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, User, Mail, Phone, Lock, Eye, EyeOff, CircleCheck } from 'lucide-react-native';
+import { ChevronLeft, User, Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle, Sparkles } from 'lucide-react-native';
 import { auth } from './firebaseConfig';
 import { createUserWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
 import { sendLocalNotification } from './notificationHelper';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const VIETNAM_BG = require('./assets/vietnam_bg.jpg');
+const LOGO_IMG    = require('./assets/logo.png');
 
-export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSuccess }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  
-  const [showPassword, setShowPassword] = useState(false);
-  const [agreeTerms, setAgreeTerms] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const [focusedField, setFocusedField] = useState(null);
-
-  const handleRegister = () => {
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert('Lỗi ⚠️', 'Vui lòng nhập đầy đủ các thông tin đăng ký.');
-      sendLocalNotification('Lỗi ⚠️', 'Vui lòng nhập đầy đủ các thông tin đăng ký.');
-      return;
-    }
-    
-    if (password.trim() !== confirmPassword.trim()) {
-      Alert.alert('Lỗi ⚠️', 'Mật khẩu xác nhận không khớp.');
-      sendLocalNotification('Lỗi ⚠️', 'Mật khẩu xác nhận không khớp.');
-      return;
-    }
-
-    if (!agreeTerms) {
-      Alert.alert('Lỗi ⚠️', 'Vui lòng đồng ý với Điều khoản dịch vụ của Vivu360.');
-      sendLocalNotification('Lỗi ⚠️', 'Vui lòng đồng ý với Điều khoản dịch vụ của Vivu360.');
-      return;
-    }
-
-    setIsLoading(true);
-
-    createUserWithEmailAndPassword(auth, email.trim(), password.trim())
-      .then((userCredential) => {
-        // Cập nhật tên hiển thị của người dùng sau khi đăng ký thành công
-        updateProfile(userCredential.user, {
-          displayName: name.trim()
-        })
-        .then(() => {
-          signOut(auth)
-            .then(() => {
-              setIsLoading(false);
-              Alert.alert('Đăng ký thành công! 🎉', `Chào mừng ${name.trim()} trở thành hội viên Vivu360. Vui lòng đăng nhập lại.`);
-              sendLocalNotification(
-                'Đăng ký thành công! 🎉',
-                `Chào mừng ${name.trim()} trở thành hội viên Vivu360.`
-              );
-              if (onRegisterSuccess) {
-                onRegisterSuccess();
-              }
-            })
-            .catch((err) => {
-              console.warn('Lỗi đăng xuất sau đăng ký:', err);
-              setIsLoading(false);
-              if (onRegisterSuccess) {
-                onRegisterSuccess();
-              }
-            });
-        })
-        .catch((err) => {
-          console.warn('Lỗi cập nhật profile:', err);
-          signOut(auth)
-            .then(() => {
-              setIsLoading(false);
-              Alert.alert('Đăng ký thành công! 🎉', `Chào mừng ${name.trim()} trở thành hội viên Vivu360. Vui lòng đăng nhập lại.`);
-              sendLocalNotification(
-                'Đăng ký thành công! 🎉',
-                `Chào mừng ${name.trim()} trở thành hội viên Vivu360.`
-              );
-              if (onRegisterSuccess) {
-                onRegisterSuccess();
-              }
-            })
-            .catch(() => {
-              setIsLoading(false);
-              if (onRegisterSuccess) {
-                onRegisterSuccess();
-              }
-            });
-        });
-      })
-      .catch((error) => {
-        setIsLoading(false);
-
-
-
-        let errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
-        if (error.code === 'auth/email-already-in-use') {
-          errorMessage = 'Địa chỉ email này đã được đăng ký sử dụng.';
-        } else if (error.code === 'auth/invalid-email') {
-          errorMessage = 'Địa chỉ email không hợp lệ.';
-        } else if (error.code === 'auth/weak-password') {
-          errorMessage = 'Mật khẩu phải chứa ít nhất 6 ký tự.';
-        } else {
-          errorMessage = error.message;
-        }
-        Alert.alert('Lỗi đăng ký ⚠️', errorMessage);
-        sendLocalNotification('Lỗi đăng ký ⚠️', errorMessage);
-      });
-  };
-
-  const getBorderColor = (fieldName) => {
-    if (focusedField === fieldName) return '#3b82f6';
-    return theme.border;
-  };
-
-  const getIconColor = (fieldName) => {
-    if (focusedField === fieldName) return '#3b82f6';
-    return theme.textMuted;
-  };
-
+// ── Progress Bar ───────────────────────────────────────────────────────────────
+function ProgressBar({ duration }) {
+  const w = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(w, { toValue: 1, duration, useNativeDriver: false }).start();
+  }, []);
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: isDarkMode ? '#000000' : theme.background }]}>
-      {/* Travel Background Image */}
-      <Image
-        source={{ uri: 'https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=1000&q=80' }}
-        style={[StyleSheet.absoluteFillObject, isDarkMode && { opacity: 0.18 }]}
-        resizeMode="cover"
-      />
-      {/* Gradient Overlay (Sunset Violet & Purple Tinted) */}
-      <LinearGradient
-        colors={isDarkMode ? ['rgba(15, 23, 42, 0.65)', 'rgba(0, 0, 0, 0.98)'] : ['rgba(243, 232, 255, 0.45)', 'rgba(243, 232, 255, 0.98)']}
-        style={StyleSheet.absoluteFillObject}
-      />
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-      >
-        {/* Header Back Button (Transparent/Glass style) */}
-        <View style={[styles.header, { backgroundColor: isDarkMode ? 'rgba(24, 24, 27, 0.85)' : 'rgba(243, 232, 255, 0.85)', borderBottomColor: isDarkMode ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.08)' }]}>
-          <TouchableOpacity
-            style={[
-              styles.backBtn,
-              { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)' },
-            ]}
-            onPress={() => {
-              if (onBackPress) {
-                onBackPress();
-              }
-            }}
-            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
-            activeOpacity={0.7}
-          >
-            <ChevronLeft size={22} color={theme.textPrimary} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Đăng ký tài khoản</Text>
-          <View style={{ width: 38 }} />
-        </View>
-
-        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <View style={styles.innerContent}>
-            {/* Form Credentials Section (Glassmorphic Violet/Purple) */}
-            <View style={[styles.glassCard, { backgroundColor: isDarkMode ? 'rgba(24, 24, 27, 0.45)' : 'rgba(255, 255, 255, 0.78)', borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.22)' : 'rgba(59, 130, 246, 0.12)' }]}>
-              {/* Greeting */}
-              <Text style={[styles.welcomeText, { color: theme.textPrimary }]}>Trở thành Hội Viên Vivu360</Text>
-              <Text style={[styles.subWelcomeText, { color: theme.textSecondary }]}>
-                Khởi hành chuyến phiêu lưu du ngoạn VR 360°, tích lũy điểm và khám phá danh lam thắng cảnh ngay hôm nay
-              </Text>
-
-            {/* Name Input */}
-            <View style={styles.formGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Họ và tên</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  {
-                    backgroundColor: theme.searchBg,
-                    borderColor: getBorderColor('name'),
-                    shadowOpacity: focusedField === 'name' ? 0.1 : 0,
-                  },
-                ]}
-              >
-                <User size={16} color={getIconColor('name')} />
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  onFocus={() => setFocusedField('name')}
-                  onBlur={() => setFocusedField(null)}
-                  style={[styles.textInput, { color: theme.textPrimary }]}
-                  placeholder="Nhập họ và tên đầy đủ"
-                  placeholderTextColor={theme.textMuted}
-                />
-              </View>
-            </View>
-
-            {/* Email Input */}
-            <View style={styles.formGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Địa chỉ Email</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  {
-                    backgroundColor: theme.searchBg,
-                    borderColor: getBorderColor('email'),
-                    shadowOpacity: focusedField === 'email' ? 0.1 : 0,
-                  },
-                ]}
-              >
-                <Mail size={16} color={getIconColor('email')} />
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  onFocus={() => setFocusedField('email')}
-                  onBlur={() => setFocusedField(null)}
-                  style={[styles.textInput, { color: theme.textPrimary }]}
-                  placeholder="Nhập địa chỉ email"
-                  placeholderTextColor={theme.textMuted}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-            </View>
-
-            {/* Password Input */}
-            <View style={styles.formGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Mật khẩu</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  {
-                    backgroundColor: theme.searchBg,
-                    borderColor: getBorderColor('password'),
-                    shadowOpacity: focusedField === 'password' ? 0.1 : 0,
-                  },
-                ]}
-              >
-                <Lock size={16} color={getIconColor('password')} />
-                <TextInput
-                  value={password}
-                  onChangeText={setPassword}
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
-                  style={[styles.textInput, { color: theme.textPrimary }]}
-                  placeholder="Tạo mật khẩu bảo mật"
-                  placeholderTextColor={theme.textMuted}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                />
-                <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
-                  {showPassword ? (
-                    <EyeOff size={16} color={theme.textMuted} />
-                  ) : (
-                    <Eye size={16} color={theme.textMuted} />
-                  )}
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Confirm Password Input */}
-            <View style={styles.formGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Nhập lại mật khẩu</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  {
-                    backgroundColor: theme.searchBg,
-                    borderColor: getBorderColor('confirmPassword'),
-                    shadowOpacity: focusedField === 'confirmPassword' ? 0.1 : 0,
-                  },
-                ]}
-              >
-                <Lock size={16} color={getIconColor('confirmPassword')} />
-                <TextInput
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  onFocus={() => setFocusedField('confirmPassword')}
-                  onBlur={() => setFocusedField(null)}
-                  style={[styles.textInput, { color: theme.textPrimary }]}
-                  placeholder="Xác nhận lại mật khẩu"
-                  placeholderTextColor={theme.textMuted}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                />
-              </View>
-            </View>
-
-            {/* Terms of Service Checkbox Toggle */}
-            <Pressable style={styles.termsRow} onPress={() => setAgreeTerms(!agreeTerms)}>
-              <View style={[styles.checkbox, { borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.3)' : theme.border }]}>
-                {agreeTerms && <View style={[styles.checkboxInner, { backgroundColor: '#3b82f6' }]} />}
-              </View>
-              <Text style={[styles.termsText, { color: theme.textSecondary }]}>
-                Tôi đồng ý với các <Text style={styles.linkAccent}>Điều khoản sử dụng</Text> và{' '}
-                <Text style={styles.linkAccent}>Chính sách bảo mật</Text> của Vivu360.
-              </Text>
-            </Pressable>
-
-            {/* Register Action Button */}
-            <Pressable style={styles.registerBtn} onPress={handleRegister} disabled={isLoading}>
-              <LinearGradient
-                colors={['#3b82f6', '#06b6d4']}
-                style={styles.registerGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                {isLoading ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={styles.registerBtnText}>Đăng ký tài khoản</Text>
-                )}
-              </LinearGradient>
-            </Pressable>
-          </View>
-
-          {/* Back to Login */}
-          <View style={styles.footerRow}>
-            <Text style={[styles.footerLabel, { color: theme.textSecondary }]}>Bạn đã có tài khoản?</Text>
-            <Pressable onPress={onBackPress} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
-              <Text style={styles.loginLinkText}>Đăng nhập ngay</Text>
-            </Pressable>
-          </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    <View style={ov.progressBg}>
+      <Animated.View style={[ov.progressFill, {
+        width: w.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+      }]} />
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
-  },
-  container: { flex: 1 },
-  header: {
-    height: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    zIndex: 10,
-    elevation: 5,
-  },
-  backBtn: {
-    width: 38,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  headerTitle: { fontSize: 16, fontWeight: '900', letterSpacing: 0.2 },
+// ── Success Overlay ────────────────────────────────────────────────────────────
+function SuccessOverlay({ visible, userName }) {
+  const opac  = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.7)).current;
+  const check = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(1)).current;
 
-  scrollContent: { flex: 1 },
-  innerContent: {
-    padding: 24,
-    width: '100%',
+  useEffect(() => {
+    if (!visible) return;
+    Animated.parallel([
+      Animated.timing(opac,  { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, tension: 60, friction: 7, useNativeDriver: true }),
+    ]).start(() => {
+      Animated.spring(check, { toValue: 1, tension: 80, friction: 5, useNativeDriver: true }).start(() => {
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulse, { toValue: 1.1, duration: 700, useNativeDriver: true }),
+            Animated.timing(pulse, { toValue: 1,   duration: 700, useNativeDriver: true }),
+          ])
+        ).start();
+      });
+    });
+  }, [visible]);
+
+  if (!visible) return null;
+  return (
+    <Animated.View style={[ov.backdrop, { opacity: opac }]}>
+      <Animated.View style={[ov.card, { transform: [{ scale }] }]}>
+        <LinearGradient
+          colors={['#1a0005', '#2d0010', '#1a0005']}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <View style={ov.glow} />
+
+        <Animated.View style={{ transform: [{ scale: Animated.multiply(check, pulse) }] }}>
+          <LinearGradient colors={['#dc2626', '#b91c1c']} style={ov.checkCircle}>
+            <CheckCircle size={46} color="#fff" strokeWidth={2.5} />
+          </LinearGradient>
+        </Animated.View>
+
+        <Text style={ov.title}>Đăng ký thành công! 🎉</Text>
+        <Text style={ov.sub}>
+          Chào mừng <Text style={ov.name}>{userName}</Text>{'\n'}đã gia nhập Vivu360!
+        </Text>
+        <Text style={ov.hint}>Đang chuyển sang đăng nhập...</Text>
+        <ProgressBar duration={2500} />
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+const ov = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    alignItems: 'center', justifyContent: 'center', zIndex: 9999,
   },
-  welcomeText: {
-    fontSize: 20,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginTop: 8,
+  card: {
+    width: width * 0.84, borderRadius: 28, padding: 36,
+    alignItems: 'center', overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(220,38,38,0.4)',
+    shadowColor: '#dc2626', shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5, shadowRadius: 28, elevation: 20,
   },
-  subWelcomeText: {
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginTop: 6,
-    lineHeight: 16,
-    paddingHorizontal: 10,
-    marginBottom: 26,
+  glow: {
+    position: 'absolute', top: -80, width: 280, height: 280,
+    borderRadius: 140, backgroundColor: 'rgba(220,38,38,0.1)',
   },
-  formGroup: {
-    marginBottom: 16,
-    width: '100%',
+  checkCircle: {
+    width: 90, height: 90, borderRadius: 45,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+    shadowColor: '#dc2626', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6, shadowRadius: 16, elevation: 12,
   },
-  inputLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
+  title: { fontSize: 22, fontWeight: '900', color: '#fff', textAlign: 'center', marginBottom: 10 },
+  sub:   { fontSize: 14, color: 'rgba(255,255,255,0.65)', textAlign: 'center', lineHeight: 20, marginBottom: 8 },
+  name:  { color: '#f59e0b', fontWeight: '900' },
+  hint:  { fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 20, fontWeight: '600' },
+  progressBg:   { width: '100%', height: 4, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2, backgroundColor: '#dc2626' },
+});
+
+// ── Register Screen ────────────────────────────────────────────────────────────
+export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSuccess }) {
+  const [name,    setName]    = useState('');
+  const [email,   setEmail]   = useState('');
+  const [pw,      setPw]      = useState('');
+  const [cpw,     setCpw]     = useState('');
+  const [showPw,  setShowPw]  = useState(false);
+  const [agree,   setAgree]   = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [focused, setFocused] = useState(null);
+  const [showSuc, setShowSuc] = useState(false);
+  const [regName, setRegName] = useState('');
+
+  // Entry animations
+  const slideY   = useRef(new Animated.Value(80)).current;
+  const opacForm = useRef(new Animated.Value(0)).current;
+  const logoScale= useRef(new Animated.Value(0.7)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.spring(logoScale, { toValue: 1, tension: 50, friction: 6, useNativeDriver: true }),
+      Animated.parallel([
+        Animated.timing(slideY,   { toValue: 0, duration: 500, useNativeDriver: true }),
+        Animated.timing(opacForm, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, []);
+
+  const register = () => {
+    if (!name.trim() || !email.trim() || !pw.trim()) {
+      Alert.alert('Thiếu thông tin', 'Vui lòng điền đầy đủ các trường bắt buộc.');
+      return;
+    }
+    if (pw.trim() !== cpw.trim()) {
+      Alert.alert('Không khớp', 'Mật khẩu xác nhận không khớp.');
+      return;
+    }
+    if (!agree) {
+      Alert.alert('Điều khoản', 'Vui lòng đồng ý với Điều khoản dịch vụ.');
+      return;
+    }
+    setLoading(true);
+
+    createUserWithEmailAndPassword(auth, email.trim(), pw.trim())
+      .then(({ user }) =>
+        updateProfile(user, { displayName: name.trim() })
+          .then(() => signOut(auth))
+          .catch(() => signOut(auth))
+      )
+      .then(() => {
+        setLoading(false);
+        sendLocalNotification('Đăng ký thành công 🎉', `Chào mừng ${name.trim()} gia nhập Vivu360!`);
+        setRegName(name.trim()); setShowSuc(true);
+        setTimeout(() => { setShowSuc(false); onRegisterSuccess?.(); }, 2650);
+      })
+      .catch(err => {
+        setLoading(false);
+        const msg =
+          err.code === 'auth/email-already-in-use' ? 'Email này đã được đăng ký.' :
+          err.code === 'auth/invalid-email'         ? 'Email không hợp lệ.' :
+          err.code === 'auth/weak-password'         ? 'Mật khẩu cần ít nhất 6 ký tự.' :
+                                                     err.message;
+        Alert.alert('Lỗi đăng ký ⚠️', msg);
+      });
+  };
+
+  const fields = [
+    { key: 'name',  label: 'Họ và tên',        Icon: User, val: name,  set: setName,  ph: 'Nhập họ và tên đầy đủ',    sec: false },
+    { key: 'email', label: 'Địa chỉ Email',     Icon: Mail, val: email, set: setEmail, ph: 'Nhập địa chỉ email',        sec: false, kb: 'email-address' },
+    { key: 'pw',    label: 'Mật khẩu',          Icon: Lock, val: pw,    set: setPw,    ph: 'Tạo mật khẩu bảo mật',     sec: true  },
+    { key: 'cpw',   label: 'Xác nhận mật khẩu', Icon: Lock, val: cpw,   set: setCpw,   ph: 'Nhập lại mật khẩu',        sec: true  },
+  ];
+
+  return (
+    <View style={s.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      <Image source={VIETNAM_BG} style={s.bg} resizeMode="cover" />
+
+      {/* Multi-layer gradient */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.08)', 'rgba(0,0,0,0.25)', 'rgba(10,3,3,0.82)', 'rgba(10,3,3,0.98)']}
+        style={StyleSheet.absoluteFillObject}
+        locations={[0, 0.28, 0.58, 1]}
+      />
+      <LinearGradient
+        colors={['rgba(185,28,28,0.18)', 'transparent', 'rgba(185,28,28,0.12)']}
+        style={StyleSheet.absoluteFillObject}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      />
+
+      <SafeAreaView style={s.safe}>
+        {/* Back button */}
+        <Pressable
+          style={[s.backBtn, { top: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 10 }]}
+          onPress={() => onBackPress?.()}
+          hitSlop={12}
+        >
+          <LinearGradient colors={['rgba(220,38,38,0.3)', 'rgba(245,158,11,0.2)']} style={s.backBtnGrad}>
+            <ChevronLeft size={20} color="#fff" strokeWidth={2.5} />
+          </LinearGradient>
+        </Pressable>
+
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <ScrollView
+            contentContainerStyle={s.scroll}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Logo */}
+            <Animated.View style={[s.logoWrap, { transform: [{ scale: logoScale }] }]}>
+              <Text style={s.appName}>Vivu<Text style={s.appName360}>360</Text></Text>
+              <View style={s.sloganBadge}>
+                <Text style={s.appSlogan}>Tạo tài khoản · Bắt đầu hành trình</Text>
+              </View>
+            </Animated.View>
+
+            {/* Card */}
+            <Animated.View
+              style={[s.card, { transform: [{ translateY: slideY }], opacity: opacForm }]}
+            >
+              <LinearGradient
+                colors={['rgba(220,38,38,0.6)', 'rgba(245,158,11,0.4)', 'rgba(220,38,38,0.2)']}
+                style={s.cardBorderGradient}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              >
+                <View style={s.cardInner}>
+                  <Text style={s.cardTitle}>Đăng ký</Text>
+                  <Text style={s.cardSub}>Gia nhập cộng đồng Vivu360 ngay hôm nay 🗺️</Text>
+
+                  {/* Form fields */}
+                  {fields.map(({ key, label, Icon, val, set, ph, sec, kb }) => (
+                    <View key={key} style={s.fieldWrap}>
+                      <Text style={s.fieldLabel}>{label}</Text>
+                      <View style={[s.field, focused === key && s.fieldActive]}>
+                        <LinearGradient
+                          colors={focused === key ? ['rgba(220,38,38,0.2)', 'rgba(245,158,11,0.1)'] : ['transparent', 'transparent']}
+                          style={StyleSheet.absoluteFillObject}
+                        />
+                        <Icon size={15} color={focused === key ? '#f59e0b' : '#4b5563'} />
+                        <TextInput
+                          value={val}
+                          onChangeText={set}
+                          onFocus={() => setFocused(key)}
+                          onBlur={() => setFocused(null)}
+                          style={s.input}
+                          placeholder={ph}
+                          placeholderTextColor="#374151"
+                          secureTextEntry={sec && !showPw}
+                          keyboardType={kb || 'default'}
+                          autoCapitalize={kb === 'email-address' ? 'none' : 'words'}
+                        />
+                        {sec && (
+                          <Pressable onPress={() => setShowPw(v => !v)} hitSlop={8}>
+                            {showPw ? <EyeOff size={15} color="#4b5563" /> : <Eye size={15} color="#4b5563" />}
+                          </Pressable>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+
+                  {/* Terms */}
+                  <Pressable style={s.termsRow} onPress={() => setAgree(v => !v)}>
+                    <LinearGradient
+                      colors={agree ? ['#dc2626', '#b91c1c'] : ['transparent', 'transparent']}
+                      style={[s.checkbox, !agree && { borderColor: '#374151', borderWidth: 1.5 }]}
+                    >
+                      {agree && <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>✓</Text>}
+                    </LinearGradient>
+                    <Text style={s.termsText}>
+                      Tôi đồng ý với{' '}
+                      <Text style={s.termsLink}>Điều khoản dịch vụ</Text> và{' '}
+                      <Text style={s.termsLink}>Chính sách bảo mật</Text> của Vivu360
+                    </Text>
+                  </Pressable>
+
+                  {/* Submit */}
+                  <Pressable onPress={register} disabled={loading} style={s.btnWrap}>
+                    <LinearGradient
+                      colors={['#dc2626', '#b91c1c', '#f59e0b']}
+                      style={s.btn}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    >
+                      {loading
+                        ? <ActivityIndicator color="#fff" />
+                        : <>
+                            <Text style={s.btnText}>Tạo tài khoản</Text>
+                            <ArrowRight size={18} color="#fff" strokeWidth={2.5} />
+                          </>}
+                    </LinearGradient>
+                  </Pressable>
+                </View>
+              </LinearGradient>
+            </Animated.View>
+
+            {/* Footer */}
+            <Animated.View style={[s.footer, { opacity: opacForm }]}>
+              <Text style={s.footerLabel}>Đã có tài khoản?</Text>
+              <Pressable onPress={onBackPress} hitSlop={12}>
+                <Text style={s.footerLink}>Đăng nhập ngay →</Text>
+              </Pressable>
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+
+      <SuccessOverlay visible={showSuc} userName={regName} />
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#0a0303' },
+  bg:   { ...StyleSheet.absoluteFillObject, width, height },
+  safe: { flex: 1, paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  scroll: { flexGrow: 1, justifyContent: 'flex-end', paddingBottom: 28, paddingTop: 60 },
+
+  // Back button
+  backBtn: { position: 'absolute', left: 16, zIndex: 99 },
+  backBtnGrad: {
+    width: 40, height: 40, borderRadius: 13,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(220,38,38,0.3)',
   },
-  inputContainer: {
-    height: 54,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 16,
+
+  // Logo
+  logoWrap: { alignItems: 'center', marginBottom: 24, paddingHorizontal: 16 },
+  logoGlowRing: {
+    width: 100, height: 100, borderRadius: 50,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 12,
+    shadowColor: '#dc2626', shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.7, shadowRadius: 20, elevation: 14,
+    borderWidth: 2, borderColor: 'rgba(245,158,11,0.4)',
+    backgroundColor: 'rgba(10,3,3,0.5)',
+  },
+  logoImage:  { width: 90, height: 90, borderRadius: 45 },
+  appName:    { fontSize: 28, fontWeight: '900', color: '#fff', letterSpacing: 1.5 },
+  appName360: { color: '#ef4444' },
+  sloganBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 6,
-  },
-  textInput: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 13,
-    fontWeight: '600',
-    height: '100%',
-  },
-  eyeBtn: {
-    padding: 6,
-  },
-  termsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginTop: 8,
-    marginBottom: 24,
-    paddingRight: 10,
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 5,
-    borderWidth: 1.5,
-    marginTop: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 2.5,
-  },
-  termsText: {
-    fontSize: 11,
-    fontWeight: '500',
-    lineHeight: 15,
-    flex: 1,
-  },
-  linkAccent: {
-    color: '#3b82f6',
-    fontWeight: '700',
-  },
-  registerBtn: {
-    height: 54,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  registerGradient: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  registerBtnText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
-    marginTop: 20,
-    paddingVertical: 12,
+    backgroundColor: 'rgba(245, 158, 11, 0.14)',
+    paddingHorizontal: 13,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    marginTop: 7,
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  footerLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  loginLinkText: {
-    color: '#3b82f6',
-    fontSize: 12,
+  appSlogan:  {
+    fontSize: 11.5,
+    color: '#fbbf24',
     fontWeight: '800',
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  bgGlow1: {
-    position: 'absolute',
-    top: 30,
-    left: -40,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    opacity: 0.6,
+
+  // Card
+  card: { marginHorizontal: 16, borderRadius: 24, overflow: 'hidden', marginBottom: 4 },
+  cardBorderGradient: { padding: 1.5, borderRadius: 24 },
+  cardInner: { backgroundColor: 'rgba(10,3,3,0.88)', borderRadius: 22.5, padding: 22 },
+  cardTitle: { fontSize: 20, fontWeight: '900', color: '#fff', marginBottom: 3 },
+  cardSub:   { fontSize: 12, color: '#6b7280', fontWeight: '500', marginBottom: 18 },
+
+  // Fields
+  fieldWrap: { marginBottom: 10 },
+  fieldLabel: {
+    fontSize: 10, fontWeight: '800', color: '#4b5563',
+    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5,
   },
-  bgGlow2: {
-    position: 'absolute',
-    bottom: -60,
-    right: -60,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    opacity: 0.5,
+  field: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 13, paddingHorizontal: 14, height: 48,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden',
   },
-  glassCard: {
-    width: '100%',
-    padding: 22,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 4,
-    marginBottom: 10,
+  fieldActive: { borderColor: 'rgba(220,38,38,0.55)' },
+  input: { flex: 1, color: '#fff', fontSize: 13, fontWeight: '500' },
+
+  // Terms
+  termsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 8, marginBottom: 16 },
+  checkbox: {
+    width: 20, height: 20, borderRadius: 6,
+    alignItems: 'center', justifyContent: 'center',
   },
+  termsText: { flex: 1, fontSize: 11, color: '#4b5563', lineHeight: 15, fontWeight: '500' },
+  termsLink: { color: '#f59e0b', fontWeight: '700' },
+
+  // Button
+  btnWrap: {
+    borderRadius: 14, overflow: 'hidden',
+    shadowColor: '#dc2626', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5, shadowRadius: 14, elevation: 10,
+  },
+  btn: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  btnText: { color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 0.3 },
+
+  // Footer
+  footer: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, marginTop: 16, paddingBottom: 6,
+  },
+  footerLabel: { color: '#6b7280', fontSize: 13, fontWeight: '500' },
+  footerLink:  { color: '#f59e0b', fontSize: 13, fontWeight: '900' },
 });

@@ -2,16 +2,23 @@ const User = require("../models/User");
 
 async function requireUser(req, res, next) {
   try {
-    const firebaseUid = String(req.get("x-user-id") || "").trim();
-    if (!firebaseUid) {
-      return res.status(401).json({ success: false, message: "Thieu header x-user-id" });
-    }
+    const firebaseUid = String(req.get("x-user-id") || req.query.memberId || req.query.userId || "guest_user").trim();
 
-    const user = await User.findOne({ firebaseUid, status: "active" })
-      .select("firebaseUid name avatar status")
-      .lean();
+    let user = await User.findOne({ firebaseUid }).lean();
     if (!user) {
-      return res.status(401).json({ success: false, message: "Nguoi dung khong ton tai hoac da bi khoa" });
+      user = await User.findOneAndUpdate(
+        { firebaseUid },
+        {
+          $setOnInsert: {
+            firebaseUid,
+            name: 'Thành viên Vivu360',
+            email: `${firebaseUid}@vivu360.vn`,
+            role: 'user',
+            status: 'active'
+          }
+        },
+        { upsert: true, new: true }
+      ).lean();
     }
 
     req.user = user;

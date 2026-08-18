@@ -11,6 +11,7 @@ const postSchema = new mongoose.Schema(
     },
     location: { type: String, default: "", trim: true, maxlength: 200 },
     category: { type: String, default: "", trim: true, maxlength: 100 },
+    privacy: { type: String, enum: ["public", "friends", "private"], default: "public", index: true },
     likes: { type: [String], default: [] },
     commentsCount: { type: Number, default: 0, min: 0 },
     comments: [{

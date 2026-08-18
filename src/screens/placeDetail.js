@@ -181,6 +181,9 @@ export function PlaceDetailScreen({
 
   const getMatchedKey = (name) => {
     const lower = String(name || '').toLowerCase();
+    if (lower.includes('huế') || lower.includes('thừa thiên') || lower.includes('đại nội') || lower.includes('khải định') || lower.includes('thiên mụ')) return 'huế';
+    if (lower.includes('đà nẵng') || lower.includes('bà nà') || lower.includes('mỹ khê') || lower.includes('ngũ hành sơn') || lower.includes('cầu rồng')) return 'đà nẵng';
+    if (lower.includes('hội an') || lower.includes('chùa cầu') || lower.includes('sông hoài') || lower.includes('bảy mẫu')) return 'hội an';
     if (lower.includes('ninh bình') || lower.includes('tràng an') || lower.includes('bái đính') || lower.includes('hang múa') || lower.includes('tam cốc') || lower.includes('hoa lư') || lower.includes('châu sơn') || lower.includes('ninh xuân')) return 'ninh bình';
     if (lower.includes('quảng ninh') || lower.includes('hạ long') || lower.includes('ti tốp') || lower.includes('sửng sốt') || lower.includes('tuần châu') || lower.includes('bãi cháy') || lower.includes('cù kỳ') || lower.includes('sam')) return 'hạ long';
     if (lower.includes('kiên giang') || lower.includes('phú quốc') || lower.includes('an thới') || lower.includes('gành dầu') || lower.includes('bãi sao') || lower.includes('hòn thơm')) return 'phú quốc';

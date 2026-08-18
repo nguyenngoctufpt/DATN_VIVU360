@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Image, Pressable, StyleSheet, TextInput, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Camera, Heart, Image as ImageIcon, MapPin, MessageCircle, Pencil, Send, UserRound, X } from 'lucide-react-native';
+import { Camera, Heart, Image as ImageIcon, MapPin, MessageCircle, Pencil, Send, Trash2, UserRound, X } from 'lucide-react-native';
 import { loadAppData, saveAppData } from '../services/appDataService';
+import { deletePost, getUserPosts, mapMongoPostToFeedPost } from '../services/postService';
+import { PostCard } from '../components/PostCard';
+import { EditPostModal } from '../social/editPostModal';
 
 const DEFAULT_COVER = 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80';
+const DEFAULT_AVATAR = 'https://i.pravatar.cc/150?img=68';
 
 export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, onEditProfile }) {
   const [posts, setPosts] = useState([]);
@@ -15,6 +19,24 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
   const [postImage, setPostImage] = useState('');
   const [publishing, setPublishing] = useState(false);
 
+  // Edit Post states
+  const [editingPost, setEditingPost] = useState(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+
+  const handleOpenEdit = (postToEdit) => {
+    setEditingPost(postToEdit);
+    setEditModalVisible(true);
+  };
+
+  const handlePostUpdated = (updatedPost) => {
+    const nextPosts = posts.map(p => (p.id === updatedPost.id || p._id === updatedPost._id) ? updatedPost : p);
+    setPosts(nextPosts);
+    if (ownerId) {
+      saveAppData(ownerId, 'social', { posts: nextPosts })
+        .catch(err => console.warn('Cập nhật AppData thất bại:', err.message));
+    }
+  };
+
   useEffect(() => {
     let active = true;
     if (!ownerId) {
@@ -24,13 +46,26 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
     }
 
     setLoading(true);
-    loadAppData(ownerId, 'social')
-      .then(saved => {
-        if (active) setPosts(Array.isArray(saved?.posts) ? saved.posts : []);
+
+    // Lấy bài viết cá nhân từ MongoDB Backend API
+    getUserPosts(ownerId, ownerId)
+      .then(mongoPosts => {
+        if (!active) return;
+        if (Array.isArray(mongoPosts) && mongoPosts.length > 0) {
+          setPosts(mongoPosts.map(mapMongoPostToFeedPost));
+        } else {
+          loadAppData(ownerId, 'social').then(saved => {
+            if (active) setPosts(Array.isArray(saved?.posts) ? saved.posts : []);
+          });
+        }
       })
       .catch(error => {
-        if (active) setPosts([]);
-        console.warn('Không thể tải bài viết cá nhân:', error.message);
+        console.warn('[ProfileFeed] Tải bài viết cá nhân từ MongoDB thất bại, fallback local:', error.message);
+        if (active) {
+          loadAppData(ownerId, 'social')
+            .then(saved => setPosts(Array.isArray(saved?.posts) ? saved.posts : []))
+            .catch(() => setPosts([]));
+        }
       })
       .finally(() => active && setLoading(false));
 
@@ -41,6 +76,30 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
     (post.user?.firebaseUid && post.user.firebaseUid === ownerId) ||
     (!post.user?.firebaseUid && post.user?.name === userInfo.name)
   ), [posts, ownerId, userInfo.name]);
+
+  const handleDeletePost = (targetPostId) => {
+    Alert.alert(
+      'Xác nhận xóa',
+      'Bạn có chắc chắn muốn xóa bài viết này khỏi trang cá nhân và bảng tin?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa bài viết',
+          style: 'destructive',
+          onPress: async () => {
+            const nextPosts = posts.filter(p => p.id !== targetPostId && p._id !== targetPostId);
+            setPosts(nextPosts);
+            if (ownerId) {
+              saveAppData(ownerId, 'social', { posts: nextPosts })
+                .catch(err => console.warn('Cập nhật AppData thất bại:', err.message));
+              deletePost(ownerId, targetPostId)
+                .catch(err => console.warn('Xóa bài viết MongoDB thất bại:', err.message));
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const publishPost = async () => {
     const content = postContent.trim();
@@ -99,7 +158,7 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
 
         <View style={styles.identityArea}>
           <View style={[styles.avatarFrame, { backgroundColor: theme.card }]}>
-            <Image source={{ uri: userInfo.avatar }} style={styles.avatar} />
+            <Image source={{ uri: userInfo.avatar || DEFAULT_AVATAR }} style={styles.avatar} />
           </View>
           <Pressable style={styles.editButton} onPress={onEditProfile}>
             <Pencil size={14} color="#fff" />
@@ -113,7 +172,7 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
 
       <View style={[styles.composerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <View style={styles.composerTopRow}>
-          <Image source={{ uri: userInfo.avatar }} style={styles.composerAvatar} />
+          <Image source={{ uri: userInfo.avatar || DEFAULT_AVATAR }} style={styles.composerAvatar} />
           <Pressable
             style={[styles.composerPrompt, { backgroundColor: theme.searchBg, borderColor: theme.border }]}
             onPress={() => setComposerOpen(true)}
@@ -171,26 +230,35 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
           <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>Chưa có bài viết</Text>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Các bài bạn đăng trên Bảng tin sẽ xuất hiện tại đây.</Text>
         </View>
-      ) : myPosts.map(post => (
-        <View key={post.id} style={[styles.postCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.postHeader}>
-            <Image source={{ uri: userInfo.avatar }} style={styles.postAvatar} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.postAuthor, { color: theme.textPrimary }]}>{userInfo.name}</Text>
-              <Text style={[styles.postMeta, { color: theme.textSecondary }]}>{post.time || 'Vừa xong'} · Vivu360</Text>
-            </View>
-          </View>
-          {!!post.content && <Text style={[styles.postContent, { color: theme.textPrimary }]}>{post.content}</Text>}
-          {!!post.location && (
-            <View style={styles.locationRow}><MapPin size={13} color="#3b82f6" /><Text style={styles.locationText}>{post.location}</Text></View>
-          )}
-          {!!post.image && <Image source={{ uri: post.image }} style={styles.postImage} />}
-          <View style={[styles.postActions, { borderTopColor: theme.border }]}>
-            <View style={styles.action}><Heart size={17} color={post.likedByUser ? '#ef4444' : theme.textSecondary} fill={post.likedByUser ? '#ef4444' : 'transparent'} /><Text style={{ color: theme.textSecondary }}>{post.likes || 0}</Text></View>
-            <View style={styles.action}><MessageCircle size={17} color={theme.textSecondary} /><Text style={{ color: theme.textSecondary }}>{post.commentsCount || 0}</Text></View>
-          </View>
-        </View>
+      ) : myPosts.map((post, idx) => (
+        <PostCard
+          key={post.id || post._id || idx}
+          post={post}
+          theme={theme}
+          isDarkMode={isDarkMode}
+          onMoreOptions={(targetPost) => {
+            Alert.alert(
+              'Tùy chọn bài viết',
+              `Bài viết của bạn`,
+              [
+                { text: '✏️ Chỉnh sửa bài viết', onPress: () => handleOpenEdit(targetPost) },
+                { text: '🗑️ Xóa bài viết', style: 'destructive', onPress: () => handleDeletePost(targetPost.id || targetPost._id) },
+                { text: 'Đóng', style: 'cancel' }
+              ]
+            );
+          }}
+        />
       ))}
+
+      <EditPostModal
+        visible={editModalVisible}
+        post={editingPost}
+        onClose={() => setEditModalVisible(false)}
+        onPostUpdated={handlePostUpdated}
+        ownerId={ownerId}
+        isDarkMode={isDarkMode}
+        theme={theme}
+      />
     </View>
   );
 }

@@ -13,6 +13,7 @@ const chatGroupSchema = new mongoose.Schema(
     tag: { type: String, default: "Du lịch", trim: true },
     directKey: { type: String, trim: true, default: undefined },
     admins: { type: [String], default: [] },
+    deputyIds: { type: [String], default: [] },
     members: { type: [String], required: true, validate: value => Array.isArray(value) && value.length > 0 },
     itinerary: { type: mongoose.Schema.Types.Mixed, default: {} },
     fund: {
@@ -23,6 +24,7 @@ const chatGroupSchema = new mongoose.Schema(
         expenses: [],
       }),
     },
+    tasks: { type: [mongoose.Schema.Types.Mixed], default: [] },
     lastMessageAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
@@ -35,6 +37,8 @@ chatGroupSchema.pre("validate", function normalizeMembers() {
   this.members = [...new Set([this.ownerId, ...(this.members || [])].filter(Boolean))];
   this.admins = [...new Set([this.ownerId, ...(this.admins || [])].filter(Boolean))]
     .filter(id => this.members.includes(id));
+  this.deputyIds = [...new Set((this.deputyIds || []).filter(Boolean))]
+    .filter(id => this.members.includes(id) && !this.admins.includes(id) && id !== this.ownerId);
 
   this.type = this.type === "direct" ? "direct" : "group";
   if (this.type === "direct") {
@@ -55,6 +59,7 @@ chatGroupSchema.pre("validate", function normalizeMembers() {
     contributions: Array.isArray(rawFund.contributions) ? rawFund.contributions : [],
     expenses: Array.isArray(rawFund.expenses) ? rawFund.expenses : [],
   };
+  this.tasks = Array.isArray(this.tasks) ? this.tasks : [];
 });
 
 module.exports = mongoose.model("ChatGroup", chatGroupSchema);

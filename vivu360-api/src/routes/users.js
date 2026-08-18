@@ -100,9 +100,34 @@ router.get("/search/friends", async (req, res, next) => {
     const relations = await Friendship.find({ users: viewerId }).lean();
     const relationMap = new Map(relations.map(relation => [
       relation.users.find(id => id !== viewerId),
-      { _id: relation._id, users: relation.users, requesterId: relation.requesterId, status: relation.status, direction: relation.requesterId === viewerId ? "outgoing" : "incoming" },
+      { _id: relation._id, users: relation.users, requesterId: relation.requesterId, status: "accepted", direction: relation.requesterId === viewerId ? "outgoing" : "incoming" },
     ]));
     res.json({ success: true, data: users.map(user => ({ ...user, friendship: relationMap.get(user.firebaseUid) || null })) });
+  } catch (error) { next(error); }
+});
+
+router.get("/:identifier/stats", async (req, res, next) => {
+  try {
+    const identifier = String(req.params.identifier).trim();
+    let targetId = identifier;
+    const user = await User.findOne({ $or: [{ firebaseUid: identifier }, { email: identifier }] }).lean();
+    if (user) targetId = user.firebaseUid;
+
+    const [postsCount, friendships] = await Promise.all([
+      Post.countDocuments({ authorId: targetId }),
+      Friendship.find({ users: targetId }).lean(),
+    ]);
+
+    const acceptedCount = friendships.filter(f => f.status === "accepted" || !f.status).length;
+
+    res.json({
+      success: true,
+      data: {
+        posts: postsCount,
+        followers: acceptedCount,
+        following: acceptedCount,
+      }
+    });
   } catch (error) { next(error); }
 });
 

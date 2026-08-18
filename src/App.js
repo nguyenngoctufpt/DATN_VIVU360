@@ -9,6 +9,8 @@ import {
   User,
   Newspaper,
   MessageSquare,
+  Compass,
+  Sparkles,
   X,
 } from 'lucide-react-native';
 
@@ -21,9 +23,10 @@ import {
   AllDiaDiem,
   DiaDiemDetails,
   ProfileFeedScreen,
+  SmartPlannerScreen,
 } from './screens';
 
-import { VietnamTravelWebScreen, VirtualTourScreen, ProvinceGalleryScreen } from './map';
+import { MapScreen, VietnamTravelWebScreen, VirtualTourScreen, ProvinceGalleryScreen } from './map';
 import { SocialScreen, UserProfileModal } from './social';
 import { ChatScreen } from './chat';
 import { EditProfileScreen, MembershipTiersScreen, TravelChallengesScreen } from './settings';
@@ -35,22 +38,7 @@ import { registerForPushNotificationsAsync, sendLocalNotification } from './auth
 import { loadAppData, saveAppData } from './services/appDataService';
 import { syncUser, searchFriends } from './services/userService';
 import { createChatGroup, getChatGroups, getChatMessages } from './services/chatService';
-import Constants from 'expo-constants';
-
-const getHostIp = () => {
-  let host = Constants.expoConfig?.hostUri;
-  if (!host && Constants.manifest) {
-    host = Constants.manifest.debuggerHost;
-  }
-  if (!host && Constants.manifest2?.extra?.expoGo) {
-    host = Constants.manifest2.extra.expoGo.debuggerHost;
-  }
-  if (host) {
-    const ip = host.split(':')[0];
-    if (ip) return ip;
-  }
-  return '192.168.100.101'; // Default fallback IP
-};
+import { getHostIp } from './utils/hostIp';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -63,7 +51,12 @@ Notifications.setNotificationHandler({
 
 LogBox.ignoreLogs([
   '@firebase/auth: Auth',
-  'Firebase Auth state listener timed out'
+  'Firebase Auth state listener timed out',
+  'Cannot connect to Metro',
+  'HMRClient',
+  'WebSocket',
+  '[Social]',
+  'Network Error',
 ]);
 
 import {
@@ -284,30 +277,11 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Force loading spinner to disappear after 3.5 seconds to prevent being stuck forever
-    const timer = setTimeout(() => {
-      console.log("Firebase Auth state listener timed out. Forcing authLoading to false.");
-      setAuthLoading(false);
-    }, 3500);
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      clearTimeout(timer);
-      if (user) {
-        setIsLoggedIn(true);
-        setDataOwnerId(user.uid);
-        syncUserProfile(user);
-      } else {
-        setIsLoggedIn(false);
-        setDataOwnerId(null);
-        setAppDataLoaded(false);
-      }
-      setAuthLoading(false);
-    });
-    
-    return () => {
-      clearTimeout(timer);
-      unsubscribe();
-    };
+    // Đảm bảo mỗi lần khởi chạy ứng dụng luôn hiển thị Màn hình Đăng nhập / Đăng ký
+    signOut(auth).catch(() => {});
+    setIsLoggedIn(false);
+    setDataOwnerId(null);
+    setAuthLoading(false);
   }, []);
 
   // Load cloud app data when user logs in
@@ -468,6 +442,21 @@ export default function App() {
   // Helper render active tab screen
   const renderScreenContent = () => {
     switch (activeNav) {
+      case 'planner':
+      case 'smartPlanner':
+        return (
+          <SmartPlannerScreen
+            theme={theme}
+            isDarkMode={isDarkMode}
+            selectedPlaceName={selectedPlaceName}
+            onNavigateToTab={(tab) => setActiveNav(tab)}
+            onNavigateToTour={(tourId) => {
+              setSelectedTourId(tourId || 1);
+              setSelectedSpotIdx(0);
+              setActiveNav('virtualTour');
+            }}
+          />
+        );
       case 'explore':
         return (
           <ExploreScreen
@@ -505,6 +494,7 @@ export default function App() {
             isDarkMode={isDarkMode}
             theme={theme}
             currentUser={userInfo}
+            selectedPlaceName={selectedPlaceName}
             onNavigateToTab={(tab) => setActiveNav(tab)}
             onNavigateToMapWithPlace={(placeName) => {
               setSelectedPlaceName(placeName);
@@ -546,6 +536,10 @@ export default function App() {
               setSelectedPlaceName(placeName);
               setActiveNav('placeDetail');
             }}
+            onOpenAIPlanning={(placeName) => {
+              setSelectedPlaceName(placeName);
+              setActiveNav('smartPlanner');
+            }}
             onNavigateToProvince={(provName) => {
               setSelectedProvinceName(provName);
               setActiveNav('provinceGallery');
@@ -560,7 +554,7 @@ export default function App() {
             placeName={selectedPlaceName}
             theme={theme}
             isDarkMode={isDarkMode}
-            onBack={() => setActiveNav('map')}
+            onBack={() => { setSelectedPlaceName(''); setActiveNav('map'); }}
             ownerId={dataOwnerId}
             currentUser={userInfo}
             onNavigateToTab={(tab) => setActiveNav(tab)}
@@ -590,7 +584,7 @@ export default function App() {
             theme={theme}
             isDarkMode={isDarkMode}
             provinceName={selectedProvinceName}
-            onBack={() => setActiveNav('map')}
+            onBack={() => { setSelectedPlaceName(''); setActiveNav('map'); }}
             onNavigateToTour={(tourId) => {
               setSelectedTourId(tourId || 1);
               setSelectedSpotIdx(0);
@@ -711,6 +705,7 @@ export default function App() {
             setIsDarkMode={setIsDarkMode}
             theme={theme}
             currentUser={userInfo}
+            onViewTiers={() => setActiveNav('membershipTiers')}
             allCategories={allCategories}
             onNavigateToExplore={(tag, search) => {
               setExploreTag(tag === 'all' ? 'Tất cả' : tag);
@@ -837,32 +832,22 @@ export default function App() {
             ]}
             onPress={() => setActiveNav('home')}
           >
-            <Home size={20} color={activeNav === 'home' ? '#3b82f6' : theme.textSecondary} />
-            <Text style={[styles.navText, { color: activeNav === 'home' ? '#3b82f6' : theme.textSecondary }]}>Trang chủ</Text>
+            <Home size={20} color={activeNav === 'home' ? '#f59e0b' : theme.textSecondary} />
+            <Text style={[styles.navText, { color: activeNav === 'home' ? '#f59e0b' : theme.textSecondary }]}>Trang chủ</Text>
             {activeNav === 'home' && <View style={styles.activeDot} />}
           </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.navItem,
-              pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 }
-            ]}
-            onPress={() => setActiveNav('explore')}
-          >
-            <Globe size={20} color={activeNav === 'explore' ? '#3b82f6' : theme.textSecondary} />
-            <Text style={[styles.navText, { color: activeNav === 'explore' ? '#3b82f6' : theme.textSecondary }]}>Khám phá</Text>
-            {activeNav === 'explore' && <View style={styles.activeDot} />}
-          </Pressable>
+
 
           <Pressable
             style={({ pressed }) => [
               styles.navItem,
               pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 }
             ]}
-            onPress={() => setActiveNav('map')}
+            onPress={() => { setSelectedPlaceName(''); setActiveNav('map'); }}
           >
-            <MapIcon size={20} color={activeNav === 'map' ? '#3b82f6' : theme.textSecondary} />
-            <Text style={[styles.navText, { color: activeNav === 'map' ? '#3b82f6' : theme.textSecondary }]}>Bản đồ</Text>
+            <MapIcon size={20} color={activeNav === 'map' ? '#f59e0b' : theme.textSecondary} />
+            <Text style={[styles.navText, { color: activeNav === 'map' ? '#f59e0b' : theme.textSecondary }]}>Bản đồ</Text>
             {activeNav === 'map' && <View style={styles.activeDot} />}
           </Pressable>
 
@@ -873,8 +858,8 @@ export default function App() {
             ]}
             onPress={() => setActiveNav('social')}
           >
-            <Newspaper size={20} color={activeNav === 'social' ? '#3b82f6' : theme.textSecondary} />
-            <Text style={[styles.navText, { color: activeNav === 'social' ? '#3b82f6' : theme.textSecondary }]}>Bảng tin</Text>
+            <Newspaper size={20} color={activeNav === 'social' ? '#f59e0b' : theme.textSecondary} />
+            <Text style={[styles.navText, { color: activeNav === 'social' ? '#f59e0b' : theme.textSecondary }]}>Bảng tin</Text>
             {activeNav === 'social' && <View style={styles.activeDot} />}
           </Pressable>
 
@@ -885,8 +870,8 @@ export default function App() {
             ]}
             onPress={() => setActiveNav('profile')}
           >
-            <User size={20} color={activeNav === 'profile' ? '#3b82f6' : theme.textSecondary} />
-            <Text style={[styles.navText, { color: activeNav === 'profile' ? '#3b82f6' : theme.textSecondary }]}>Cá nhân</Text>
+            <User size={20} color={activeNav === 'profile' ? '#f59e0b' : theme.textSecondary} />
+            <Text style={[styles.navText, { color: activeNav === 'profile' ? '#f59e0b' : theme.textSecondary }]}>Cá nhân</Text>
             {activeNav === 'profile' && <View style={styles.activeDot} />}
           </Pressable>
 
@@ -934,7 +919,7 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#f59e0b',
     marginTop: 4,
     position: 'absolute',
     bottom: 6,

@@ -1,37 +1,53 @@
 import axios from "axios";
-import Constants from "expo-constants";
+import { getHostIp } from "../utils/hostIp";
 
-// Lấy IP từ Expo host (tự động khi chạy qua Expo Go)
 const getApiBaseUrl = () => {
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-
-  // Thử lấy host từ các phiên bản Expo khác nhau
-  const hostUri =
-    Constants.expoConfig?.hostUri ||
-    Constants.manifest?.debuggerHost ||
-    Constants.manifest2?.extra?.expoGo?.debuggerHost;
-
-  if (hostUri) {
-    const ip = hostUri.split(':')[0];
-    if (ip && ip !== 'localhost') {
-      return `http://${ip}:3000/api`;
-    }
-  }
-
-  // Fallback: IP máy tính trong mạng LAN
-  return 'http://192.168.100.101:3000/api';
+  const host = getHostIp();
+  return `http://${host}:3000/api`;
 };
 
 const apiBaseUrl = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: apiBaseUrl,
-  timeout: 8000, // 8 giây - đủ thời gian kết nối qua LAN
+  timeout: 10000,
 });
 
-// Log URL khi khởi động để debug
 console.log('[API] Base URL:', apiBaseUrl);
+
+// Tự động thử lại các IP thay thế (IP LAN / 10.0.2.2 / localhost) nếu gặp Network Error
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const config = error.config;
+    if (!config || config._retry || error.message !== 'Network Error') {
+      return Promise.reject(error);
+    }
+
+    config._retry = true;
+    const currentHost = getHostIp();
+    const fallbacks = [
+      `http://${currentHost}:3000/api`,
+      'http://10.0.2.2:3000/api',
+      'http://localhost:3000/api',
+      'http://127.0.0.1:3000/api',
+    ];
+    
+    for (const altUrl of fallbacks) {
+      if (altUrl !== apiBaseUrl) {
+        try {
+          const originalPath = config.url.replace(config.baseURL || '', '');
+          config.baseURL = altUrl;
+          config.url = originalPath;
+          return await axios(config);
+        } catch (_) {}
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default api;

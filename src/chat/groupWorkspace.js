@@ -14,11 +14,26 @@ import {
   StatusBar,
   ActivityIndicator,
   Linking,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { loadAppData, saveAppData } from '../services/appDataService';
 import { searchFriends } from '../services/userService';
-import { addChatMembers, createChatGroup, getChatGroups, getChatMessages, getGroupNotifications, removeChatMember, renameChatGroup, sendChatMessage, updateChatGroupWorkspace } from '../services/chatService';
+import {
+  addChatMembers,
+  createChatGroup,
+  getChatGroups,
+  getChatMessages,
+  getGroupNotifications,
+  removeChatMember,
+  renameChatGroup,
+  sendChatMessage,
+  updateChatGroupWorkspace,
+  askGroupAssistant,
+  createGroupPoll,
+  voteGroupPoll,
+  closeGroupPoll,
+} from '../services/chatService';
 import { fetchGoogleWeatherForecast } from '../services/googleWeatherService';
 import { isSystemChatEntry, looksLikeSystemAnnouncement, normalizeGroupPreviewText, normalizeSystemAnnouncementText } from '../utils/chatText';
 import {
@@ -50,9 +65,16 @@ import {
   MapPinned,
   LogOut,
   RefreshCw,
+  Bot,
+  BarChart3,
+  CheckSquare,
+  Bell,
 } from 'lucide-react-native';
 
 import { UserProfileModal } from '../social';
+import { GroupAssistantModal } from './groupAssistantModal';
+import { CreatePollModal } from './createPollModal';
+import { GroupTaskTab } from './groupTaskTab';
 
 const { height } = Dimensions.get('window');
 
@@ -76,6 +98,7 @@ const WORKSPACE_TABS = [
   { key: 'chat', label: 'Chat', Icon: MessageCircle },
   { key: 'planner', label: 'Lịch trình', Icon: CalendarDays },
   { key: 'fund', label: 'Quỹ du lịch', Icon: Wallet },
+  { key: 'tasks', label: 'Phân công', Icon: CheckSquare },
 ];
 
 const TRAVEL_DESTINATIONS = [
@@ -203,6 +226,111 @@ const TRAVEL_DESTINATIONS = [
       cloudy: ['Đi cafe trong trung tâm', 'Mua đặc sản và tham quan nhà ga', 'Dạo chợ Đà Lạt'],
       rainy: ['Ưu tiên lịch trong nhà', 'Cafe, bánh nóng và nghỉ ngơi', 'Sắp xếp thời gian di chuyển ngắn'],
       evening: ['Đi chợ đêm', 'Ăn lẩu gà lá é', 'Chốt đồ dùng mang theo cho sáng hôm sau'],
+    },
+  },
+  {
+    id: 'ha-noi',
+    name: 'Hà Nội',
+    region: 'Hà Nội',
+    climateKey: 'capital',
+    image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=80',
+    keywords: ['hà nội', 'thủ đô', 'hồ gươm', 'phố cổ'],
+    intro: 'Thủ đô ngàn năm văn hiến với phố cổ, nét văn hóa ẩm thực đặc sắc và các di tích lịch sử.',
+    highlights: ['Hồ Hoàn Kiếm', 'Lăng Bác', 'Phố Cổ Hà Nội', 'Văn Miếu'],
+    mapStops: ['Hồ Hoàn Kiếm, Hà Nội', 'Lăng Chủ tịch Hồ Chí Minh', 'Văn Miếu Quốc Tử Giám'],
+    coordinates: { latitude: 21.0285, longitude: 105.8542 },
+    packingCore: ['CCCD', 'giày êm', 'sạc dự phòng', 'ô che'],
+    packingSunny: ['nón', 'kem chống nắng'],
+    packingRainy: ['áo mưa mỏng', 'ô gấp'],
+    activities: {
+      sunny: ['Dạo Hồ Gươm và phố cổ sáng sớm', 'Tham quan Văn Miếu', 'Thưởng thức cafe trứng Hàng Gai'],
+      cloudy: ['Food tour phố cổ Hà Nội', 'Check-in Bảo tàng Lịch sử', 'Mua quà bún chả và cốm'],
+      rainy: ['Ngồi cafe phố cổ ngắm mưa', 'Ăn phở nóng và dạo trung tâm'],
+      evening: ['Dạo phố đi bộ', 'Ăn bún chả / phở', 'Trà đá vỉa hè phố cổ'],
+    },
+  },
+  {
+    id: 'ninh-binh',
+    name: 'Ninh Bình',
+    region: 'Ninh Bình',
+    climateKey: 'heritage',
+    image: 'https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=600&q=80',
+    keywords: ['ninh bình', 'tràng an', 'tam cốc', 'bái đính', 'hang múa'],
+    intro: 'Cố đô Hoa Lư với danh thắng Tràng An, núi non trùng điệp và sông nước hữu tình.',
+    highlights: ['Tràng An', 'Hang Múa', 'Chùa Bái Đính', 'Tam Cốc - Bích Động'],
+    mapStops: ['Danh thắng Tràng An', 'Hang Múa, Ninh Bình', 'Chùa Bái Đính'],
+    coordinates: { latitude: 20.2506, longitude: 105.9744 },
+    packingCore: ['CCCD', 'giày thể thao', 'nón lá/mũ', 'nước uống'],
+    packingSunny: ['kem chống nắng', 'kính mát'],
+    packingRainy: ['áo mưa gọn', 'túi chống nước'],
+    activities: {
+      sunny: ['Đi thuyền Tràng An / Tam Cốc', 'Leo đỉnh Hang Múa ngắm toàn cảnh', 'Bái Phật chùa Bái Đính'],
+      cloudy: ['Tham quan Cố đô Hoa Lư', 'Dạo đầm Vân Long', 'Thưởng thức thịt dê nướng'],
+      rainy: ['Nghỉ ngơi resort núi', 'Ăn cơm cháy thịt dê nóng hổi'],
+      evening: ['Dạo phố cổ Hoa Lư đêm', 'Ăn tối đặc sản dê núi'],
+    },
+  },
+  {
+    id: 'hue',
+    name: 'Huế',
+    region: 'Thừa Thiên Huế',
+    climateKey: 'heritage',
+    image: 'https://images.unsplash.com/photo-1555921015-5532091f6026?auto=format&fit=crop&w=600&q=80',
+    keywords: ['huế', 'cố đô', 'sông hương', 'đại nội', 'chùa thiên mụ'],
+    intro: 'Mảnh đất Cố đô thơ mộng với Đại Nội cổ kính, lăng tẩm triều Nguyễn và nhã nhạc cung đình.',
+    highlights: ['Đại Nội Huế', 'Chùa Thiên Mụ', 'Lăng Khải Định', 'Sông Hương'],
+    mapStops: ['Đại Nội Huế', 'Chùa Thiên Mụ, Huế', 'Lăng Khải Định, Huế'],
+    coordinates: { latitude: 16.4637, longitude: 107.5908 },
+    packingCore: ['CCCD', 'giày đi bộ', 'ô du lịch', 'mũ nón'],
+    packingSunny: ['kem chống nắng', 'áo khoác mỏng'],
+    packingRainy: ['áo mưa', 'ô màu trầm'],
+    activities: {
+      sunny: ['Tham quan Đại Nội Huế', 'Ngắm cảnh chùa Thiên Mụ', 'Viếng Lăng Khải Định'],
+      cloudy: ['Thưởng thức bún bò Huế và bánh nậm', 'Dạo chợ Đông Ba', 'Ngồi cafe ngắm sông Hương'],
+      rainy: ['Nghe Ca Huế trên Sông Hương', 'Ăn chè hẻm Huế ấm cúng'],
+      evening: ['Đi thuyền nghe ca Huế', 'Dạo cầu Tràng Tiền ngắm đèn nghệ thuật'],
+    },
+  },
+  {
+    id: 'ha-giang',
+    name: 'Hà Giang',
+    region: 'Hà Giang',
+    climateKey: 'mountain',
+    image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=600&q=80',
+    keywords: ['hà giang', 'mã pí lèng', 'đồng văn', 'lũng cú', 'sông nho quế'],
+    intro: 'Vùng cao nguyên đá hùng vĩ với đèo Mã Pí Lèng, hẻm Tu Sản và sông Nho Quế xanh ngọc.',
+    highlights: ['Mã Pí Lèng', 'Sông Nho Quế', 'Cột cờ Lũng Cú', 'Dinh họ Vương'],
+    mapStops: ['Đèo Mã Pí Lèng, Hà Giang', 'Sông Nho Quế', 'Cột cờ Lũng Cú'],
+    coordinates: { latitude: 22.8233, longitude: 104.9836 },
+    packingCore: ['CCCD', 'giày leo núi', 'áo khoác ấm', 'găng tay xe máy'],
+    packingSunny: ['kính râm', 'kem chống nắng'],
+    packingRainy: ['áo mưa bộ', 'túi chống nước'],
+    activities: {
+      sunny: ['Chinh phục đèo Mã Pí Lèng', 'Đi thuyền trên sông Nho Quế', 'Check-in Cột cờ Lũng Cú'],
+      cloudy: ['Tham quan Phố cổ Đồng Văn', 'Ghé Dinh Vua Mèo', 'Ngắm hoa tam giác mạch'],
+      rainy: ['Thưởng thức thắng cố và rượu ngô', 'Sưởi ấm bên bếp lửa nhà sàn'],
+      evening: ['Dạo phố cổ Đồng Văn', 'Ăn lẩu gà đen', 'Thưởng thức trà Shan Tuyết'],
+    },
+  },
+  {
+    id: 'ho-chi-minh',
+    name: 'TP. Hồ Chí Minh',
+    region: 'TP. Hồ Chí Minh',
+    climateKey: 'metropolis',
+    image: 'https://images.unsplash.com/photo-1509060464153-4466739f78ad?auto=format&fit=crop&w=600&q=80',
+    keywords: ['hồ chí minh', 'sài gòn', 'bến thành', 'bưu điện trung tâm', 'dinh độc lập'],
+    intro: 'Đô thị sầm uất bậc nhất với sự giao thoa văn hóa, ẩm thực phong phú và nhịp sống hiện đại.',
+    highlights: ['Chợ Bến Thành', 'Dinh Độc Lập', 'Bưu điện Trung tâm', 'Phố đi bộ Nguyễn Huệ'],
+    mapStops: ['Chợ Bến Thành, TP.HCM', 'Dinh Độc Lập', 'Phố đi bộ Nguyễn Huệ'],
+    coordinates: { latitude: 10.8231, longitude: 106.6297 },
+    packingCore: ['CCCD', 'giày nhẹ', 'sạc dự phòng', 'ô gấp'],
+    packingSunny: ['kem chống nắng', 'kính râm'],
+    packingRainy: ['áo mưa mỏng'],
+    activities: {
+      sunny: ['Dạo Dinh Độc Lập và Nhà thờ Đức Bà', 'Check-in Bưu điện trung tâm', 'Ngắm phố Nguyễn Huệ'],
+      cloudy: ['Thưởng thức cơm tấm & hủ tiếu', 'Cafe chung cư 42 Nguyễn Huệ', 'Mua sắm tại Chợ Bến Thành'],
+      rainy: ['Ngồi cafe ngắm phố Sài Gòn', 'Ăn lẩu và thưởng thức ẩm thực trong nhà'],
+      evening: ['Đi xe buýt 2 tầng ngắm phố', 'Dạo Phố Bùi Viện / Nguyễn Huệ'],
     },
   },
 ];
@@ -570,9 +698,10 @@ const buildItinerarySuggestion = ({ destination, startDate, endDate, forecast, s
             ? 'Trời nhiều mây, thích hợp đi bộ tham quan và chụp ảnh cả ngày.'
             : 'Thời tiết đẹp, có thể ưu tiên hoạt động ngoài trời và điểm mở.',
       slots: [
-        { title: 'Buổi sáng', text: morning },
-        { title: 'Buổi chiều', text: afternoon },
-        { title: 'Buổi tối', text: evening },
+        { time: '08:00', period: 'SÁNG', title: 'Hoạt động Sáng (08:00)', text: morning },
+        { time: '12:00', period: 'TRƯA', title: 'Ăn trưa & Nghỉ ngơi (12:00)', text: `Thưởng thức ẩm thực đặc sản ${destination.name}` },
+        { time: '14:30', period: 'CHIỀU', title: 'Hoạt động Chiều (14:30)', text: afternoon },
+        { time: '19:00', period: 'TỐI', title: 'Hoạt động Tối (19:00)', text: evening },
       ],
     };
   });
@@ -769,12 +898,13 @@ const normalizeApiMessage = (message, currentUser, ownerId, membersList = []) =>
     id: message._id || message.id,
     type: isSystemMessage ? 'system' : (message.type || 'text'),
     senderId: message.senderId,
-    user: isSystemMessage ? 'H\u1ec7 th\u1ed1ng' : senderProfile.name || 'Th\u00e0nh vi\u00ean Vivu360',
-    actorName: senderProfile.name || 'Th\u00e0nh vi\u00ean',
+    user: isSystemMessage ? 'Hệ thống' : senderProfile.name || 'Thành viên Vivu360',
+    actorName: senderProfile.name || 'Thành viên',
     avatar: isSystemMessage ? '' : senderProfile.avatar || '',
     text: isSystemMessage
-      ? normalizeSystemAnnouncementText(rawText, senderProfile.name || 'Th\u00e0nh vi\u00ean')
+      ? normalizeSystemAnnouncementText(rawText, senderProfile.name || 'Thành viên')
       : rawText,
+    poll: message.poll,
     createdAt: message.createdAt,
   };
 };
@@ -894,6 +1024,67 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [workspaceTab, setWorkspaceTab] = useState('chat');
 
+  const [assistantModalVisible, setAssistantModalVisible] = useState(false);
+  const [createPollModalVisible, setCreatePollModalVisible] = useState(false);
+
+  const handleAskAssistant = async (questionText) => {
+    if (!selectedGroup) return;
+    try {
+      const aiMessage = await askGroupAssistant(selectedGroup.id, ownerId, questionText);
+      const normalizedMsg = normalizeApiMessage(aiMessage, currentUser, ownerId, selectedGroup.membersList);
+      updateGroupById(selectedGroup.id, (group) => ({
+        ...group,
+        lastMessage: `🤖 Trợ Lý AI: ${aiMessage.content?.slice(0, 30)}...`,
+        messages: [...group.messages, normalizedMsg],
+      }));
+    } catch (err) {
+      Alert.alert('Lỗi Trợ Lý AI', 'Không thể gửi câu hỏi cho Trợ lý AI.');
+    }
+  };
+
+  const handleCreatePoll = async ({ question, options, multipleChoice }) => {
+    if (!selectedGroup) return;
+    try {
+      const pollMessage = await createGroupPoll(selectedGroup.id, ownerId, question, options, multipleChoice);
+      const normalizedMsg = normalizeApiMessage(pollMessage, currentUser, ownerId, selectedGroup.membersList);
+      updateGroupById(selectedGroup.id, (group) => ({
+        ...group,
+        lastMessage: `📊 Bình chọn: ${question}`,
+        messages: [...group.messages, normalizedMsg],
+      }));
+    } catch (err) {
+      Alert.alert('Lỗi Bình Chọn', 'Không thể khởi tạo bài bình chọn.');
+    }
+  };
+
+  const handleVotePoll = async (messageId, optionId) => {
+    if (!selectedGroup) return;
+    try {
+      const updatedMsg = await voteGroupPoll(selectedGroup.id, messageId, optionId, ownerId);
+      const normalizedMsg = normalizeApiMessage(updatedMsg, currentUser, ownerId, selectedGroup.membersList);
+      updateGroupById(selectedGroup.id, (group) => ({
+        ...group,
+        messages: group.messages.map((m) => (m.id === messageId ? normalizedMsg : m)),
+      }));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleClosePoll = async (messageId) => {
+    if (!selectedGroup) return;
+    try {
+      const updatedMsg = await closeGroupPoll(selectedGroup.id, messageId, ownerId);
+      const normalizedMsg = normalizeApiMessage(updatedMsg, currentUser, ownerId, selectedGroup.membersList);
+      updateGroupById(selectedGroup.id, (group) => ({
+        ...group,
+        messages: group.messages.map((m) => (m.id === messageId ? normalizedMsg : m)),
+      }));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupTag, setNewGroupTag] = useState('');
 
@@ -966,8 +1157,10 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
         }));
       })
       .catch((error) => {
-        console.warn('Không thể tải nhóm chat:', error.message);
-        if (active) Alert.alert('Không thể tải chat', 'Hãy kiểm tra Vivu360_API đang chạy và thử lại.');
+        if (error?.message !== 'Network Error') {
+          console.warn('Không thể tải nhóm chat:', error.message);
+          if (active) Alert.alert('Không thể tải chat', 'Hãy kiểm tra Vivu360_API đang chạy và thử lại.');
+        }
       })
       .finally(() => {
         if (active) {
@@ -1015,7 +1208,11 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
             })
           );
         })
-        .catch((error) => console.warn('Kh\u00f4ng th\u1ec3 t\u1ea3i d\u1eef li\u1ec7u chat nh\u00f3m:', error.message));
+        .catch((error) => {
+          if (error?.message !== 'Network Error') {
+            console.warn('Không thể tải dữ liệu chat nhóm:', error.message);
+          }
+        });
     loadMessages();
     const timer = setInterval(loadMessages, 3000);
     return () => { active = false; clearInterval(timer); };
@@ -1397,7 +1594,9 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
       memberId: contributor.id,
       memberName: contributor.name,
       amount,
-      note: fundContributionNote.trim() || '\u0110\u00f3ng g\u00f3p qu\u1ef9',
+      note: fundContributionNote.trim() || 'Đóng góp quỹ',
+      stk: fundStkInput?.trim() || null,
+      billImage: fundBillImage || null,
       createdAt: new Date().toISOString(),
     };
 
@@ -1636,45 +1835,68 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
       </Modal>
 
       {selectedGroup && (
-        <Modal animationType="fade" transparent={false} visible={chatModalVisible} onRequestClose={() => setChatModalVisible(false)}>
-          <View style={[styles.chatRoomContainer, { backgroundColor: theme.background }]}>
-            <LinearGradient colors={isDarkMode ? ['#0f172a', '#020617'] : ['#f8fafc', '#e2e8f0']} style={{ flex: 1 }}>
-              <View style={[styles.chatHeader, { backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.92)', borderBottomColor: theme.border }]}>
-                <Pressable style={[styles.backChatBtn, { backgroundColor: theme.searchBg }]} onPress={() => setChatModalVisible(false)}>
-                  <X size={18} color={theme.textPrimary} />
+        <Modal animationType="slide" transparent={false} visible={chatModalVisible} onRequestClose={() => setChatModalVisible(false)} statusBarTranslucent>
+          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+          <View style={[styles.chatRoomContainer, { backgroundColor: isDarkMode ? '#12101d' : '#fcf4ef' }]}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+            <View style={{ flex: 1, backgroundColor: isDarkMode ? '#12101d' : '#fcf4ef' }}>
+              {/* ── HEADER KHÔNG GIAN NHÓM CHÁT (Collection UI Style) ──────────────── */}
+              <View style={[styles.chatHeader, { backgroundColor: isDarkMode ? '#12101d' : '#fcf4ef', borderBottomWidth: 0, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 44, paddingBottom: 10 }]}>
+                {/* Nút Quay Lại */}
+                <Pressable style={[styles.backChatBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]} onPress={() => setChatModalVisible(false)}>
+                  <ChevronLeft size={20} color={theme.textPrimary} />
                 </Pressable>
-                <View style={styles.chatHeaderAvatarWrapper}>
-                  <Image source={{ uri: selectedGroup.image }} style={styles.chatHeaderAvatar} />
-                  <View style={styles.statusActiveDot} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text numberOfLines={1} style={[styles.chatHeaderName, { color: theme.textPrimary }]}>
+
+                {/* Avatar Nhóm có Vòng Gradient */}
+                <LinearGradient
+                  colors={['#f43f5e', '#fb923c']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ width: 44, height: 44, borderRadius: 22, padding: 1.5, marginLeft: 8 }}
+                >
+                  <View style={{ flex: 1, borderRadius: 20, overflow: 'hidden', backgroundColor: isDarkMode ? '#12101d' : '#ffffff' }}>
+                    <Image source={{ uri: selectedGroup.image }} style={{ width: '100%', height: '100%' }} />
+                  </View>
+                </LinearGradient>
+
+                {/* Tên nhóm & Thành viên */}
+                <View style={{ flex: 1, marginLeft: 10, justifyContent: 'center' }}>
+                  <Text numberOfLines={1} style={[styles.chatHeaderName, { color: theme.textPrimary, fontSize: 16, fontWeight: '900', letterSpacing: -0.2 }]}>
                     {selectedGroup.name}
                   </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                    <Text style={styles.chatHeaderMembers}>{selectedGroup.members} thành viên</Text>
-                    <RolePill role={currentRole} isDarkMode={isDarkMode} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
+                    <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#10b981' }} />
+                    <Text style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '600' }} numberOfLines={1}>
+                      {(selectedGroup.membersList || []).map(m => m.name.split(' ').pop()).slice(0, 3).join(', ')} +{Math.max(0, (selectedGroup.membersList || []).length - 3)} · {selectedGroup.members} thành viên
+                    </Text>
                   </View>
                 </View>
-                <Pressable
-                  style={[styles.chatInfoBtn, { backgroundColor: theme.searchBg }]}
-                  onPress={() =>
-                    Alert.alert(
-                      'Thông tin nhóm',
-                      `${selectedGroup.name}\nChủ đề: ${selectedGroup.tag}\nTrưởng nhóm: ${
-                        selectedGroup.membersList.find((member) => member.id === selectedGroup.leaderId)?.name || 'Đang cập nhật'
-                      }\nThành viên: ${selectedGroup.members}`
-                    )
-                  }
-                >
-                  <Info size={16} color={theme.textSecondary} />
-                </Pressable>
-                <Pressable style={[styles.chatInfoBtn, { backgroundColor: theme.searchBg }]} onPress={() => setSettingsVisible(true)}>
-                  <Settings2 size={16} color={theme.textSecondary} />
-                </Pressable>
+
+                {/* Nút Hành động Góc Phải (Call, Video, Settings) */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Pressable
+                    style={[styles.chatInfoBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                    onPress={() => Alert.alert('Gọi thoại', `Đang kết nối cuộc gọi thoại nhóm cho ${selectedGroup.name}...`)}
+                  >
+                    <Phone size={17} color={theme.textPrimary} />
+                  </Pressable>
+                  <Pressable
+                    style={[styles.chatInfoBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                    onPress={() => Alert.alert('Gọi Video', `Đang mở phòng gọi Video nhóm cho ${selectedGroup.name}...`)}
+                  >
+                    <Video size={17} color={theme.textPrimary} />
+                  </Pressable>
+                  <Pressable
+                    style={[styles.chatInfoBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                    onPress={() => setSettingsVisible(true)}
+                  >
+                    <Settings2 size={17} color={theme.textPrimary} />
+                  </Pressable>
+                </View>
               </View>
 
-              <View style={[styles.workspaceTabBar, { borderBottomColor: theme.border, backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.78)' : 'rgba(255, 255, 255, 0.8)' }]}>
+              {/* ── WORKSPACE TABS BAR (Bù trải rộng 100%, Không bao giờ bị mất chữ) ─────── */}
+              <View style={[styles.workspaceTabBar, { borderBottomWidth: 0, backgroundColor: isDarkMode ? '#12101d' : '#fcf4ef', paddingHorizontal: 16, paddingVertical: 8 }]}>
                 {WORKSPACE_TABS.map((tabItem) => {
                   const isActive = workspaceTab === tabItem.key;
                   const Icon = tabItem.Icon;
@@ -1682,11 +1904,46 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                   return (
                     <Pressable
                       key={tabItem.key}
-                      style={[styles.workspaceTabButton, isActive ? styles.workspaceTabButtonActive : null, { backgroundColor: isActive ? 'rgba(59, 130, 246, 0.12)' : 'transparent', borderColor: isActive ? 'rgba(59, 130, 246, 0.3)' : 'transparent' }]}
+                      style={{ flex: 1, borderRadius: 16, overflow: 'hidden' }}
                       onPress={() => setWorkspaceTab(tabItem.key)}
                     >
-                      <Icon size={15} color={isActive ? '#3b82f6' : theme.textSecondary} />
-                      <Text style={[styles.workspaceTabText, { color: isActive ? '#3b82f6' : theme.textSecondary }]}>{tabItem.label}</Text>
+                      {isActive ? (
+                        <LinearGradient
+                          colors={['#f43f5e', '#e11d48']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            paddingVertical: 9,
+                            paddingHorizontal: 8,
+                            borderRadius: 16,
+                          }}
+                        >
+                          <Icon size={15} color="#ffffff" />
+                          <Text style={{ color: '#ffffff', fontSize: 12.5, fontWeight: '800' }}>
+                            {tabItem.label}
+                          </Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          paddingVertical: 9,
+                          paddingHorizontal: 8,
+                          borderRadius: 16,
+                          backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                        }}>
+                          <Icon size={15} color={theme.textSecondary} />
+                          <Text style={{ color: theme.textSecondary, fontSize: 12.5, fontWeight: '700' }}>
+                            {tabItem.label}
+                          </Text>
+                        </View>
+                      )}
                     </Pressable>
                   );
                 })}
@@ -1712,17 +1969,182 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
                       const isMe = String(message.senderId) === String(ownerId);
                       const messageTime = getFormattedMsgTime(message.createdAt || message.id);
+                      const isLocationShare = typeof message.text === 'string' && (message.text.includes('CHIA SẺ ĐỊA ĐIỂM') || message.text.includes('📍 [CHIA SẺ'));
+
+                      const resolveMemberName = (msg) => {
+                        if (isMe) {
+                          return currentUser?.name || currentUser?.fullName || 'Bạn';
+                        }
+                        const raw = msg?.user || msg?.userName || msg?.senderName || msg?.sender?.name;
+                        if (raw && typeof raw === 'string' && !raw.startsWith('Thành viên (') && raw !== 'Thành viên') {
+                          return raw;
+                        }
+                        const sid = String(msg?.senderId || msg?.sender || '');
+                        if (Array.isArray(selectedGroup?.membersList)) {
+                          const found = selectedGroup.membersList.find(m => String(m.id || m.firebaseUid || m._id) === sid);
+                          if (found && found.name && !found.name.startsWith('Thành viên (')) {
+                            return found.name;
+                          }
+                        }
+                        return (currentUser?.name && !currentUser.name.startsWith('Thành viên (')) ? currentUser.name : 'Nguyễn Ngọc Tú';
+                      };
+
+                      const senderDisplayName = resolveMemberName(message);
+
+                      if (isLocationShare) {
+                        const locNameMatch = message.text.match(/🚩\s*([^\n]+)/);
+                        const locName = locNameMatch ? locNameMatch[1].trim() : 'Địa điểm du lịch';
+
+                        return (
+                          <View key={message.id} style={{ marginVertical: 8, marginHorizontal: 12 }}>
+                            <View style={{
+                              backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+                              borderRadius: 16,
+                              borderWidth: 1.5,
+                              borderColor: '#3b82f6',
+                              padding: 12,
+                              elevation: 3,
+                              shadowColor: '#3b82f6',
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: 0.15,
+                              shadowRadius: 6,
+                            }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, borderBottomWidth: 0.5, borderBottomColor: theme.border, paddingBottom: 8 }}>
+                                <Image source={{ uri: message.avatar || getUserAvatarByName(senderDisplayName) }} style={{ width: 26, height: 26, borderRadius: 13 }} />
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ fontSize: 12.5, fontWeight: '850', color: theme.textPrimary }}>
+                                    👤 {senderDisplayName}
+                                  </Text>
+                                  <Text style={{ fontSize: 10, color: '#3b82f6', fontWeight: '700' }}>📍 Đã chia sẻ vị trí Bản đồ 360°</Text>
+                                </View>
+                                <Text style={{ fontSize: 10, color: theme.textMuted }}>{messageTime}</Text>
+                              </View>
+
+                              <Text style={{ fontSize: 12.5, color: theme.textPrimary, lineHeight: 18, fontWeight: '600' }}>
+                                {message.text}
+                              </Text>
+
+                              <Pressable
+                                style={{
+                                  marginTop: 10,
+                                  backgroundColor: '#3b82f6',
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 6,
+                                  paddingVertical: 8,
+                                  borderRadius: 10,
+                                }}
+                                onPress={() => {
+                                  if (setChatModalVisible) setChatModalVisible(false);
+                                  if (onNavigateToMapWithPlace) onNavigateToMapWithPlace(locName);
+                                }}
+                              >
+                                <Compass size={14} color="#fff" />
+                                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '850' }}>🗺️ Xem trên Bản đồ 360°</Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        );
+                      }
+
+                      if (message.type === 'poll' || message.poll) {
+                        const poll = message.poll || {};
+                        const totalVotes = (poll.options || []).reduce((sum, o) => sum + (o.voters?.length || 0), 0);
+
+                        return (
+                          <View key={message.id} style={{ marginVertical: 8, paddingHorizontal: 12 }}>
+                            <LinearGradient colors={isDarkMode ? ['#3b0764', '#1e1b4b'] : ['#f3e8ff', '#faf5ff']} style={{ padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#c4b5fd' }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                <BarChart3 size={18} color="#8b5cf6" />
+                                <Text style={{ fontWeight: '700', fontSize: 14, color: theme.textPrimary, flex: 1 }}>{poll.question}</Text>
+                                {poll.closed && <Text style={{ fontSize: 10, color: '#ef4444', backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>Đã khóa</Text>}
+                              </View>
+
+                              {(poll.options || []).map((opt) => {
+                                const voteCount = opt.voters?.length || 0;
+                                const percent = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                                const hasVoted = (opt.voters || []).includes(ownerId);
+
+                                return (
+                                  <Pressable
+                                    key={opt.id}
+                                    style={{
+                                      backgroundColor: hasVoted ? 'rgba(139, 92, 246, 0.18)' : isDarkMode ? 'rgba(255,255,255,0.08)' : '#ffffff',
+                                      padding: 10,
+                                      borderRadius: 12,
+                                      marginVertical: 4,
+                                      borderWidth: 1,
+                                      borderColor: hasVoted ? '#8b5cf6' : theme.border,
+                                    }}
+                                    onPress={() => !poll.closed && handleVotePoll(message.id, opt.id)}
+                                  >
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textPrimary, flex: 1 }}>{opt.text}</Text>
+                                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#8b5cf6' }}>{voteCount} vote ({percent}%)</Text>
+                                    </View>
+                                    <View style={{ height: 4, backgroundColor: 'rgba(148,163,184,0.2)', borderRadius: 2, marginTop: 6, overflow: 'hidden' }}>
+                                      <View style={{ height: '100%', width: `${percent}%`, backgroundColor: '#8b5cf6', borderRadius: 2 }} />
+                                    </View>
+                                  </Pressable>
+                                );
+                              })}
+
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                                <Text style={{ fontSize: 11, color: theme.textMuted }}>Tổng số vote: {totalVotes}</Text>
+                                {!poll.closed && (selectedGroup?.leaderId === ownerId || selectedGroup?.deputyIds?.includes(ownerId)) && (
+                                  <Pressable onPress={() => handleClosePoll(message.id)}>
+                                    <Text style={{ fontSize: 11, color: '#ef4444', fontWeight: '600' }}>Khóa bình chọn</Text>
+                                  </Pressable>
+                                )}
+                              </View>
+                            </LinearGradient>
+                          </View>
+                        );
+                      }
+
+                      if (message.type === 'assistant' || message.senderId === 'VIVU_AI_BOT') {
+                        return (
+                          <View key={message.id} style={{ marginVertical: 8, paddingHorizontal: 12 }}>
+                            <LinearGradient colors={isDarkMode ? ['#0f172a', '#1e293b'] : ['#eff6ff', '#dbeafe']} style={{ padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#60a5fa' }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#3b82f6', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Bot size={14} color="#ffffff" />
+                                </View>
+                                <Text style={{ fontWeight: '700', fontSize: 13, color: '#2563eb' }}>Trợ Lý Vivu360 🤖</Text>
+                                <Sparkles size={12} color="#3b82f6" />
+                              </View>
+                              <Text style={{ fontSize: 13, color: theme.textPrimary, lineHeight: 19 }}>{message.text}</Text>
+                              <Text style={{ fontSize: 10, color: theme.textMuted, marginTop: 6, alignSelf: 'flex-end' }}>{messageTime}</Text>
+                            </LinearGradient>
+                          </View>
+                        );
+                      }
+
+                      if (message.type === 'task_reminder') {
+                        return (
+                          <View key={message.id} style={{ marginVertical: 6, paddingHorizontal: 12 }}>
+                            <LinearGradient colors={isDarkMode ? ['#451a03', '#78350f'] : ['#fef3c7', '#fde68a']} style={{ padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#f59e0b' }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                <Bell size={16} color="#d97706" />
+                                <Text style={{ fontWeight: '700', fontSize: 13, color: '#b45309' }}>NHẮC NHỞ CÔNG VIỆC</Text>
+                              </View>
+                              <Text style={{ fontSize: 13, color: '#78350f', fontWeight: '500' }}>{message.text}</Text>
+                            </LinearGradient>
+                          </View>
+                        );
+                      }
 
                       return (
                         <View key={message.id} style={[styles.msgWrapper, isMe ? styles.msgWrapperMe : null]}>
                           {isMe ? (
                             <View style={{ alignItems: 'flex-end' }}>
-                              <LinearGradient colors={['#06b6d4', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.msgBubble, styles.msgBubbleMe]}>
+                              <LinearGradient colors={['#f43f5e', '#e11d48']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.msgBubble, styles.msgBubbleMe]}>
                                 <Text style={styles.msgTextMe}>{message.text}</Text>
                               </LinearGradient>
                               <View style={styles.msgMetaMe}>
                                 <Text style={[styles.msgTimeTextMe, { color: theme.textMuted }]}>{messageTime}</Text>
-                                <CheckCheck size={11} color="#06b6d4" />
+                                <CheckCheck size={11} color="#f43f5e" />
                               </View>
                             </View>
                           ) : (
@@ -1734,7 +2156,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                               <View style={styles.otherMsgCol}>
                                 <View style={styles.otherMsgHeader}>
                                   <Pressable onPress={() => { setChatModalVisible(false); handleOpenUserProfile(message.user); }}>
-                                    <Text style={[styles.msgUserNameText, { color: theme.textPrimary }]}>{message.user}</Text>
+                                    <Text style={[styles.msgUserNameText, { color: theme.textPrimary }]}>{senderDisplayName}</Text>
                                   </Pressable>
                                   {(() => {
                                     const rank = getUserRankColors(message.user);
@@ -1788,9 +2210,15 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                     <View style={styles.chatInputInnerRow}>
                       <Pressable
                         style={[styles.chatInputAttachBtn, { backgroundColor: theme.searchBg }]}
-                        onPress={() => Alert.alert('Đính kèm tệp', 'Tính năng đính kèm tệp đang được chuẩn bị cho nhóm chat.')}
+                        onPress={() => setAssistantModalVisible(true)}
                       >
-                        <Paperclip size={16} color={theme.textSecondary} />
+                        <Bot size={16} color="#3b82f6" />
+                      </Pressable>
+                      <Pressable
+                        style={[styles.chatInputAttachBtn, { backgroundColor: theme.searchBg, marginRight: 4 }]}
+                        onPress={() => setCreatePollModalVisible(true)}
+                      >
+                        <BarChart3 size={16} color="#8b5cf6" />
                       </Pressable>
                       <Pressable
                         style={[styles.chatInputAttachBtn, { backgroundColor: theme.searchBg, marginRight: 4 }]}
@@ -1801,7 +2229,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
                       <View style={{ flex: 1, position: 'relative' }}>
                         <TextInput
-                          placeholder="Nhập tin nhắn trò chuyện..."
+                          placeholder="Hỏi AI, bình chọn hoặc nhắn tin..."
                           placeholderTextColor={theme.textMuted}
                           value={chatInput}
                           onChangeText={setChatInput}
@@ -1813,7 +2241,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                       </View>
 
                       <Pressable style={[styles.sendMsgBtn, isSendingMessage && { opacity: 0.55 }]} onPress={handleSendChatMessage} disabled={isSendingMessage}>
-                        <LinearGradient colors={['#06b6d4', '#3b82f6']} style={styles.sendMsgGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                        <LinearGradient colors={['#f43f5e', '#e11d48']} style={styles.sendMsgGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                           <Send size={14} color="#fff" />
                         </LinearGradient>
                       </Pressable>
@@ -1902,7 +2330,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                     </View>
 
                     <Pressable style={styles.primaryActionBtn} onPress={handleGenerateItinerary} disabled={isGeneratingPlan}>
-                      <LinearGradient colors={['#06b6d4', '#3b82f6']} style={styles.primaryActionGradient}>
+                      <LinearGradient colors={['#f43f5e', '#e11d48']} style={styles.primaryActionGradient}>
                         {isGeneratingPlan ? <ActivityIndicator color="#fff" /> : <RefreshCw size={16} color="#fff" />}
                         <Text style={styles.primaryActionText}>{isGeneratingPlan ? 'Đang tạo lịch trình...' : 'Tạo lịch trình gợi ý'}</Text>
                       </LinearGradient>
@@ -2007,18 +2435,111 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
               ) : (
                 <ScrollView style={styles.workspaceScroll} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                   <View style={styles.metricsRow}>
-                    <MetricCard title="Mục tiêu quỹ" value={formatMoney(fundTotals.goal)} subtitle="Ngân sách chung" icon={<Wallet size={16} color="#3b82f6" />} theme={theme} isDarkMode={isDarkMode} />
+                    <MetricCard title="Mục tiêu quỹ" value={formatMoney(fundTotals.goal)} subtitle="Ngân sách chung" icon={<Wallet size={16} color="#f59e0b" />} theme={theme} isDarkMode={isDarkMode} />
                     <MetricCard title="Số dư hiện tại" value={formatMoney(fundTotals.balance)} subtitle={`Còn thiếu ${formatMoney(fundTotals.remaining)}`} icon={<Coins size={16} color="#10b981" />} theme={theme} isDarkMode={isDarkMode} />
                   </View>
 
-                  <View style={[styles.workspaceCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
-                    <Text style={[styles.workspaceTitle, { color: theme.textPrimary }]}>Tiến độ quỹ chuyến đi</Text>
-                    <View style={[styles.progressTrack, { backgroundColor: theme.searchBg }]}>
-                      <LinearGradient colors={['#06b6d4', '#3b82f6']} style={[styles.progressFill, { width: `${Math.max(fundTotals.progress * 100, fundTotals.balance > 0 ? 8 : 0)}%` }]} />
+                  {/* ── BIỂU ĐỒ THỐNG KÊ QUỸ DU LỊCH (STATISTICS CHART) ────────────────────── */}
+                  <View style={[styles.workspaceCard, { backgroundColor: isDarkMode ? '#1c1a29' : '#ffffff', borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', shadowColor: isDarkMode ? '#000' : '#d6c4b8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: isDarkMode ? 'rgba(244,63,94,0.15)' : 'rgba(244,63,94,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+                          <Coins size={17} color="#f43f5e" />
+                        </View>
+                        <View>
+                          <Text style={[styles.workspaceTitle, { color: theme.textPrimary, fontSize: 15, fontWeight: '900' }]}>Thống kê Quỹ chuyến đi</Text>
+                          <Text style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '600', marginTop: 1 }}>Biểu đồ tỷ lệ Thu - Chi & Tiến độ</Text>
+                        </View>
+                      </View>
+                      <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: isDarkMode ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.08)' }}>
+                        <Text style={{ fontSize: 11, fontWeight: '900', color: '#10b981' }}>{Math.round(fundTotals.progress * 100)}% Hoàn thành</Text>
+                      </View>
                     </View>
-                    <Text style={[styles.workspaceSubtitle, { color: theme.textSecondary }]}>
-                      Tổng đóng góp {formatMoney(fundTotals.contributions)} · Chi ra {formatMoney(fundTotals.expenses)}
-                    </Text>
+
+                    {/* Thanh Tỷ Lệ Đã Đóng Quỹ */}
+                    <View style={{ marginTop: 4, marginBottom: 16 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: theme.textSecondary }}>Tiến độ đóng góp ({formatMoney(fundTotals.contributions)})</Text>
+                        <Text style={{ fontSize: 11.5, fontWeight: '800', color: theme.textPrimary }}>{formatMoney(fundTotals.goal)}</Text>
+                      </View>
+                      <View style={[styles.progressTrack, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', height: 10, borderRadius: 5 }]}>
+                        <LinearGradient colors={['#f43f5e', '#e11d48']} style={[styles.progressFill, { width: `${Math.min(100, Math.max(fundTotals.progress * 100, fundTotals.balance > 0 ? 6 : 0))}%`, borderRadius: 5 }]} />
+                      </View>
+                    </View>
+
+                    {/* BIỂU ĐỒ CỘT SO SÁNH THU - CHI - SỐ DƯ */}
+                    {(() => {
+                      const maxVal = Math.max(fundTotals.goal || 1, fundTotals.contributions || 1, fundTotals.expenses || 1, fundTotals.balance || 1);
+                      const goalH = Math.max(20, Math.min(110, ((fundTotals.goal || 0) / maxVal) * 110));
+                      const incomeH = Math.max(20, Math.min(110, ((fundTotals.contributions || 0) / maxVal) * 110));
+                      const expenseH = Math.max(20, Math.min(110, ((fundTotals.expenses || 0) / maxVal) * 110));
+                      const balanceH = Math.max(20, Math.min(110, ((fundTotals.balance || 0) / maxVal) * 110));
+
+                      return (
+                        <View style={{ marginTop: 8, paddingVertical: 12, borderTopWidth: 1, borderTopColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textPrimary, marginBottom: 14 }}>Biểu đồ phân tích tài chính nhóm (đ):</Text>
+                          
+                          <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', height: 140, paddingBottom: 8 }}>
+                            {/* Cột 1: Mục tiêu */}
+                            <View style={{ alignItems: 'center', width: 64 }}>
+                              <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#f59e0b', marginBottom: 4 }}>{formatMoney(fundTotals.goal).replace(' đ', '')}</Text>
+                              <LinearGradient colors={['#f59e0b', '#d97706']} style={{ width: 28, height: goalH, borderRadius: 6 }} />
+                              <Text style={{ fontSize: 10.5, fontWeight: '700', color: theme.textSecondary, marginTop: 8 }}>Mục tiêu</Text>
+                            </View>
+
+                            {/* Cột 2: Đã Thu */}
+                            <View style={{ alignItems: 'center', width: 64 }}>
+                              <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#10b981', marginBottom: 4 }}>{formatMoney(fundTotals.contributions).replace(' đ', '')}</Text>
+                              <LinearGradient colors={['#10b981', '#059669']} style={{ width: 28, height: incomeH, borderRadius: 6 }} />
+                              <Text style={{ fontSize: 10.5, fontWeight: '700', color: theme.textSecondary, marginTop: 8 }}>Đã thu</Text>
+                            </View>
+
+                            {/* Cột 3: Đã Chi */}
+                            <View style={{ alignItems: 'center', width: 64 }}>
+                              <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#ef4444', marginBottom: 4 }}>{formatMoney(fundTotals.expenses).replace(' đ', '')}</Text>
+                              <LinearGradient colors={['#f43f5e', '#e11d48']} style={{ width: 28, height: expenseH, borderRadius: 6 }} />
+                              <Text style={{ fontSize: 10.5, fontWeight: '700', color: theme.textSecondary, marginTop: 8 }}>Đã chi</Text>
+                            </View>
+
+                            {/* Cột 4: Số Dư */}
+                            <View style={{ alignItems: 'center', width: 64 }}>
+                              <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#3b82f6', marginBottom: 4 }}>{formatMoney(fundTotals.balance).replace(' đ', '')}</Text>
+                              <LinearGradient colors={['#3b82f6', '#1d4ed8']} style={{ width: 28, height: balanceH, borderRadius: 6 }} />
+                              <Text style={{ fontSize: 10.5, fontWeight: '700', color: theme.textSecondary, marginTop: 8 }}>Số dư</Text>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })()}
+
+                    {/* Xếp Hạng Đóng Góp Thành Viên */}
+                    <View style={{ borderTopWidth: 1, borderTopColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', paddingTop: 12, marginTop: 10 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textPrimary, marginBottom: 8 }}>Thống kê đóng góp theo thành viên:</Text>
+                      {(selectedGroup.membersList || []).map((m, idx) => {
+                        const mContribTotal = (selectedGroup.fund?.contributions || [])
+                          .filter(c => String(c.memberId) === String(m.id) || c.memberName === m.name)
+                          .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+                        const mTarget = (fundTotals.goal || 0) / Math.max(1, (selectedGroup.membersList || []).length);
+                        const mPct = mTarget > 0 ? Math.min(100, Math.round((mContribTotal / mTarget) * 100)) : 0;
+
+                        return (
+                          <View key={`m-stat-${m.id}`} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4, gap: 10 }}>
+                            <Image source={{ uri: m.avatar || getUserAvatarByName(m.name) }} style={{ width: 28, height: 28, borderRadius: 14 }} />
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                                <Text style={{ fontSize: 11.5, fontWeight: '700', color: theme.textPrimary }}>
+                                  {m.name} {idx === 0 ? '👑' : ''}
+                                </Text>
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: '#10b981' }}>{formatMoney(mContribTotal)}</Text>
+                              </View>
+                              <View style={{ height: 5, borderRadius: 2.5, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                                <View style={{ width: `${Math.max(5, mPct)}%`, height: '100%', backgroundColor: '#10b981', borderRadius: 2.5 }} />
+                              </View>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
                   </View>
 
                   <View style={[styles.workspaceCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
@@ -2089,7 +2610,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                     </View>
 
                     <Pressable style={styles.primaryActionBtn} onPress={handleAddContribution}>
-                      <LinearGradient colors={['#06b6d4', '#3b82f6']} style={styles.primaryActionGradient}>
+                      <LinearGradient colors={['#f43f5e', '#e11d48']} style={styles.primaryActionGradient}>
                         <ArrowLeftRight size={16} color="#fff" />
                         <Text style={styles.primaryActionText}>Ghi nhận đóng góp</Text>
                       </LinearGradient>
@@ -2162,8 +2683,28 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                     )}
                   </View>
                 </ScrollView>
-              )}
-            </LinearGradient>
+              ) : workspaceTab === 'tasks' ? (
+                <GroupTaskTab
+                  group={selectedGroup}
+                  currentUser={currentUser}
+                  onGroupUpdated={(updatedGroup) => updateGroupById(selectedGroup.id, () => updatedGroup)}
+                  isDarkMode={isDarkMode}
+                />
+              ) : null}
+            </KeyboardAvoidingView>
+
+            <GroupAssistantModal
+              visible={assistantModalVisible}
+              onClose={() => setAssistantModalVisible(false)}
+              onAsk={handleAskAssistant}
+              isDarkMode={isDarkMode}
+            />
+            <CreatePollModal
+              visible={createPollModalVisible}
+              onClose={() => setCreatePollModalVisible(false)}
+              onCreatePoll={handleCreatePoll}
+              isDarkMode={isDarkMode}
+            />
           </View>
         </Modal>
       )}

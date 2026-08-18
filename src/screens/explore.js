@@ -20,32 +20,30 @@ import { exploreItems } from '../data';
 import { styles } from './screens.js';
 import { globalSharedState } from '../social/socialShared';
 
-const getHostIp = () => {
-  let host = Constants.expoConfig?.hostUri;
-  if (!host && Constants.manifest) {
-    host = Constants.manifest.debuggerHost;
-  }
-  if (!host && Constants.manifest2?.extra?.expoGo) {
-    host = Constants.manifest2.extra.expoGo.debuggerHost;
-  }
-  if (host) {
-    const ip = host.split(':')[0];
-    if (ip) return ip;
-  }
-  return '192.168.100.101'; // Default fallback IP
-};
+import { getHostIp } from '../utils/hostIp';
 
 const getDiaDiem = async () => {
   try {
     const hostIp = getHostIp();
-    const response = await fetch(`http://${hostIp}:7321/api/diadiem`);
-    if (response.ok) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500);
+
+    let response = await fetch(`http://${hostIp}:7321/api/diadiem`, { signal: controller.signal })
+      .catch(() => null);
+
+    if (!response || !response.ok) {
+      response = await fetch(`http://${hostIp}:3000/api/diadiem`, { signal: controller.signal })
+        .catch(() => null);
+    }
+    clearTimeout(timer);
+
+    if (response && response.ok) {
       const result = await response.json();
-      if (Array.isArray(result)) return result;
+      if (Array.isArray(result) && result.length > 0) return result;
     }
     return [];
   } catch (error) {
-    console.log("Lỗi tải địa điểm từ SQLite API (cổng 7321):", error.message);
+    console.log("Lỗi tải địa điểm:", error.message);
     return [];
   }
 };

@@ -22,6 +22,8 @@ import {
   Sparkles,
   Edit,
   Trash2,
+  CheckCircle,
+  Compass,
 } from 'lucide-react-native';
 
 export function GroupScheduleTab({
@@ -31,13 +33,29 @@ export function GroupScheduleTab({
   onOpenAIPlanner,
   onEditActivity,
   onDeleteActivity,
+  onDeleteDay,
+  onClearAllDays,
+  onNavigateToMapWithPlace,
 }) {
-  const rawItinerary = selectedGroup?.itinerary;
+  const [checkIns, setCheckIns] = React.useState({
+    'act-0-0': '08:15',
+  });
+
+  const handleCheckIn = (actId, title) => {
+    const timeNow = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    setCheckIns(prev => ({
+      ...prev,
+      [actId]: timeNow,
+    }));
+    Alert.alert('📍 Check-in thành công!', `Đã ghi nhận check-in tại "${title}" lúc ${timeNow}.`);
+  };
+
+  const rawItinerary = selectedGroup && selectedGroup.itinerary;
   
   // Adapter chuyển đổi dữ liệu thật sang cấu trúc hiển thị
   const getDisplayItinerary = () => {
-    if (!rawItinerary || !Array.isArray(rawItinerary.days) || rawItinerary.days.length === 0) {
-      // Mock data Đà Lạt chất lượng cao mặc định nếu chưa sinh lịch trình
+    if (!rawItinerary || !Array.isArray(rawItinerary.days)) {
+      // Mock data Đà Lạt chất lượng cao mặc định nếu chưa khởi tạo lần nào
       return {
         title: 'Du lịch Đà Lạt 3 Ngày 2 Đêm',
         startDate: '25/08/2026',
@@ -94,16 +112,48 @@ export function GroupScheduleTab({
       };
     }
 
+    if (rawItinerary.days.length === 0) {
+      return {
+        title: 'Chưa có lịch trình du lịch nào',
+        startDate: '--/--/----',
+        endDate: '--/--/----',
+        days: [],
+      };
+    }
+
+    const formatSafeDate = (dateVal, fallback) => {
+      if (!dateVal) return fallback;
+      if (typeof dateVal === 'string' && dateVal.includes('/')) return dateVal;
+      try {
+        const str = String(dateVal).split('T')[0];
+        const parts = str.split('-');
+        if (parts.length === 3) {
+          return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        const d = new Date(dateVal);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('vi-VN');
+        }
+      } catch (e) {}
+      return String(dateVal);
+    };
+
     // Convert real data
     const days = rawItinerary.days.map((d, index) => {
       const weatherTemp = d.weather ? `${d.weather.minTemp || 18}°C - ${d.weather.maxTemp || 25}°C` : '22°C';
-      const weatherIcon = d.weather?.iconText || '🌤️';
+      const weatherIcon = (d.weather && d.weather.iconText) || '🌤️';
       
-      const activities = (d.slots || []).map((slot, sIdx) => {
+      const rawSlots = (Array.isArray(d.slots) && d.slots.length > 0)
+        ? d.slots
+        : ((Array.isArray(d.activities) && d.activities.length > 0) ? d.activities : []);
+
+      const activities = rawSlots.map((slot, sIdx) => {
         let type = 'sightseeing';
         let color = '#f43f5e'; // đỏ hồng mặc định
         let bgColor = 'rgba(244, 63, 94, 0.06)';
-        const text = slot.text || '';
+        
+        const slotObj = typeof slot === 'string' ? { text: slot, title: slot } : (slot || {});
+        const text = slotObj.text || slotObj.description || slotObj.content || (typeof slot === 'string' ? slot : '');
         
         if (text.includes('Bay') || text.includes('sân bay') || text.includes('di chuyển')) {
           type = 'flight';
@@ -113,29 +163,25 @@ export function GroupScheduleTab({
           type = 'hotel';
           color = '#10b981';
           bgColor = 'rgba(16, 185, 129, 0.06)';
-        } else if (text.includes('Ăn') || text.includes('lẩu') || text.includes('cafe') || text.includes('uống')) {
+        } else if (text.includes('Ăn') || text.includes('lẩu') || text.includes('cafe') || text.includes('uống') || text.includes('trưa')) {
           type = 'food';
           color = '#f97316';
           bgColor = 'rgba(249, 115, 22, 0.06)';
         }
 
-        let time = '08:00';
-        let period = 'SÁNG';
-        if (sIdx === 1) {
-          time = '14:00';
-          period = 'CHIỀU';
-        } else if (sIdx === 2) {
-          time = '19:00';
-          period = 'TỐI';
-        }
+        const defaultTimes = ['08:00', '12:00', '14:30', '19:00'];
+        const defaultPeriods = ['SÁNG', 'TRƯA', 'CHIỀU', 'TỐI'];
+
+        let time = slotObj.time || defaultTimes[sIdx] || '08:00';
+        let period = slotObj.period || defaultPeriods[sIdx] || 'SÁNG';
 
         return {
-          id: `act-${index}-${sIdx}`,
+          id: slotObj.id || `act-${index}-${sIdx}`,
           dayIndex: index,
           slotIndex: sIdx,
           time,
           period,
-          title: slot.title || (sIdx === 0 ? 'Hoạt động Sáng' : sIdx === 1 ? 'Hoạt động Chiều' : 'Hoạt động Tối'),
+          title: slotObj.title || (period ? `Hoạt động ${period}` : `Hoạt động ${sIdx + 1}`),
           description: text,
           note: sIdx === 0 ? d.note : null,
           type,
@@ -144,16 +190,14 @@ export function GroupScheduleTab({
         };
       });
 
-      // Tạo ngày hiển thị đẹp mắt
+      // Tạo ngày hiển thị đẹp mắt kèm Ngày/Tháng/Năm
       let dayName = d.label || `Ngày ${index + 1}`;
       if (d.date) {
-        try {
-          const formattedDate = new Date(d.date).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' });
-          dayName = `${d.label || `Ngày ${index + 1}`} (${formattedDate})`;
-        } catch (e) {}
+        dayName = `${d.label || `Ngày ${index + 1}`} - ${formatSafeDate(d.date, d.date)}`;
       }
 
       return {
+        dayIndex: index,
         dayNumber: index + 1,
         dayName,
         temp: weatherTemp,
@@ -167,8 +211,8 @@ export function GroupScheduleTab({
 
     return {
       title: `Lịch trình đi ${destinationName}${region}`,
-      startDate: rawItinerary.startDate ? new Date(rawItinerary.startDate).toLocaleDateString('vi-VN') : 'Bắt đầu',
-      endDate: rawItinerary.endDate ? new Date(rawItinerary.endDate).toLocaleDateString('vi-VN') : 'Kết thúc',
+      startDate: formatSafeDate(rawItinerary.startDate, 'Bắt đầu'),
+      endDate: formatSafeDate(rawItinerary.endDate, 'Kết thúc'),
       days,
     };
   };
@@ -194,52 +238,100 @@ export function GroupScheduleTab({
       contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* HEADER CARD */}
-      <View style={[styles.headerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <View style={styles.headerInfoRow}>
-          <View style={[styles.mapIconBg, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
-            <MapPin size={22} color="#3b82f6" />
-          </View>
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={[styles.tripTitle, { color: theme.textPrimary }]}>{itinerary.title}</Text>
-            <View style={styles.dateRow}>
-              <Calendar size={13} color={theme.textMuted} />
-              <Text style={[styles.dateText, { color: theme.textMuted }]}>
-                {itinerary.startDate} - {itinerary.endDate}
+      {/* HEADER CARD — Gradient Banner */}
+      <LinearGradient
+        colors={isDarkMode ? ['#1e1b4b', '#312e81', '#1e293b'] : ['#eff6ff', '#f0fdf4', '#fff']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[styles.headerCard, { borderColor: isDarkMode ? 'rgba(139,92,246,0.3)' : 'rgba(59,130,246,0.15)', borderWidth: 1 }]}
+      >
+        {/* Trip title + date */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+          <LinearGradient
+            colors={['#3b82f6', '#8b5cf6']}
+            style={{ width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <MapPin size={22} color="#fff" />
+          </LinearGradient>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.tripTitle, { color: theme.textPrimary }]} numberOfLines={2}>{itinerary.title}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+              <Calendar size={12} color="#8b5cf6" />
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#8b5cf6' }}>
+                {itinerary.startDate} → {itinerary.endDate}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Nút Xuất PDF & Thêm Lịch trình & Gợi ý AI */}
-        <View style={styles.headerActionsRow}>
+        {/* AI Primary Button */}
+        <Pressable style={styles.aiPrimaryBtn} onPress={onOpenAIPlanner}>
+          <LinearGradient
+            colors={['#7c3aed', '#db2777', '#f43f5e']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.aiPrimaryGradient}
+          >
+            <Sparkles size={16} color="#fff" />
+            <Text style={styles.aiPrimaryText}>✨ AI Lập Lịch Trình Thông Minh 360°</Text>
+          </LinearGradient>
+        </Pressable>
+
+        {/* Action Row */}
+        <View style={styles.headerSecondaryActions}>
           <Pressable
-            style={[styles.pdfBtn, { backgroundColor: theme.searchBg, borderColor: theme.border }]}
-            onPress={() => Alert.alert('Xuất PDF 📄', 'Đã tạo file lịch trình chuyến đi dạng PDF thành công!')}
+            style={[styles.secondaryActionBtn, { borderColor: 'rgba(59,130,246,0.35)', backgroundColor: isDarkMode ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.07)' }]}
+            onPress={() => {
+              const targetLoc = itinerary.title.replace('Lịch trình đi ', '').replace('Du lịch ', '');
+              onNavigateToMapWithPlace ? onNavigateToMapWithPlace(targetLoc) : Alert.alert('🗺️ Bản đồ 360', `Mở "${targetLoc}" trên bản đồ.`);
+            }}
+          >
+            <Compass size={14} color="#3b82f6" />
+            <Text style={[styles.secondaryActionText, { color: '#3b82f6' }]}>Bản đồ</Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.secondaryActionBtn, { borderColor: 'rgba(239,68,68,0.35)', backgroundColor: isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.07)' }]}
+            onPress={() => Alert.alert('📄 Xuất PDF', 'Đã tạo file lịch trình PDF thành công!')}
           >
             <FileText size={14} color="#ef4444" />
-            <Text style={[styles.pdfBtnText, { color: theme.textPrimary }]}>Xuất PDF</Text>
+            <Text style={[styles.secondaryActionText, { color: '#ef4444' }]}>Xuất PDF</Text>
           </Pressable>
 
           <Pressable
-            style={styles.addBtn}
+            style={[styles.secondaryActionBtn, { borderColor: 'rgba(16,185,129,0.35)', backgroundColor: isDarkMode ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.07)' }]}
             onPress={onOpenAIPlanner}
           >
-            <Plus size={14} color="#fff" />
-            <Text style={styles.addBtnText}>Thêm mới</Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.aiBtn}
-            onPress={onOpenAIPlanner}
-          >
-            <LinearGradient colors={['#3b82f6', '#1d4ed8', '#8b5cf6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.aiBtnGradient}>
-              <Sparkles size={13} color="#fff" />
-              <Text style={styles.aiBtnText}>AI lập lịch</Text>
-            </LinearGradient>
+            <Plus size={14} color="#10b981" />
+            <Text style={[styles.secondaryActionText, { color: '#10b981' }]}>Thêm điểm</Text>
           </Pressable>
         </View>
-      </View>
+
+        {/* Nút Xóa toàn bộ lịch trình AI */}
+        {itinerary.days && itinerary.days.length > 0 && (
+          <Pressable
+            style={[
+              styles.clearAllBtn,
+              { borderColor: 'rgba(244,63,94,0.4)', backgroundColor: isDarkMode ? 'rgba(244,63,94,0.1)' : 'rgba(244,63,94,0.06)' },
+            ]}
+            onPress={() => {
+              Alert.alert(
+                '🗑️ Xóa toàn bộ lịch trình?',
+                `Tất cả ${itinerary.days.length} ngày do AI gợi ý sẽ bị xóa hoàn toàn. Bạn có chắc không?`,
+                [
+                  { text: 'Hủy', style: 'cancel' },
+                  {
+                    text: 'Xóa hết',
+                    style: 'destructive',
+                    onPress: () => onClearAllDays && onClearAllDays(),
+                  },
+                ],
+              );
+            }}
+          >
+            <Trash2 size={14} color="#f43f5e" />
+            <Text style={[styles.secondaryActionText, { color: '#f43f5e' }]}>Xóa toàn bộ lịch trình</Text>
+          </Pressable>
+        )}
+      </LinearGradient>
 
       {/* TIMELINE LIST */}
       {itinerary.days.map((day) => (
@@ -250,75 +342,172 @@ export function GroupScheduleTab({
               <Text style={styles.dayBadgeText}>N{day.dayNumber}</Text>
             </View>
             <Text style={[styles.dayNameText, { color: theme.textPrimary }]}>{day.dayName}</Text>
-            
+
             {/* Weather Widget */}
             <View style={[styles.weatherWidget, { backgroundColor: isDarkMode ? 'rgba(250, 204, 21, 0.15)' : 'rgba(250, 204, 21, 0.08)' }]}>
               <Text style={{ fontSize: 13, marginRight: 2 }}>{day.weatherIcon}</Text>
               <Text style={styles.weatherTempText}>{day.temp}</Text>
             </View>
+
+            {/* Nút xóa ngày */}
+            <Pressable
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={{
+                marginLeft: 8,
+                padding: 5,
+                borderRadius: 8,
+                backgroundColor: isDarkMode ? 'rgba(244,63,94,0.15)' : 'rgba(244,63,94,0.08)',
+              }}
+              onPress={() => {
+                Alert.alert(
+                  `🗑️ Xóa ngày ${day.dayNumber}?`,
+                  `Bạn có chắc muốn xóa toàn bộ "${day.dayName}" khỏi lịch trình không?`,
+                  [
+                    { text: 'Hủy', style: 'cancel' },
+                    {
+                      text: 'Xóa ngày',
+                      style: 'destructive',
+                      onPress: () => onDeleteDay && onDeleteDay(day.dayIndex ?? (day.dayNumber - 1)),
+                    },
+                  ],
+                );
+              }}
+            >
+              <Trash2 size={15} color="#f43f5e" />
+            </Pressable>
           </View>
+
+          {/* Check-in Progress Bar per Day */}
+          {(() => {
+            const completedCount = day.activities.filter(a => Boolean(checkIns[a.id])).length;
+            const totalCount = day.activities.length;
+            const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+            return (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, marginBottom: 8, paddingHorizontal: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: '750', color: theme.textSecondary }}>
+                  📍 Tiến độ Check-in: {completedCount}/{totalCount} điểm ({progressPercent}%)
+                </Text>
+                <View style={{ width: 100, height: 5, borderRadius: 2.5, backgroundColor: theme.border, marginLeft: 10, overflow: 'hidden' }}>
+                  <View style={{ width: `${progressPercent}%`, height: '100%', backgroundColor: '#10b981', borderRadius: 2.5 }} />
+                </View>
+              </View>
+            );
+          })()}
 
           {/* Activities List */}
           <View style={styles.activitiesContainer}>
             {day.activities.map((activity, index) => {
               const isLast = index === day.activities.length - 1;
+              const checkInTime = checkIns[activity.id];
               return (
                 <View key={activity.id} style={styles.activityRow}>
-                  {/* Left Time Column */}
+                  {/* Left: Time */}
                   <View style={styles.timeColumn}>
                     <Text style={[styles.activityTime, { color: theme.textPrimary }]}>{activity.time}</Text>
                     <Text style={[styles.activityPeriod, { color: theme.textMuted }]}>{activity.period}</Text>
                   </View>
 
-                  {/* Vertical Line Connector */}
+                  {/* Connector */}
                   <View style={styles.connectorColumn}>
-                    <View style={[styles.timelineDot, { backgroundColor: activity.color }]} />
+                    <View style={[styles.timelineDot, { backgroundColor: checkInTime ? '#10b981' : activity.color }]} />
                     {!isLast && <View style={[styles.timelineLine, { backgroundColor: theme.border }]} />}
                   </View>
 
-                  {/* Activity Card */}
-                  <View
-                    style={[
-                      styles.activityCard,
-                      {
-                        backgroundColor: theme.card,
-                        borderColor: theme.border,
-                        borderLeftColor: activity.color,
-                        borderStyle: activity.description ? 'solid' : 'dashed',
-                        opacity: activity.description ? 1 : 0.75,
-                      },
-                    ]}
-                  >
+                  {/* Activity Card — Redesigned */}
+                  <View style={[
+                    styles.activityCard,
+                    {
+                      backgroundColor: isDarkMode ? 'rgba(30,41,59,0.85)' : '#fff',
+                      borderColor: checkInTime ? 'rgba(16,185,129,0.5)' : (isDarkMode ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'),
+                      borderLeftColor: checkInTime ? '#10b981' : activity.color,
+                      borderLeftWidth: 4,
+                      shadowColor: activity.color,
+                      shadowOpacity: 0.08,
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowRadius: 6,
+                      elevation: 2,
+                    },
+                  ]}>
                     {activity.description ? (
-                      <View style={{ flex: 1, paddingRight: 8 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={[styles.activityTitle, { color: theme.textPrimary, flex: 1 }]}>
-                            {activity.title}
-                          </Text>
-                          <View style={{ flexDirection: 'row', gap: 12, marginRight: 4 }}>
-                            <Pressable onPress={() => onEditActivity(activity.dayIndex, activity.slotIndex, activity.title, activity.description)}>
-                              <Edit size={13} color="#3b82f6" />
-                            </Pressable>
-                            <Pressable onPress={() => onDeleteActivity(activity.dayIndex, activity.slotIndex)}>
-                              <Trash2 size={13} color="#f43f5e" />
-                            </Pressable>
+                      <View style={{ flex: 1 }}>
+                        {/* Top row: title + type icon */}
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                          <View style={[styles.typeIconCircle, { backgroundColor: activity.bgColor, marginTop: 1 }]}>
+                            {getIconForType(activity.type, activity.color)}
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.activityTitle, { color: theme.textPrimary }]} numberOfLines={2}>
+                              {activity.title}
+                            </Text>
+                            <Text numberOfLines={2} style={[styles.activityDesc, { color: theme.textSecondary, marginTop: 3 }]}>
+                              {activity.description}
+                            </Text>
                           </View>
                         </View>
-                        <Text numberOfLines={2} style={[styles.activityDesc, { color: theme.textSecondary, marginTop: 4 }]}>
-                          {activity.description}
-                        </Text>
+
+                        {/* Note */}
                         {activity.note && (
-                          <Text numberOfLines={1} style={[styles.activityNote, { color: theme.textMuted, marginTop: 4 }]}>
-                            ⚠️ {activity.note}
-                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 7, backgroundColor: isDarkMode ? 'rgba(251,191,36,0.1)' : 'rgba(251,191,36,0.08)', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 4 }}>
+                            <Text style={{ fontSize: 10, color: '#d97706', fontWeight: '700', flex: 1 }} numberOfLines={2}>⚠️ {activity.note}</Text>
+                          </View>
                         )}
+
+                        {/* Bottom action row */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                          {/* Check-in */}
+                          {checkInTime ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(16,185,129,0.12)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
+                              <CheckCircle size={11} color="#10b981" />
+                              <Text style={{ fontSize: 10, fontWeight: '800', color: '#10b981' }}>Check-in {checkInTime}</Text>
+                            </View>
+                          ) : (
+                            <Pressable
+                              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: isDarkMode ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}
+                              onPress={() => handleCheckIn(activity.id, activity.title)}
+                            >
+                              <MapPin size={11} color="#3b82f6" />
+                              <Text style={{ fontSize: 10, fontWeight: '800', color: '#3b82f6' }}>Check-in</Text>
+                            </Pressable>
+                          )}
+
+                          {/* Map */}
+                          <Pressable
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: isDarkMode ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.1)', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 8 }}
+                            onPress={() => {
+                              const place = activity.title || activity.description || 'Đà Lạt';
+                              onNavigateToMapWithPlace ? onNavigateToMapWithPlace(place) : Alert.alert('🗺️ Bản đồ', `Mở "${place}" trên bản đồ.`);
+                            }}
+                          >
+                            <Compass size={11} color="#8b5cf6" />
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#8b5cf6' }}>Bản đồ</Text>
+                          </Pressable>
+
+                          <View style={{ flex: 1 }} />
+
+                          {/* Edit */}
+                          <Pressable
+                            onPress={() => onEditActivity(activity.dayIndex, activity.slotIndex, activity.title, activity.description)}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            style={{ padding: 4, borderRadius: 7, backgroundColor: isDarkMode ? 'rgba(59,130,246,0.12)' : 'rgba(59,130,246,0.08)' }}
+                          >
+                            <Edit size={14} color="#3b82f6" />
+                          </Pressable>
+                          {/* Delete */}
+                          <Pressable
+                            onPress={() => onDeleteActivity(activity.dayIndex, activity.slotIndex)}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            style={{ padding: 4, borderRadius: 7, backgroundColor: isDarkMode ? 'rgba(244,63,94,0.12)' : 'rgba(244,63,94,0.08)' }}
+                          >
+                            <Trash2 size={14} color="#f43f5e" />
+                          </Pressable>
+                        </View>
                       </View>
                     ) : (
-                      <View style={{ flex: 1, paddingRight: 8, justifyContent: 'center' }}>
+                      <View style={{ flex: 1, justifyContent: 'center' }}>
                         <Text style={{ fontSize: 13, color: theme.textMuted, fontStyle: 'italic' }}>
-                          Chưa thiết lập hoạt trình ({activity.title})
+                          Chưa thiết lập ({activity.title})
                         </Text>
-                        <Pressable 
+                        <Pressable
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}
                           onPress={() => onEditActivity(activity.dayIndex, activity.slotIndex, activity.title, '')}
                         >
@@ -327,11 +516,6 @@ export function GroupScheduleTab({
                         </Pressable>
                       </View>
                     )}
-
-                    {/* Right Icon Circle */}
-                    <View style={[styles.typeIconCircle, { backgroundColor: activity.bgColor }]}>
-                      {getIconForType(activity.type, activity.color)}
-                    </View>
                   </View>
                 </View>
               );
@@ -380,62 +564,61 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  headerActionsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 18,
-    borderTopWidth: 0.5,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-    paddingTop: 14,
-  },
-  pdfBtn: {
-    flex: 1,
-    height: 38,
-    borderRadius: 10,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  pdfBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  addBtn: {
-    flex: 1,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: '#f43f5e',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  addBtnText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  aiBtn: {
-    flex: 1.5,
-    height: 38,
-    borderRadius: 10,
+  aiPrimaryBtn: {
+    width: '100%',
+    height: 42,
+    borderRadius: 14,
     overflow: 'hidden',
+    marginTop: 14,
+    elevation: 3,
+    shadowColor: '#ec4899',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
   },
-  aiBtnGradient: {
+  aiPrimaryGradient: {
     width: '100%',
     height: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
   },
-  aiBtnText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '850',
+  aiPrimaryText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '900',
     letterSpacing: -0.2,
+  },
+  headerSecondaryActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  secondaryActionBtn: {
+    flex: 1,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  secondaryActionText: {
+    fontSize: 11.5,
+    fontWeight: '850',
+  },
+  clearAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginTop: 10,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   dayLabelRow: {
     flexDirection: 'row',
@@ -480,12 +663,13 @@ const styles = StyleSheet.create({
   },
   activityRow: {
     flexDirection: 'row',
-    height: 90,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   timeColumn: {
-    width: 44,
+    width: 48,
     alignItems: 'flex-start',
-    paddingTop: 6,
+    paddingTop: 14,
   },
   activityTime: {
     fontSize: 12.5,
@@ -499,34 +683,29 @@ const styles = StyleSheet.create({
   connectorColumn: {
     width: 20,
     alignItems: 'center',
-    position: 'relative',
-    height: '100%',
+    alignSelf: 'stretch',
   },
   timelineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 10,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 14,
     zIndex: 2,
   },
   timelineLine: {
-    width: 1.5,
-    position: 'absolute',
-    top: 18,
-    bottom: 0,
+    width: 2,
+    flex: 1,
+    marginTop: 4,
+    marginBottom: 0,
     zIndex: 1,
   },
   activityCard: {
     flex: 1,
     borderRadius: 14,
     borderWidth: 1,
-    borderLeftWidth: 4.5,
+    borderLeftWidth: 4,
     padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    height: 80,
+    flexDirection: 'column',
   },
   activityTitle: {
     fontSize: 12.5,

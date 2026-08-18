@@ -29,8 +29,24 @@ import {
   Check,
   MapPin,
   Compass,
+  Edit3,
+  BarChart3,
+  Lock,
+  CheckCircle2,
+  X,
 } from 'lucide-react-native';
-import { getChatMessages, sendChatMessage, markMessagesAsRead, sendTypingStatus, getTypingStatus } from '../services/chatService';
+import {
+  getChatMessages,
+  sendChatMessage,
+  markMessagesAsRead,
+  sendTypingStatus,
+  getTypingStatus,
+  editChatMessage,
+  createGroupPoll,
+  voteGroupPoll,
+  closeGroupPoll,
+} from '../services/chatService';
+import { CreatePollModal } from './createPollModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -151,9 +167,74 @@ export function DirectChatScreen({
   const [isSending, setIsSending] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
+  const [editingMsg, setEditingMsg] = useState(null);
+  const [createPollModalVisible, setCreatePollModalVisible] = useState(false);
+  const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const handleStartEdit = (msg) => {
+    setEditingMsg(msg);
+    setChatInput(msg.content || msg.text || '');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMsg(null);
+    setChatInput('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingMsg || !chatInput.trim()) return;
+    const msgId = editingMsg._id || editingMsg.id;
+    const newContent = chatInput.trim();
+    setEditingMsg(null);
+    setChatInput('');
+
+    setMessages(prev => prev.map(m => (String(m._id || m.id) === String(msgId) ? { ...m, content: newContent, text: newContent, isEdited: true } : m)));
+
+    try {
+      if (groupId && ownerId) {
+        await editChatMessage(groupId, msgId, ownerId, newContent);
+      }
+    } catch (e) {
+      console.warn("Edit direct chat message failed:", e.message);
+    }
+  };
+
+  const handleCreatePoll = async ({ question, options, multipleChoice }) => {
+    try {
+      if (groupId && ownerId) {
+        const pollMsg = await createGroupPoll(groupId, ownerId, question, options, multipleChoice);
+        setMessages(prev => [...prev, pollMsg]);
+        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+      }
+    } catch (e) {
+      console.warn("Create poll in direct chat failed:", e.message);
+    }
+  };
+
+  const handleVotePoll = async (messageId, optionId) => {
+    try {
+      if (groupId && ownerId) {
+        const updatedMsg = await voteGroupPoll(groupId, messageId, optionId, ownerId);
+        setMessages(prev => prev.map(m => (String(m._id || m.id) === String(messageId) ? updatedMsg : m)));
+      }
+    } catch (e) {
+      console.warn("Vote poll failed:", e.message);
+    }
+  };
+
+  const handleClosePoll = async (messageId) => {
+    try {
+      if (groupId && ownerId) {
+        const updatedMsg = await closeGroupPoll(groupId, messageId, ownerId);
+        setMessages(prev => prev.map(m => (String(m._id || m.id) === String(messageId) ? updatedMsg : m)));
+      }
+    } catch (e) {
+      console.warn("Close poll failed:", e.message);
+    }
+  };
 
   // Real-time MongoDB typing status
   useEffect(() => {
@@ -196,11 +277,20 @@ export function DirectChatScreen({
       try {
         const data = await getChatMessages(groupId, ownerId);
         if (active) {
-          setMessages(data || []);
+          setMessages(prevMsgs => {
+            const apiMsgs = data || [];
+            const msgMap = new Map();
+            (prevMsgs || []).forEach(m => { if (m.id || m._id) msgMap.set(String(m.id || m._id), m); });
+            apiMsgs.forEach(m => { if (m.id || m._id) msgMap.set(String(m.id || m._id), m); });
+            const merged = Array.from(msgMap.values()).sort((a, b) => (new Date(a.createdAt || a.id || 0).getTime()) - (new Date(b.createdAt || b.id || 0).getTime()));
+            return merged.length > 0 ? merged : prevMsgs;
+          });
           setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
         }
       } catch (e) {
-        console.warn('Lỗi tải tin nhắn:', e.message);
+        if (e?.message !== 'Network Error') {
+          console.warn('Lỗi tải tin nhắn:', e.message);
+        }
       }
       markMessagesAsRead(groupId, ownerId).catch(() => {});
     };
@@ -217,20 +307,48 @@ export function DirectChatScreen({
   // ─── Send ──────────────────────────────────────────────────────────────────
 
   const handleSend = async (text) => {
+    if (editingMsg) {
+      handleSaveEdit();
+      return;
+    }
+
     const content = (text || chatInput).trim();
-    if (!content || isSending) return;
-    setIsSending(true);
+    if (!content) return;
+
     setChatInput('');
     setShowQuickReplies(false);
+
+    const localMsgId = Date.now();
+
+    const localMsg = {
+      _id: localMsgId,
+      id: localMsgId,
+      senderId: ownerId,
+      sender: {
+        name: currentUser?.name || 'Bạn',
+        avatar: currentUser?.avatar || getUserAvatarByName(currentUser?.name),
+      },
+      content,
+      text: content,
+      createdAt: Date.now(),
+      readBy: [ownerId],
+    };
+
+    // 1. Hiển thị ngay lập tức tin nhắn trên màn hình Chat riêng (Optimistic UI)
+    setMessages((prev) => [...(Array.isArray(prev) ? prev : []), localMsg]);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+
+    // 2. Đồng bộ về MongoDB API backend ở background
     try {
-      await sendChatMessage(groupId, ownerId, content);
-      const data = await getChatMessages(groupId, ownerId);
-      setMessages(data || []);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
+      if (groupId && ownerId) {
+        await sendChatMessage(groupId, ownerId, content);
+        const data = await getChatMessages(groupId, ownerId);
+        if (Array.isArray(data) && data.length > 0) {
+          setMessages(data);
+        }
+      }
     } catch (e) {
-      Alert.alert('Gửi thất bại', e.message);
-    } finally {
-      setIsSending(false);
+      console.log('Online sync for direct message failed, kept in local chat stream:', e.message);
     }
   };
 
@@ -273,8 +391,8 @@ export function DirectChatScreen({
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           {/* ── Header ─────────────────────────────────────────────────────── */}
           <View style={styles.header}>
@@ -386,9 +504,97 @@ export function DirectChatScreen({
                 );
               }
 
+              const msgKey = item._id || item.id;
+              const isShowingReactions = activeReactionMsgId === msgKey;
+
+              // --- 📊 RENDER BÌNH CHỌN (POLL CARD) ---
+              if (item.type === 'poll' || item.poll) {
+                const poll = item.poll || {};
+                const totalVotes = (poll.options || []).reduce((sum, o) => sum + (Array.isArray(o.voters) ? o.voters.length : 0), 0);
+
+                return (
+                  <View key={`poll-${msgKey}`} style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
+                    {!isMe && (
+                      <Image source={{ uri: item.sender?.avatar || avatarUri }} style={styles.otherAvatar} />
+                    )}
+                    <View style={styles.msgCol}>
+                      <View style={styles.pollCardContainer}>
+                        <LinearGradient
+                          colors={['#1e1b4b', '#311b92', '#1e1035']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.pollCardGradient}
+                        >
+                          <View style={styles.pollCardHeader}>
+                            <View style={styles.pollHeaderIconBox}>
+                              <BarChart3 size={16} color="#c084fc" />
+                            </View>
+                            <Text style={styles.pollHeaderTitle}>BÌNH CHỌN TRỰC TIẾP</Text>
+                            {poll.closed && (
+                              <View style={styles.pollClosedBadge}>
+                                <Text style={styles.pollClosedText}>Đã khóa</Text>
+                              </View>
+                            )}
+                          </View>
+
+                          <Text style={styles.pollQuestionText}>{poll.question || content}</Text>
+                          <Text style={styles.pollSubInfo}>
+                            {poll.multipleChoice ? '• Được chọn nhiều phương án' : '• Chọn 1 phương án'} · {totalVotes} lượt bình chọn
+                          </Text>
+
+                          <View style={styles.pollOptionsList}>
+                            {(poll.options || []).map((opt) => {
+                              const voters = Array.isArray(opt.voters) ? opt.voters : [];
+                              const count = voters.length;
+                              const percent = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+                              const hasVoted = voters.includes(ownerId);
+
+                              return (
+                                <Pressable
+                                  key={opt.id || opt.text}
+                                  style={[styles.pollOptRow, hasVoted && styles.pollOptRowVoted]}
+                                  onPress={() => !poll.closed && handleVotePoll(msgKey, opt.id)}
+                                  disabled={poll.closed}
+                                >
+                                  <View style={[styles.pollOptProgress, { width: `${percent}%` }]} />
+                                  <View style={styles.pollOptContent}>
+                                    <View style={styles.pollOptCheckCircle}>
+                                      {hasVoted ? (
+                                        <CheckCircle2 size={16} color="#c084fc" />
+                                      ) : (
+                                        <View style={styles.pollOptUnchecked} />
+                                      )}
+                                    </View>
+                                    <Text style={[styles.pollOptText, hasVoted && { fontWeight: '700', color: '#fff' }]}>
+                                      {opt.text}
+                                    </Text>
+                                    <Text style={styles.pollOptVotes}>{count} ({percent}%)</Text>
+                                  </View>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+
+                          {!poll.closed && isMe && (
+                            <Pressable style={styles.closePollBtn} onPress={() => handleClosePoll(msgKey)}>
+                              <Lock size={12} color="#f43f5e" />
+                              <Text style={styles.closePollBtnText}>Khóa bài bình chọn này</Text>
+                            </Pressable>
+                          )}
+                        </LinearGradient>
+                      </View>
+
+                      <View style={[styles.msgMeta, isMe ? { flexDirection: 'row-reverse' } : {}]}>
+                        <Text style={styles.msgTime}>{msgTime}</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              }
+
               return (
                 <View
-                  key={item._id || item.id}
+                  key={msgKey}
                   style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}
                 >
                   {/* Other avatar */}
@@ -397,24 +603,50 @@ export function DirectChatScreen({
                   )}
 
                   <View style={[styles.msgCol, isMe ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
-                    {/* Bubble */}
-                    {isMe ? (
-                      <LinearGradient
-                        colors={['#0084ff', '#0099ff']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={[styles.bubble, styles.bubbleMe]}
-                      >
-                        <Text style={styles.bubbleTextMe}>{content}</Text>
-                      </LinearGradient>
-                    ) : (
-                      <View style={[styles.bubble, styles.bubbleOther]}>
-                        <Text style={styles.bubbleTextOther}>{content}</Text>
+                    {isMe && isShowingReactions && (
+                      <View style={[styles.reactionPickerBar, { right: 0 }]}>
+                        {['❤️', '😆', '😮', '😢', '😡', '👍'].map((emoji) => (
+                          <Pressable key={emoji} style={styles.reactionEmojiBtn} onPress={() => setActiveReactionMsgId(null)}>
+                            <Text style={{ fontSize: 18 }}>{emoji}</Text>
+                          </Pressable>
+                        ))}
+                        <Pressable
+                          style={styles.actionEditBtn}
+                          onPress={() => {
+                            setActiveReactionMsgId(null);
+                            handleStartEdit(item);
+                          }}
+                        >
+                          <Edit3 size={14} color="#38bdf8" />
+                          <Text style={styles.actionEditText}>Sửa</Text>
+                        </Pressable>
                       </View>
                     )}
 
+                    {/* Bubble */}
+                    <Pressable
+                      onLongPress={() => isMe && setActiveReactionMsgId(isShowingReactions ? null : msgKey)}
+                      onPress={() => isMe && setActiveReactionMsgId(isShowingReactions ? null : msgKey)}
+                    >
+                      {isMe ? (
+                        <LinearGradient
+                          colors={['#f43f5e', '#e11d48']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={[styles.bubble, styles.bubbleMe]}
+                        >
+                          <Text style={styles.bubbleTextMe}>{content}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={[styles.bubble, styles.bubbleOther]}>
+                          <Text style={styles.bubbleTextOther}>{content}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+
                     {/* Meta */}
                     <View style={[styles.msgMeta, isMe ? { flexDirection: 'row-reverse' } : {}]}>
+                      {isMe && item.isEdited && <Text style={styles.editedTag}>(đã sửa)</Text>}
                       <Text style={styles.msgTime}>{msgTime}</Text>
                       {isMe && (
                         <CheckCheck
@@ -459,16 +691,40 @@ export function DirectChatScreen({
             )}
           </ScrollView>
 
-          {/* ── Quick Replies ──────────────────────────────────────────────── */}
+          {/* ── Quick Replies & Poll Button ──────────────────────────────────── */}
           {showQuickReplies && (
             <View style={styles.quickRow}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 8, alignItems: 'center' }}>
+                <Pressable
+                  style={[styles.quickChip, { backgroundColor: '#8b5cf6', borderColor: '#a78bfa' }]}
+                  onPress={() => {
+                    setShowQuickReplies(false);
+                    setCreatePollModalVisible(true);
+                  }}
+                >
+                  <BarChart3 size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                  <Text style={[styles.quickText, { color: '#ffffff', fontWeight: '800' }]}>📊 Tạo bình chọn</Text>
+                </Pressable>
                 {QUICK_REPLIES.map((qr) => (
                   <Pressable key={qr} style={styles.quickChip} onPress={() => handleSend(qr)}>
                     <Text style={styles.quickText}>{qr}</Text>
                   </Pressable>
                 ))}
               </ScrollView>
+            </View>
+          )}
+
+          {/* Editing Message Banner */}
+          {editingMsg && (
+            <View style={styles.editingBannerContainer}>
+              <View style={styles.editingBarIndicator} />
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.editingBannerTitle}>✏️ Đang chỉnh sửa tin nhắn</Text>
+                <Text style={styles.editingBannerText} numberOfLines={1}>{editingMsg.content || editingMsg.text}</Text>
+              </View>
+              <Pressable onPress={handleCancelEdit} style={{ padding: 6 }}>
+                <X size={16} color="#b0b3b8" />
+              </Pressable>
             </View>
           )}
 
@@ -515,7 +771,7 @@ export function DirectChatScreen({
                 disabled={isSending}
               >
                 <LinearGradient
-                  colors={['#a855f7', '#7c3aed']}
+                  colors={['#f43f5e', '#e11d48']}
                   style={styles.sendGrad}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
@@ -537,6 +793,14 @@ export function DirectChatScreen({
             )}
           </View>
         </KeyboardAvoidingView>
+
+        {/* Modal Tạo Bình Chọn Nhanh */}
+        <CreatePollModal
+          visible={createPollModalVisible}
+          onClose={() => setCreatePollModalVisible(false)}
+          onCreatePoll={handleCreatePoll}
+          isDarkMode={isDarkMode}
+        />
       </View>
     </Modal>
   );
@@ -962,5 +1226,195 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
+  },
+
+  // Edit Action Button & Tag
+  actionEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 4,
+  },
+  actionEditText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#38bdf8',
+  },
+  editedTag: {
+    fontSize: 9.5,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+    marginRight: 4,
+  },
+  editingBannerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#18191a',
+    borderTopWidth: 1,
+    borderTopColor: '#242526',
+    borderLeftWidth: 3,
+    borderLeftColor: '#38bdf8',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 10,
+  },
+  editingBarIndicator: {
+    width: 3,
+    height: '100%',
+    backgroundColor: '#38bdf8',
+    borderRadius: 2,
+  },
+  editingBannerTitle: {
+    fontSize: 11,
+    color: '#38bdf8',
+    fontWeight: '700',
+  },
+  editingBannerText: {
+    fontSize: 12,
+    color: '#b0b3b8',
+    marginTop: 1,
+  },
+
+  // Poll Card Styles
+  pollCardContainer: {
+    marginVertical: 4,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.35)',
+    shadowColor: '#8b5cf6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
+    width: width * 0.74,
+  },
+  pollCardGradient: {
+    padding: 14,
+  },
+  pollCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  pollHeaderIconBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(192, 132, 252, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pollHeaderTitle: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#c084fc',
+    letterSpacing: 0.8,
+    flex: 1,
+  },
+  pollClosedBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: '#ef4444',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  pollClosedText: {
+    fontSize: 9.5,
+    color: '#ef4444',
+    fontWeight: '800',
+  },
+  pollQuestionText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#ffffff',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  pollSubInfo: {
+    fontSize: 11,
+    color: '#a78bfa',
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  pollOptionsList: {
+    gap: 8,
+  },
+  pollOptRow: {
+    position: 'relative',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    overflow: 'hidden',
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  pollOptRowVoted: {
+    borderColor: '#a855f7',
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+  },
+  pollOptProgress: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(168, 85, 247, 0.35)',
+    borderRadius: 12,
+  },
+  pollOptContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    zIndex: 2,
+  },
+  pollOptCheckCircle: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pollOptUnchecked: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  pollOptText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#e2e8f0',
+    fontWeight: '500',
+  },
+  pollOptVotes: {
+    fontSize: 11,
+    color: '#c084fc',
+    fontWeight: '700',
+  },
+  closePollBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+  },
+  closePollBtnText: {
+    fontSize: 11,
+    color: '#f43f5e',
+    fontWeight: '700',
   },
 });

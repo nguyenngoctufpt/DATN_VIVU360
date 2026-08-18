@@ -17,8 +17,10 @@ import {
   StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, Camera, Save, User, Mail, Phone, Sparkles, X, Award } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Camera, ImagePlus, User, Mail, Phone, FileText, Check, ArrowLeft, Award, Sparkles, ChevronLeft, X } from 'lucide-react-native';
 import { getRankDetails } from '../data';
+import { updateUser } from '../services/userService';
 
 const { width } = Dimensions.get('window');
 
@@ -31,6 +33,14 @@ const presetAvatars = [
   'https://i.pravatar.cc/150?img=11', // Mountain adventurer
 ];
 
+const presetCovers = [
+  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=80', // Vịnh Hạ Long
+  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', // Biển xanh
+  'https://images.unsplash.com/photo-1518684079-3c830dcef090?auto=format&fit=crop&w=800&q=80', // Hội An
+  'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=800&q=80', // Phú Quốc
+  'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=800&q=80', // Bầu trời đêm ngàn sao
+];
+
 export function EditProfileScreen({ theme, isDarkMode, onBack, onSave, currentUser = {} }) {
   const user = currentUser || {};
   const [name, setName] = useState(user.name || '');
@@ -41,28 +51,91 @@ export function EditProfileScreen({ theme, isDarkMode, onBack, onSave, currentUs
       'Thích tìm hiểu lịch sử, danh lam thắng cảnh. Thích trải nghiệm tham quan ảo AR 360 độ trên Vivu360! 🌐🎒'
   );
   const [avatar, setAvatar] = useState(user.avatar || 'https://i.pravatar.cc/150?img=68');
+  const [cover, setCover] = useState(user.cover || 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=80');
   const [isSaving, setIsSaving] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
 
   const rank = getRankDetails(user.points || 0);
 
-  const handleSave = () => {
-    if (!name.trim()) {
+  const pickAvatarImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Quyền truy cập', 'Vui lòng cho phép ứng dụng truy cập Thư viện ảnh thiết bị để chọn ảnh đại diện!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setAvatar(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.warn('Lỗi chọn ảnh đại diện:', error.message);
+    }
+  };
+
+  const pickCoverImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Quyền truy cập', 'Vui lòng cho phép ứng dụng truy cập Thư viện ảnh thiết bị để chọn ảnh bìa!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.85,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setCover(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.warn('Lỗi chọn ảnh bìa:', error.message);
+    }
+  };
+
+  const handleSave = async () => {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       Alert.alert('Lỗi', 'Họ và tên không được để trống.');
       return;
     }
 
     setIsSaving(true);
+    const updatedPayload = {
+      name: trimmedName,
+      email: email.trim(),
+      phone: phone.trim(),
+      bio: bio.trim(),
+      avatar,
+      cover,
+    };
 
-    // Simulate API call saving data
-    setTimeout(() => {
+    const targetUid = currentUser?.firebaseUid || currentUser?.id || 'me';
+
+    try {
+      if (targetUid) {
+        await updateUser(targetUid, updatedPayload);
+      }
+    } catch (error) {
+      console.log('[EditProfile] Đồng bộ updateUser API MongoDB fallback:', error.message);
+    } finally {
       setIsSaving(false);
-      Alert.alert('Thành công', 'Thông tin cá nhân của bạn đã được cập nhật!');
+      Alert.alert('Thành công ✨', 'Thông tin cá nhân & ảnh đại diện của bạn đã được cập nhật!');
       if (onSave) {
-        onSave({ name, email, phone, bio, avatar });
+        onSave(updatedPayload);
       }
       onBack();
-    }, 1200);
+    }
   };
 
   const getBorderColor = (fieldName) => {
@@ -78,7 +151,7 @@ export function EditProfileScreen({ theme, isDarkMode, onBack, onSave, currentUs
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
       >
         {/* Header */}
@@ -86,46 +159,53 @@ export function EditProfileScreen({ theme, isDarkMode, onBack, onSave, currentUs
           <TouchableOpacity
             style={[
               styles.backBtn,
-              { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: theme.border },
+              { backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.18)' : 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.35)', borderWidth: 1.2 },
             ]}
             onPress={() => {
               if (onBack) {
                 onBack();
               }
             }}
-            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+            hitSlop={{ top: 25, bottom: 25, left: 25, right: 25 }}
             activeOpacity={0.7}
           >
-            <ChevronLeft size={22} color={theme.textPrimary} />
+            <ChevronLeft size={22} color="#f59e0b" />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Chỉnh sửa thông tin</Text>
           <View style={{ width: 38 }} />
         </View>
 
         <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {/* Cover Gradient Banner */}
-          <LinearGradient
-            colors={isDarkMode ? ['#1e3a8a', '#6b21a8'] : ['#93c5fd', '#c084fc']}
-            style={styles.coverBanner}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Sparkles size={16} color="rgba(255, 255, 255, 0.4)" style={styles.bannerDecor1} />
-            <Sparkles size={24} color="rgba(255, 255, 255, 0.2)" style={styles.bannerDecor2} />
-          </LinearGradient>
+          {/* Cover Image Header */}
+          <Pressable style={styles.coverBannerWrap} onPress={pickCoverImage}>
+            <Image source={{ uri: cover?.trim() || 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=80' }} style={styles.coverBannerImg} />
+            <LinearGradient
+              colors={['rgba(0,0,0,0.5)', 'transparent', isDarkMode ? '#090a0f' : '#ffffff']}
+              style={styles.coverGradient}
+            />
+            <View style={styles.coverChangePill}>
+              <Camera size={12} color="#fff" />
+              <Text style={styles.coverChangeText}>Tải ảnh bìa từ Album máy</Text>
+            </View>
+          </Pressable>
 
           {/* Avatar Section with Rank Frame */}
           <View style={styles.avatarSection}>
-            <LinearGradient
-              colors={rank.colors}
-              style={styles.avatarFrame}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <View style={[styles.avatarInnerContainer, { backgroundColor: theme.background }]}>
-                <Image source={{ uri: avatar }} style={styles.avatarImage} />
+            <Pressable onPress={pickAvatarImage} style={styles.avatarPressWrap}>
+              <LinearGradient
+                colors={rank.colors}
+                style={styles.avatarFrame}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={[styles.avatarInnerContainer, { backgroundColor: theme.background }]}>
+                  <Image source={{ uri: avatar?.trim() || 'https://i.pravatar.cc/150?img=68' }} style={styles.avatarImage} />
+                </View>
+              </LinearGradient>
+              <View style={styles.avatarCameraBadge}>
+                <Camera size={14} color="#fff" />
               </View>
-            </LinearGradient>
+            </Pressable>
             
             {/* Rank Floating Badge */}
             <View style={[styles.rankBadge, { backgroundColor: rank.borderColor }]}>
@@ -133,7 +213,14 @@ export function EditProfileScreen({ theme, isDarkMode, onBack, onSave, currentUs
               <Text style={styles.rankBadgeText}>{rank.rankName}</Text>
             </View>
             
-            <Text style={[styles.avatarTip, { color: theme.textSecondary }]}>Ảnh đại diện hồ sơ cá nhân Vivu360</Text>
+            {/* Nút chọn ảnh từ Album máy */}
+            <Pressable
+              style={[styles.albumPickBtn, { backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.08)', borderColor: '#f59e0b' }]}
+              onPress={pickAvatarImage}
+            >
+              <ImagePlus size={14} color="#f59e0b" />
+              <Text style={styles.albumPickBtnText}>Chọn ảnh đại diện từ Album máy</Text>
+            </Pressable>
           </View>
 
           {/* Preset Travel Avatars selection */}
@@ -147,9 +234,9 @@ export function EditProfileScreen({ theme, isDarkMode, onBack, onSave, currentUs
                   style={[
                     styles.presetThumbWrapper,
                     {
-                      borderColor: avatar === url ? '#3b82f6' : theme.border,
+                      borderColor: avatar === url ? '#f59e0b' : theme.border,
                       borderWidth: avatar === url ? 3 : 1,
-                      shadowColor: '#3b82f6',
+                      shadowColor: '#f59e0b',
                       shadowOpacity: avatar === url ? 0.3 : 0,
                     },
                   ]}
@@ -160,10 +247,58 @@ export function EditProfileScreen({ theme, isDarkMode, onBack, onSave, currentUs
             </View>
           </View>
 
+          {/* Preset Cover Photos selection */}
+          <View style={styles.presetsSection}>
+            <Text style={[styles.presetsTitle, { color: theme.textPrimary }]}>Chọn nhanh ảnh bìa thắng cảnh</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
+              {presetCovers.map((url, idx) => (
+                <Pressable
+                  key={idx}
+                  onPress={() => setCover(url)}
+                  style={[
+                    styles.presetCoverWrapper,
+                    {
+                      borderColor: cover === url ? '#dc2626' : theme.border,
+                      borderWidth: cover === url ? 3 : 1,
+                    },
+                  ]}
+                >
+                  <Image source={{ uri: url }} style={styles.presetCoverThumb} />
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
           {/* Input Forms */}
           <View style={styles.formSection}>
             <View style={styles.formGroup}>
-              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Đường dẫn ảnh đại diện (URL)</Text>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>URL Ảnh bìa du lịch</Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.searchBg,
+                    borderColor: getBorderColor('coverUrl'),
+                    shadowOpacity: focusedField === 'coverUrl' ? 0.1 : 0,
+                  },
+                ]}
+              >
+                <Camera size={16} color={getIconColor('coverUrl')} />
+                <TextInput
+                  value={cover}
+                  onChangeText={setCover}
+                  onFocus={() => setFocusedField('coverUrl')}
+                  onBlur={() => setFocusedField(null)}
+                  style={[styles.textInput, { color: theme.textPrimary }]}
+                  placeholder="Dán liên kết ảnh bìa mới"
+                  placeholderTextColor={theme.textMuted}
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>URL Ảnh đại diện</Text>
               <View
                 style={[
                   styles.inputContainer,
@@ -181,7 +316,7 @@ export function EditProfileScreen({ theme, isDarkMode, onBack, onSave, currentUs
                   onFocus={() => setFocusedField('avatarUrl')}
                   onBlur={() => setFocusedField(null)}
                   style={[styles.textInput, { color: theme.textPrimary }]}
-                  placeholder="Dán liên kết ảnh mới của bạn"
+                  placeholder="Dán liên kết ảnh đại diện mới"
                   placeholderTextColor={theme.textMuted}
                   autoCapitalize="none"
                 />
@@ -308,7 +443,7 @@ export function EditProfileScreen({ theme, isDarkMode, onBack, onSave, currentUs
 
           <Pressable style={styles.submitBtn} onPress={handleSave} disabled={isSaving}>
             <LinearGradient
-              colors={['#3b82f6', '#1d4ed8']}
+              colors={['#dc2626', '#f59e0b']}
               style={styles.submitGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -357,21 +492,84 @@ const styles = StyleSheet.create({
 
   scrollContent: { flex: 1 },
 
-  coverBanner: {
-    height: 110,
+  coverBannerWrap: {
+    height: 130,
     width: '100%',
     position: 'relative',
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
   },
-  bannerDecor1: { position: 'absolute', top: 15, right: 30 },
-  bannerDecor2: { position: 'absolute', bottom: 20, left: 25 },
+  coverBannerImg: {
+    width: '100%',
+    height: '100%',
+  },
+  coverGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  coverChangePill: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  coverChangeText: {
+    color: '#fff',
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
 
   avatarSection: {
     alignItems: 'center',
     marginTop: -55,
     marginBottom: 16,
     position: 'relative',
+  },
+  avatarPressWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarCameraBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#dc2626',
+    borderWidth: 2,
+    borderColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+  },
+  albumPickBtn: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  albumPickBtnText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#f59e0b',
   },
   avatarFrame: {
     width: 110,

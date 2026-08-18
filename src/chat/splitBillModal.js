@@ -1,3 +1,4 @@
+// Expo Metro Cache Purged: 2026-08-13T22:57:15
 import React, { useState, useEffect } from 'react';
 import {
   Modal,
@@ -10,8 +11,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -79,11 +78,10 @@ export function SplitBillModal({
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.modalBackdrop}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={[styles.modalCard, { backgroundColor: theme.background || '#fff' }]}>
+        <View style={[styles.modalCard, { backgroundColor: theme.background || '#fff' }]}>
             {/* Header */}
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -95,7 +93,7 @@ export function SplitBillModal({
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {/* Bill Title Input */}
               <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Nội dung hóa đơn / Lý do</Text>
               <View style={[styles.formInputGroup, { backgroundColor: theme.searchBg }]}>
@@ -119,14 +117,65 @@ export function SplitBillModal({
                   value={totalAmountInput}
                   onChangeText={setTotalAmountInput}
                   keyboardType="numeric"
-                  style={[styles.formTextInput, { color: theme.textPrimary }]}
+                  style={[styles.formTextInput, { color: theme.textPrimary, fontSize: 16, fontWeight: '800' }]}
                 />
+                {totalAmount > 0 && (
+                  <Text style={{ fontSize: 12, fontWeight: '850', color: '#10b981' }}>
+                    {totalAmount.toLocaleString('vi-VN')} đ
+                  </Text>
+                )}
+              </View>
+
+              {/* Nút chọn nhanh số tiền (Money Presets 1-chạm) */}
+              <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                {[
+                  { label: '300k', value: '300000' },
+                  { label: '500k', value: '500000' },
+                  { label: '1Tr', value: '1000000' },
+                  { label: '1.2Tr', value: '1200000' },
+                  { label: '2Tr', value: '2000000' },
+                  { label: '3Tr', value: '3000000' },
+                ].map(preset => (
+                  <Pressable
+                    key={preset.label}
+                    style={{
+                      flex: 1,
+                      alignItems: 'center',
+                      paddingVertical: 6,
+                      borderRadius: 10,
+                      backgroundColor: totalAmountInput === preset.value ? 'rgba(244, 63, 94, 0.15)' : theme.searchBg,
+                      borderWidth: 1,
+                      borderColor: totalAmountInput === preset.value ? '#f43f5e' : theme.border,
+                    }}
+                    onPress={() => setTotalAmountInput(preset.value)}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '850', color: totalAmountInput === preset.value ? '#f43f5e' : theme.textPrimary }}>
+                      {preset.label}
+                    </Text>
+                  </Pressable>
+                ))}
               </View>
 
               {/* Member Selector List */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
                 <Text style={[styles.inputLabel, { color: theme.textMuted, marginBottom: 0 }]}>Thành viên chia bill</Text>
-                <Text style={{ fontSize: 12, fontWeight: '750', color: '#f43f5e' }}>{activeCount}/{selectedGroup?.membersList?.length || 0} người</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Pressable
+                    onPress={() => {
+                      const all = {};
+                      selectedGroup?.membersList?.forEach(m => { all[m.id] = true; });
+                      setSelectedMembers(all);
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#3b82f6' }}>✓ Tất cả</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setSelectedMembers({})}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: theme.textMuted }}>Bỏ chọn</Text>
+                  </Pressable>
+                  <Text style={{ fontSize: 12, fontWeight: '750', color: '#f43f5e' }}>{activeCount}/{selectedGroup?.membersList?.length || 0} người</Text>
+                </View>
               </View>
 
               <View style={styles.membersListContainer}>
@@ -142,9 +191,16 @@ export function SplitBillModal({
                       onPress={() => toggleMember(member.id)}
                     >
                       <Image source={{ uri: member.avatar || ('https://i.pravatar.cc/150?name=' + encodeURIComponent(member.name || 'User')) }} style={styles.memberAvatar} />
-                      <Text style={[styles.memberName, { color: theme.textPrimary }]} numberOfLines={1}>
-                        {member.name}
-                      </Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.memberName, { color: theme.textPrimary }]} numberOfLines={1}>
+                          {member.name}
+                        </Text>
+                        {isChecked && perPersonAmount > 0 && (
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#f43f5e', marginTop: 1 }}>
+                            Phần đóng: {perPersonAmount.toLocaleString('vi-VN')} đ
+                          </Text>
+                        )}
+                      </View>
                       <View
                         style={[
                           styles.checkbox,
@@ -172,7 +228,7 @@ export function SplitBillModal({
                   </View>
                   <Text style={styles.resultAmountText}>{perPersonAmount.toLocaleString('vi-VN')} đ</Text>
                   <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 2, fontStyle: 'italic' }}>
-                    * Tự động chia đều cho {activeCount} người đã chọn.
+                    * Tự động chia đều cho {activeCount} người đã chọn ({totalAmount.toLocaleString('vi-VN')} đ ÷ {activeCount} người).
                   </Text>
                 </View>
               )}
@@ -186,7 +242,6 @@ export function SplitBillModal({
               </LinearGradient>
             </Pressable>
           </View>
-        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </Modal>
   );

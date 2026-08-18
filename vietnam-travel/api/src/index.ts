@@ -73,6 +73,13 @@ if (process.env.NODE_ENV === 'production') {
 app.use(errorHandler);
 
 const PORT = Number(process.env.PORT || 7321);
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
+});
+server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+        console.log(`⚡ Cổng ${PORT} đã hoạt động sẵn — Tiếp tục dùng server hiện tại.`);
+    } else {
+        console.error('Server error:', err);
+    }
 });

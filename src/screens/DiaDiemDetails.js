@@ -52,6 +52,7 @@ const DiaDiemDetails = ({
                 <Pressable
                     onPress={onBack}
                     style={styles.backButton}
+                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
                 >
                     <ArrowLeft
                         size={22}
@@ -223,9 +224,12 @@ const styles = StyleSheet.create({
         width: 42,
         height: 42,
         borderRadius: 21,
-        backgroundColor: "rgba(0,0,0,0.35)",
+        backgroundColor: "rgba(0,0,0,0.6)",
+        borderWidth: 1.2,
+        borderColor: "rgba(245, 158, 11, 0.4)",
         justifyContent: "center",
         alignItems: "center",
+        zIndex: 100,
     },
 
     shareButton: {

@@ -24,12 +24,12 @@ import {
 } from 'lucide-react-native';
 
 export const allCategories = [
-  { key: 'map', label: 'Bản đồ 360°', Icon: MapIcon, colors: ['#3b82f6', '#1d4ed8'] },
-  { key: 'explore', label: 'Khám phá', Icon: Globe, colors: ['#10b981', '#047857'] },
+  { key: 'map', label: 'Bản đồ 360°', Icon: MapIcon, colors: ['#dc2626', '#991b1b'] },
+  { key: 'explore', label: 'Khám phá', Icon: Globe, colors: ['#f59e0b', '#d97706'] },
   { key: 'social', label: 'Bảng tin', Icon: Newspaper, colors: ['#f59e0b', '#b45309'] },
-  { key: 'chat', label: 'Nhóm du lịch', Icon: MessageSquare, colors: ['#8b5cf6', '#6d28d9'] },
+  { key: 'chat', label: 'Nhóm du lịch', Icon: MessageSquare, colors: ['#dc2626', '#991b1b'] },
   { key: 'camera', label: 'Quét AR', Icon: Scan, colors: ['#ef4444', '#b91c1c'] },
-  { key: 'profile', label: 'Cá nhân', Icon: User, colors: ['#0ea5e9', '#0369a1'] },
+  { key: 'profile', label: 'Cá nhân', Icon: User, colors: ['#f59e0b', '#d97706'] },
 ];
 
 export const banners = [
@@ -141,18 +141,18 @@ export const mockMapMarkers = [
 ];
 
 export const getTheme = (isDarkMode) => ({
-  background: isDarkMode ? '#09090b' : '#f1f5f9', // slate-100
-  card: isDarkMode ? '#18181b' : '#ffffff',
-  cardGlass: isDarkMode ? 'rgba(24, 24, 27, 0.85)' : 'rgba(255, 255, 255, 0.85)',
-  border: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)',
-  textPrimary: isDarkMode ? '#ffffff' : '#0f172a', // slate-900
-  textSecondary: isDarkMode ? '#94a3b8' : '#334155', // slate-700
-  textMuted: isDarkMode ? '#71717a' : '#64748b', // slate-500
-  searchBg: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#f3f4f6', // gray-100
-  searchBorder: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#e5e7eb', // gray-200
-  navBg: isDarkMode ? 'rgba(15, 15, 20, 0.94)' : 'rgba(255, 255, 255, 0.95)',
-  navBorder: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)',
-  statusBg: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : '#e2e8f0', // slate-200
+  background: isDarkMode ? '#090a0f' : '#f8fafc',
+  card: isDarkMode ? '#11131c' : '#ffffff',
+  cardGlass: isDarkMode ? 'rgba(17, 19, 28, 0.88)' : 'rgba(255, 255, 255, 0.92)',
+  border: isDarkMode ? 'rgba(245, 158, 11, 0.18)' : 'rgba(15, 23, 42, 0.08)',
+  textPrimary: isDarkMode ? '#ffffff' : '#0f172a',
+  textSecondary: isDarkMode ? '#94a3b8' : '#334155',
+  textMuted: isDarkMode ? '#64748b' : '#94a3b8',
+  searchBg: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#f3f4f6',
+  searchBorder: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#e5e7eb',
+  navBg: isDarkMode ? 'rgba(9, 10, 15, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+  navBorder: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(15, 23, 42, 0.06)',
+  statusBg: isDarkMode ? 'rgba(245, 158, 11, 0.1)' : '#fee2e2',
 });
 
 export function getRankDetails(points) {

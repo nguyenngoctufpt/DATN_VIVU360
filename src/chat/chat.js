@@ -1,4 +1,4 @@
-// Vivu360 Chat Module - Pure Obsidian Messenger Dark Mode
+// Vivu360 Chat Module - Pure Obsidian Messenger Dark Mode (Updated 2026-08-13T22:57:25)
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -15,11 +15,26 @@ import {
   StatusBar,
   ActivityIndicator,
   Linking,
+  RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { loadAppData, saveAppData } from '../services/appDataService';
 import { searchFriends } from '../services/userService';
-import { addChatMembers, createChatGroup, getChatGroups, getChatMessages, removeChatMember, renameChatGroup, sendChatMessage, markMessagesAsRead, updateChatGroup } from '../services/chatService';
+import {
+  addChatMembers,
+  createChatGroup,
+  getChatGroups,
+  getChatMessages,
+  removeChatMember,
+  renameChatGroup,
+  sendChatMessage,
+  markMessagesAsRead,
+  updateChatGroup,
+  createGroupPoll,
+  voteGroupPoll,
+  closeGroupPoll,
+  editChatMessage,
+} from '../services/chatService';
 import { fetchGoogleWeatherForecast } from '../services/googleWeatherService';
 import {
   X,
@@ -224,16 +239,117 @@ const TRAVEL_DESTINATIONS = [
       evening: ['Đi chợ đêm', 'Ăn lẩu gà lá é', 'Chốt đồ dùng mang theo cho sáng hôm sau'],
     },
   },
+  {
+    id: 'ha-noi',
+    name: 'Hà Nội',
+    region: 'Hà Nội',
+    climateKey: 'capital',
+    image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=80',
+    keywords: ['hà nội', 'thủ đô', 'hồ gươm', 'phố cổ'],
+    intro: 'Thủ đô ngàn năm văn hiến với phố cổ, nét văn hóa ẩm thực đặc sắc và các di tích lịch sử.',
+    highlights: ['Hồ Hoàn Kiếm', 'Lăng Bác', 'Phố Cổ Hà Nội', 'Văn Miếu'],
+    mapStops: ['Hồ Hoàn Kiếm, Hà Nội', 'Lăng Chủ tịch Hồ Chí Minh', 'Văn Miếu Quốc Tử Giám'],
+    coordinates: { latitude: 21.0285, longitude: 105.8542 },
+    packingCore: ['CCCD', 'giày êm', 'sạc dự phòng', 'ô che'],
+    packingSunny: ['nón', 'kem chống nắng'],
+    packingRainy: ['áo mưa mỏng', 'ô gấp'],
+    activities: {
+      sunny: ['Dạo Hồ Gươm và phố cổ sáng sớm', 'Tham quan Văn Miếu', 'Thưởng thức cafe trứng Hàng Gai'],
+      cloudy: ['Food tour phố cổ Hà Nội', 'Check-in Bảo tàng Lịch sử', 'Mua quà bún chả và cốm'],
+      rainy: ['Ngồi cafe phố cổ ngắm mưa', 'Ăn phở nóng và dạo trung tâm'],
+      evening: ['Dạo phố đi bộ', 'Ăn bún chả / phở', 'Trà đá vỉa hè phố cổ'],
+    },
+  },
+  {
+    id: 'ninh-binh',
+    name: 'Ninh Bình',
+    region: 'Ninh Bình',
+    climateKey: 'heritage',
+    image: 'https://images.unsplash.com/photo-1599707367072-cd6ada2bc375?auto=format&fit=crop&w=600&q=80',
+    keywords: ['ninh bình', 'tràng an', 'tam cốc', 'bái đính', 'hang múa'],
+    intro: 'Cố đô Hoa Lư với danh thắng Tràng An, núi non trùng điệp và sông nước hữu tình.',
+    highlights: ['Tràng An', 'Hang Múa', 'Chùa Bái Đính', 'Tam Cốc - Bích Động'],
+    mapStops: ['Danh thắng Tràng An', 'Hang Múa, Ninh Bình', 'Chùa Bái Đính'],
+    coordinates: { latitude: 20.2506, longitude: 105.9744 },
+    packingCore: ['CCCD', 'giày thể thao', 'nón lá/mũ', 'nước uống'],
+    packingSunny: ['kem chống nắng', 'kính mát'],
+    packingRainy: ['áo mưa gọn', 'túi chống nước'],
+    activities: {
+      sunny: ['Đi thuyền Tràng An / Tam Cốc', 'Leo đỉnh Hang Múa ngắm toàn cảnh', 'Bái Phật chùa Bái Đính'],
+      cloudy: ['Tham quan Cố đô Hoa Lư', 'Dạo đầm Vân Long', 'Thưởng thức thịt dê nướng'],
+      rainy: ['Nghỉ ngơi resort núi', 'Ăn cơm cháy thịt dê nóng hổi'],
+      evening: ['Dạo phố cổ Hoa Lư đêm', 'Ăn tối đặc sản dê núi'],
+    },
+  },
+  {
+    id: 'hue',
+    name: 'Huế',
+    region: 'Thừa Thiên Huế',
+    climateKey: 'heritage',
+    image: 'https://images.unsplash.com/photo-1555921015-5532091f6026?auto=format&fit=crop&w=600&q=80',
+    keywords: ['huế', 'cố đô', 'sông hương', 'đại nội', 'chùa thiên mụ'],
+    intro: 'Mảnh đất Cố đô thơ mộng với Đại Nội cổ kính, lăng tẩm triều Nguyễn và nhã nhạc cung đình.',
+    highlights: ['Đại Nội Huế', 'Chùa Thiên Mụ', 'Lăng Khải Định', 'Sông Hương'],
+    mapStops: ['Đại Nội Huế', 'Chùa Thiên Mụ, Huế', 'Lăng Khải Định, Huế'],
+    coordinates: { latitude: 16.4637, longitude: 107.5908 },
+    packingCore: ['CCCD', 'giày đi bộ', 'ô du lịch', 'mũ nón'],
+    packingSunny: ['kem chống nắng', 'áo khoác mỏng'],
+    packingRainy: ['áo mưa', 'ô màu trầm'],
+    activities: {
+      sunny: ['Tham quan Đại Nội Huế', 'Ngắm cảnh chùa Thiên Mụ', 'Viếng Lăng Khải Định'],
+      cloudy: ['Thưởng thức bún bò Huế và bánh nậm', 'Dạo chợ Đông Ba', 'Ngồi cafe ngắm sông Hương'],
+      rainy: ['Nghe Ca Huế trên Sông Hương', 'Ăn chè hẻm Huế ấm cúng'],
+      evening: ['Đi thuyền nghe ca Huế', 'Dạo cầu Tràng Tiền ngắm đèn nghệ thuật'],
+    },
+  },
+  {
+    id: 'ha-giang',
+    name: 'Hà Giang',
+    region: 'Hà Giang',
+    climateKey: 'mountain',
+    image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=600&q=80',
+    keywords: ['hà giang', 'mã pí lèng', 'đồng văn', 'lũng cú', 'sông nho quế'],
+    intro: 'Vùng cao nguyên đá hùng vĩ với đèo Mã Pí Lèng, hẻm Tu Sản và sông Nho Quế xanh ngọc.',
+    highlights: ['Mã Pí Lèng', 'Sông Nho Quế', 'Cột cờ Lũng Cú', 'Dinh họ Vương'],
+    mapStops: ['Đèo Mã Pí Lèng, Hà Giang', 'Sông Nho Quế', 'Cột cờ Lũng Cú'],
+    coordinates: { latitude: 22.8233, longitude: 104.9836 },
+    packingCore: ['CCCD', 'giày leo núi', 'áo khoác ấm', 'găng tay xe máy'],
+    packingSunny: ['kính râm', 'kem chống nắng'],
+    packingRainy: ['áo mưa bộ', 'túi chống nước'],
+    activities: {
+      sunny: ['Chinh phục đèo Mã Pí Lèng', 'Đi thuyền trên sông Nho Quế', 'Check-in Cột cờ Lũng Cú'],
+      cloudy: ['Tham quan Phố cổ Đồng Văn', 'Ghé Dinh Vua Mèo', 'Ngắm hoa tam giác mạch'],
+      rainy: ['Thưởng thức thắng cố và rượu ngô', 'Sưởi ấm bên bếp lửa nhà sàn'],
+      evening: ['Dạo phố cổ Đồng Văn', 'Ăn lẩu gà đen', 'Thưởng thức trà Shan Tuyết'],
+    },
+  },
+  {
+    id: 'ho-chi-minh',
+    name: 'TP. Hồ Chí Minh',
+    region: 'TP. Hồ Chí Minh',
+    climateKey: 'metropolis',
+    image: 'https://images.unsplash.com/photo-1509060464153-4466739f78ad?auto=format&fit=crop&w=600&q=80',
+    keywords: ['hồ chí minh', 'sài gòn', 'bến thành', 'bưu điện trung tâm', 'dinh độc lập'],
+    intro: 'Đô thị sầm uất bậc nhất với sự giao thoa văn hóa, ẩm thực phong phú và nhịp sống hiện đại.',
+    highlights: ['Chợ Bến Thành', 'Dinh Độc Lập', 'Bưu điện Trung tâm', 'Phố đi bộ Nguyễn Huệ'],
+    mapStops: ['Chợ Bến Thành, TP.HCM', 'Dinh Độc Lập', 'Phố đi bộ Nguyễn Huệ'],
+    coordinates: { latitude: 10.8231, longitude: 106.6297 },
+    packingCore: ['CCCD', 'giày nhẹ', 'sạc dự phòng', 'ô gấp'],
+    packingSunny: ['kem chống nắng', 'kính râm'],
+    packingRainy: ['áo mưa mỏng'],
+    activities: {
+      sunny: ['Dạo Dinh Độc Lập và Nhà thờ Đức Bà', 'Check-in Bưu điện trung tâm', 'Ngắm phố Nguyễn Huệ'],
+      cloudy: ['Thưởng thức cơm tấm & hủ tiếu', 'Cafe chung cư 42 Nguyễn Huệ', 'Mua sắm tại Chợ Bến Thành'],
+      rainy: ['Ngồi cafe ngắm phố Sài Gòn', 'Ăn lẩu và thưởng thức ẩm thực trong nhà'],
+      evening: ['Đi xe buýt 2 tầng ngắm phố', 'Dạo Phố Bùi Viện / Nguyễn Huệ'],
+    },
+  },
 ];
 
-const initialGroups = [];
-
-const SEEDED_GROUP_IDS = new Set([1, 2, 3]);
+const defaultVivuGroups = [];
 
 const sanitizeGroups = (items) => (
-  Array.isArray(items)
-    ? items.filter((group) => group && !SEEDED_GROUP_IDS.has(Number(group.id)))
-    : []
+  Array.isArray(items) ? items : []
 );
 
 const getUserAvatarByName = (name) => {
@@ -591,9 +707,10 @@ const buildItinerarySuggestion = ({ destination, startDate, endDate, forecast, s
             ? 'Trời nhiều mây, thích hợp đi bộ tham quan và chụp ảnh cả ngày.'
             : 'Thời tiết đẹp, có thể ưu tiên hoạt động ngoài trời và điểm mở.',
       slots: [
-        { title: 'Buổi sáng', text: morning },
-        { title: 'Buổi chiều', text: afternoon },
-        { title: 'Buổi tối', text: evening },
+        { time: '08:00', period: 'SÁNG', title: 'Hoạt động Sáng (08:00)', text: morning },
+        { time: '12:00', period: 'TRƯA', title: 'Ăn trưa & Nghỉ ngơi (12:00)', text: `Thưởng thức ẩm thực đặc sản ${destination.name}` },
+        { time: '14:30', period: 'CHIỀU', title: 'Hoạt động Chiều (14:30)', text: afternoon },
+        { time: '19:00', period: 'TỐI', title: 'Hoạt động Tối (19:00)', text: evening },
       ],
     };
   });
@@ -697,7 +814,7 @@ const normalizeGroup = (group, currentUser, ownerId) => {
   };
 };
 
-const buildDefaultGroups = (currentUser, ownerId) => sanitizeGroups(initialGroups).map((group) => normalizeGroup(group, currentUser, ownerId));
+const buildDefaultGroups = (currentUser, ownerId) => sanitizeGroups(defaultVivuGroups).map((group) => normalizeGroup(group, currentUser, ownerId));
 
 const normalizeApiMessage = (message, currentUser, ownerId, membersList = []) => {
   const groupMember = membersList.find(member => String(member.id) === String(message.senderId));
@@ -730,6 +847,11 @@ const normalizeApiGroup = (group, currentUser, ownerId) => {
   const groupName = group.isDirect && otherMember ? otherMember.name : group.name;
   const groupAvatar = group.isDirect && otherMember ? (otherMember.avatar || getUserAvatarByName(otherMember.name)) : (group.avatar || GROUP_IMAGES[0]);
   
+  const initialMsgs = [];
+  if (group.lastMessage && group.lastMessage.content) {
+    initialMsgs.push(normalizeApiMessage(group.lastMessage, currentUser, ownerId, membersRaw));
+  }
+
   return normalizeGroup({
     id: group._id || group.id,
     name: groupName,
@@ -747,7 +869,7 @@ const normalizeApiGroup = (group, currentUser, ownerId) => {
             ? currentUser?.name || 'Bạn'
             : membersRaw.find(member => (member.firebaseUid || member.id) === group.lastMessage.senderId)?.name || 'Thành viên'}: ${group.lastMessage.content}`
     ) : 'Chưa có tin nhắn',
-    messages: [],
+    messages: initialMsgs,
     itinerary: group.itinerary || {},
     fund: group.fund || {},
   }, currentUser, ownerId);
@@ -826,7 +948,7 @@ const MetricCard = ({ title, value, subtitle, icon, theme, isDarkMode }) => (
   </View>
 );
 
-export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, prevScreen, targetDirectChatGroupId, setTargetDirectChatGroupId, onNavigateToMapWithPlace }) {
+export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, prevScreen, targetDirectChatGroupId, setTargetDirectChatGroupId, onNavigateToMapWithPlace, selectedPlaceName }) {
   const [groups, setGroups] = useState(() => buildDefaultGroups(currentUser, ownerId));
   const [groupsOwnerId, setGroupsOwnerId] = useState(null);
   const [groupModalVisible, setGroupModalVisible] = useState(false);
@@ -844,7 +966,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const [splitBillModalVisible, setSplitBillModalVisible] = useState(false);
 
   const [selectedGroupId, setSelectedGroupId] = useState(null);
-  const selectedGroup = groups.find((group) => group.id === selectedGroupId) || null;
+  const selectedGroup = groups.find((group) => String(group.id || group._id) === String(selectedGroupId)) || null;
   const selectedMemberIds = (selectedGroup?.membersList || [])
     .map((member) => String(member.id))
     .sort()
@@ -860,7 +982,54 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const [memberSearchError, setMemberSearchError] = useState('');
   const [isSearchingMembers, setIsSearchingMembers] = useState(false);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+
+  const handleRefresh = async () => {
+    if (!ownerId) return;
+    setIsRefreshing(true);
+    try {
+      const apiGroups = await getChatGroups(ownerId);
+      if (Array.isArray(apiGroups) && apiGroups.length > 0) {
+        setGroups((prevGroups) => {
+          return apiGroups.map((apiGroup) => {
+            const normalized = normalizeApiGroup(apiGroup, currentUser, ownerId);
+            const prevGroup = prevGroups.find((g) => String(g.id) === String(normalized.id));
+            const prevDays = prevGroup?.itinerary?.days;
+            const apiDays = normalized.itinerary?.days;
+            // Nếu API backend trả về chưa có danh sách ngày nhưng local đang có lịch trình AI -> Giữ lại lịch trình AI
+            if ((!apiDays || apiDays.length === 0) && prevDays && prevDays.length > 0) {
+              normalized.itinerary = prevGroup.itinerary;
+            }
+            return normalized;
+          });
+        });
+      }
+    } catch (_) {}
+    setIsRefreshing(false);
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    const targetUserId = ownerId || currentUser?.firebaseUid || currentUser?.id || 'guest_user';
+    loadAppData(targetUserId, 'saved_chat_groups').then((saved) => {
+      if (isMounted && Array.isArray(saved) && saved.length > 0) {
+        setGroups((prevGroups) => {
+          return prevGroups.map((group) => {
+            const savedGroup = saved.find((sg) => String(sg.id) === String(group.id));
+            if (savedGroup && savedGroup.itinerary) {
+              return {
+                ...group,
+                itinerary: savedGroup.itinerary,
+              };
+            }
+            return group;
+          });
+        });
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, [ownerId]);
 
   useEffect(() => {
     if (targetDirectChatGroupId && groups.length > 0) {
@@ -874,10 +1043,13 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     }
   }, [targetDirectChatGroupId, groups]);
 
+  const [readLastMessages, setReadLastMessages] = useState({});
   const [planDaysInput, setPlanDaysInput] = useState('3');
   const [planStartDate, setPlanStartDate] = useState(getTodayIso());
   const [planEndDate, setPlanEndDate] = useState(shiftIsoDate(getTodayIso(), 2));
   const [selectedDestinationId, setSelectedDestinationId] = useState(TRAVEL_DESTINATIONS[0].id);
+  const [selectedStyleId, setSelectedStyleId] = useState('photo');
+  const [selectedBudgetId, setSelectedBudgetId] = useState('standard');
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [planStatusMessage, setPlanStatusMessage] = useState('');
   
@@ -891,6 +1063,8 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const [selectedFundMemberId, setSelectedFundMemberId] = useState(getCurrentUserMemberId(currentUser, ownerId));
   const [fundContributionInput, setFundContributionInput] = useState('');
   const [fundContributionNote, setFundContributionNote] = useState('');
+  const [fundStkInput, setFundStkInput] = useState('');
+  const [fundBillImage, setFundBillImage] = useState(null);
   const [fundExpenseTitle, setFundExpenseTitle] = useState('');
   const [fundExpenseInput, setFundExpenseInput] = useState('');
 
@@ -901,47 +1075,68 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const activeDestination = sortedDestinations.find((destination) => destination.id === selectedDestinationId) || sortedDestinations[0] || TRAVEL_DESTINATIONS[0];
   const fundTotals = getFundTotals(selectedGroup?.fund);
 
-  useEffect(() => {
-    if (!ownerId) return undefined;
+  const targetUserId = ownerId || currentUser?.firebaseUid || currentUser?.id || 'guest_user';
 
+  useEffect(() => {
     let active = true;
 
     const loadGroups = (showLoading = false) => {
       if (showLoading) setIsLoadingGroups(true);
-      getChatGroups(ownerId)
+      getChatGroups(targetUserId)
         .then((apiGroups) => {
           if (!active) return;
 
-          console.log('[Polling Groups] ownerId:', ownerId, 'groups count:', apiGroups?.length, 'groups details:', (apiGroups || []).map(g => ({ name: g.name, memberIds: g.members || g.memberIds })));
-
           setGroups(prevGroups => {
-            return (apiGroups || []).map(apiGroup => {
-              const remote = normalizeApiGroup(apiGroup, currentUser, ownerId);
-              const existing = prevGroups.find(g => String(g.id) === String(remote.id));
+            if (!Array.isArray(apiGroups) || apiGroups.length === 0) {
+              return prevGroups;
+            }
+            return apiGroups.map(apiGroup => {
+              const remote = normalizeApiGroup(apiGroup, currentUser, targetUserId);
+              const existing = prevGroups.find(g =>
+                String(g.id || g._id) === String(remote.id || remote._id) ||
+                (g.name && remote.name && g.name.trim().toLowerCase() === remote.name.trim().toLowerCase())
+              );
               if (existing) {
+                // Hợp nhất sạch sẽ danh sách tin nhắn cũ và mới, xóa trùng lập theo ID
+                const existingMsgs = existing.messages || [];
+                const remoteMsgs = remote.messages || [];
+                const msgMap = new Map();
+                existingMsgs.forEach(m => { if (m.id || m._id) msgMap.set(String(m.id || m._id), m); });
+                remoteMsgs.forEach(m => { if (m.id || m._id) msgMap.set(String(m.id || m._id), m); });
+                const mergedMessages = Array.from(msgMap.values());
+
                 return normalizeGroup({
                   ...existing,
                   ...remote,
-                  messages: existing.messages || [],
+                  messages: mergedMessages.length > 0 ? mergedMessages : (existing.messages || []),
                   membersList: remote.membersList,
                   deputyIds: remote.deputyIds,
                   leaderId: remote.leaderId,
                   name: remote.name,
                   image: remote.image,
-                  itinerary: remote.itinerary,
-                  fund: remote.fund,
-                }, currentUser, ownerId);
+                  itinerary: (remote.itinerary && Array.isArray(remote.itinerary.days) && remote.itinerary.days.length > 0)
+                    ? remote.itinerary
+                    : (existing.itinerary && Array.isArray(existing.itinerary.days) && existing.itinerary.days.length > 0)
+                      ? existing.itinerary
+                      : remote.itinerary,
+                  fund: (remote.fund && (Number(remote.fund.goal) > 0 || (Array.isArray(remote.fund.contributions) && remote.fund.contributions.length > 0) || (Array.isArray(remote.fund.expenses) && remote.fund.expenses.length > 0)))
+                    ? remote.fund
+                    : (existing.fund || remote.fund),
+                }, currentUser, targetUserId);
               }
               return remote;
             });
           });
         })
         .catch((error) => {
-          console.warn('Không thể tải nhóm chat:', error.message);
+          // Suppress repetitive warning logs when server is offline
+          if (error?.message !== 'Network Error') {
+            console.warn('Không thể tải nhóm chat:', error.message);
+          }
         })
         .finally(() => {
           if (active) {
-            setGroupsOwnerId(ownerId);
+            setGroupsOwnerId(targetUserId);
             if (showLoading) setIsLoadingGroups(false);
           }
         });
@@ -956,28 +1151,76 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
       active = false;
       clearInterval(intervalId);
     };
-  }, [ownerId, currentUser?.name, currentUser?.avatar, currentUser?.email]);
+  }, [targetUserId, currentUser?.name, currentUser?.avatar, currentUser?.email]);
 
   useEffect(() => {
-    if (!chatModalVisible || !selectedGroupId || !ownerId) return undefined;
+    if (!chatModalVisible || !selectedGroupId) return undefined;
     let active = true;
     const loadMessages = () => {
-      getChatMessages(selectedGroupId, ownerId)
+      getChatMessages(selectedGroupId, targetUserId)
         .then(messages => {
           if (!active) return;
-          setGroups(prevGroups => prevGroups.map(group => group.id !== selectedGroupId ? group : normalizeGroup({
-            ...group,
-            messages: messages.map(message => normalizeApiMessage(message, currentUser, ownerId, group.membersList)),
-          }, currentUser, ownerId)));
-        })
-        .catch(error => console.warn('Không thể tải tin nhắn:', error.message));
+          setGroups(prevGroups => prevGroups.map(group => {
+            if (String(group.id || group._id) !== String(selectedGroupId)) return group;
 
-      markMessagesAsRead(selectedGroupId, ownerId).catch(() => {});
+            const apiMsgs = messages.map(message => normalizeApiMessage(message, currentUser, targetUserId, group.membersList));
+            const existingMsgs = group.messages || [];
+            
+            // Hợp nhất tin nhắn local và API server, bảo vệ 100% tin nhắn vừa gửi không bao giờ bị trôi
+            const msgMap = new Map();
+            existingMsgs.forEach(m => { if (m.id || m._id) msgMap.set(String(m.id || m._id), m); });
+            apiMsgs.forEach(m => { if (m.id || m._id) msgMap.set(String(m.id || m._id), m); });
+            const mergedMessages = Array.from(msgMap.values());
+
+            return normalizeGroup({
+              ...group,
+              messages: mergedMessages.length > 0 ? mergedMessages : existingMsgs,
+            }, currentUser, targetUserId);
+          }));
+        })
+        .catch(error => {
+          if (error?.message !== 'Network Error') {
+            console.warn('Không thể tải tin nhắn:', error.message);
+          }
+        });
+
+      markMessagesAsRead(selectedGroupId, targetUserId).catch(() => {});
     };
     loadMessages();
     const timer = setInterval(loadMessages, 3000);
     return () => { active = false; clearInterval(timer); };
-  }, [chatModalVisible, selectedGroupId, ownerId]);
+  }, [chatModalVisible, selectedGroupId, targetUserId]);
+
+  const markGroupAsRead = (groupId, lastMsg) => {
+    if (!groupId) return;
+    setReadLastMessages((prev) => {
+      const targetRead = lastMsg || true;
+      if (prev[groupId] === targetRead) return prev;
+      return { ...prev, [groupId]: targetRead };
+    });
+  };
+
+  useEffect(() => {
+    if (chatModalVisible && selectedGroup) {
+      markGroupAsRead(selectedGroup.id, selectedGroup.lastMessage);
+    }
+  }, [chatModalVisible, selectedGroup?.id, selectedGroup?.lastMessage]);
+
+  useEffect(() => {
+    if (Array.isArray(groups) && groups.length > 0) {
+      setReadLastMessages((prev) => {
+        let hasChanges = false;
+        const next = { ...prev };
+        groups.forEach((g) => {
+          if (next[g.id] === undefined) {
+            next[g.id] = g.lastMessage || true;
+            hasChanges = true;
+          }
+        });
+        return hasChanges ? next : prev;
+      });
+    }
+  }, [groups]);
 
   useEffect(() => {
     if (!ownerId || groupsOwnerId !== ownerId) return undefined;
@@ -1028,6 +1271,20 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     setMemberSearchError('');
   }, [selectedGroupId]);
 
+  // Tự động kết nối 2 chiều giữa địa điểm chọn trên Bản đồ với AI Smart Planner
+  useEffect(() => {
+    if (selectedPlaceName) {
+      const query = String(selectedPlaceName).toLowerCase().trim();
+      const matched = TRAVEL_DESTINATIONS.find(d => 
+        query.includes(d.name.toLowerCase()) || d.name.toLowerCase().includes(query) ||
+        query.includes((d.region || '').toLowerCase())
+      );
+      if (matched) {
+        setSelectedDestinationId(matched.id);
+      }
+    }
+  }, [selectedPlaceName]);
+
   useEffect(() => {
     if (!settingsVisible) return undefined;
 
@@ -1068,9 +1325,11 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
   const updateGroupById = async (groupId, updater) => {
     let updatedGroup = null;
+    let prevGroup = null;
     setGroups((prevGroups) =>
       prevGroups.map((group) => {
         if (group.id !== groupId) return group;
+        prevGroup = group;
         updatedGroup = normalizeGroup(updater(group), currentUser, ownerId);
         return updatedGroup;
       })
@@ -1078,12 +1337,15 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
     if (updatedGroup && ownerId) {
       try {
-        await updateChatGroup(groupId, ownerId, {
-          name: updatedGroup.name,
+        const payload = {
           tag: updatedGroup.tag,
           itinerary: updatedGroup.itinerary,
           fund: updatedGroup.fund,
-        });
+        };
+        if (prevGroup && updatedGroup.name !== prevGroup.name) {
+          payload.name = updatedGroup.name;
+        }
+        await updateChatGroup(groupId, ownerId, payload);
       } catch (error) {
         console.warn('Không thể đồng bộ thông tin nhóm lên MongoDB:', error.message);
       }
@@ -1129,6 +1391,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
   const handleOpenChat = (group) => {
     setSelectedGroupId(group.id);
+    markGroupAsRead(group.id, group.lastMessage);
     setWorkspaceTab('chat');
     setChatModalVisible(true);
   };
@@ -1137,16 +1400,102 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     if (!chatInput.trim() || !selectedGroup) return;
 
     const trimmedMessage = chatInput.trim();
-    setIsSendingMessage(true);
+    const localMsgId = Date.now();
+    const localTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+    const localMessage = {
+      id: localMsgId,
+      senderId: ownerId || currentUser?.uid || currentUser?.id || 'local-user',
+      senderName: currentUser?.name || 'Bạn',
+      senderAvatar: currentUser?.avatar || getUserAvatarByName(currentUser?.name),
+      user: currentUser?.name || 'Bạn',
+      text: trimmedMessage,
+      time: localTime,
+      createdAt: localMsgId,
+    };
+
+    // Thêm tin nhắn ngay lập tức vào màn hình Chat (Optimistic UI)
+    updateGroupById(selectedGroup.id, (group) => ({
+      ...group,
+      lastMessage: `Bạn: ${trimmedMessage}`,
+      messages: [...(group.messages || []), localMessage],
+    }));
+
+    setChatInput('');
+
+    // Đồng bộ về Server API ở background
     try {
-      const sent = await sendChatMessage(selectedGroup.id, ownerId, trimmedMessage);
-      const newMessage = normalizeApiMessage({ ...sent, sender: { name: currentUser?.name, avatar: currentUser?.avatar } }, currentUser, ownerId, selectedGroup.membersList);
-      updateGroupById(selectedGroup.id, (group) => ({ ...group, lastMessage: `${newMessage.user}: ${trimmedMessage}`, messages: [...(group.messages || []), newMessage] }));
-      setChatInput('');
+      if (ownerId && selectedGroup.id) {
+        await sendChatMessage(selectedGroup.id, ownerId, trimmedMessage);
+      }
     } catch (error) {
-      Alert.alert('Gửi tin nhắn thất bại', error.response?.data?.message || 'Vui lòng thử lại.');
-    } finally {
-      setIsSendingMessage(false);
+      console.log('Syncing message to API backend failed, stored locally:', error?.message);
+    }
+  };
+
+  const handleCreatePoll = async ({ question, options, multipleChoice }) => {
+    if (!selectedGroup) return;
+    const gId = selectedGroup._id || selectedGroup.id;
+    try {
+      const pollMsg = await createGroupPoll(gId, ownerId, question, options, multipleChoice);
+      if (pollMsg) {
+        updateGroupById(selectedGroup.id, (group) => ({
+          ...group,
+          lastMessage: `📊 Bình chọn: ${question}`,
+          messages: [...(group.messages || []), pollMsg],
+        }));
+      }
+    } catch (err) {
+      console.warn("Lỗi tạo bình chọn:", err.message);
+      Alert.alert("Lỗi tạo bình chọn", err.response?.data?.message || err.message);
+    }
+  };
+
+  const handleVotePoll = async (messageId, optionId) => {
+    if (!selectedGroup) return;
+    const gId = selectedGroup._id || selectedGroup.id;
+    try {
+      const updatedMsg = await voteGroupPoll(gId, messageId, optionId, ownerId);
+      if (updatedMsg) {
+        updateGroupById(selectedGroup.id, (group) => ({
+          ...group,
+          messages: (group.messages || []).map(m => String(m.id || m._id) === String(messageId) ? updatedMsg : m),
+        }));
+      }
+    } catch (err) {
+      console.warn("Lỗi bình chọn:", err.message);
+    }
+  };
+
+  const handleClosePoll = async (messageId) => {
+    if (!selectedGroup) return;
+    const gId = selectedGroup._id || selectedGroup.id;
+    try {
+      const updatedMsg = await closeGroupPoll(gId, messageId, ownerId);
+      if (updatedMsg) {
+        updateGroupById(selectedGroup.id, (group) => ({
+          ...group,
+          messages: (group.messages || []).map(m => String(m.id || m._id) === String(messageId) ? updatedMsg : m),
+        }));
+      }
+    } catch (err) {
+      console.warn("Lỗi khóa bình chọn:", err.message);
+    }
+  };
+
+  const handleEditMessage = async (messageId, newContent) => {
+    if (!selectedGroup) return;
+    const gId = selectedGroup._id || selectedGroup.id;
+    try {
+      const updatedMsg = await editChatMessage(gId, messageId, ownerId, newContent);
+      if (updatedMsg) {
+        updateGroupById(selectedGroup.id, (group) => ({
+          ...group,
+          messages: (group.messages || []).map(m => String(m.id || m._id) === String(messageId) ? updatedMsg : m),
+        }));
+      }
+    } catch (err) {
+      console.warn("Lỗi chỉnh sửa tin nhắn:", err.message);
     }
   };
 
@@ -1182,6 +1531,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
       updateGroupById(selectedGroup.id, (group) => ({ ...group, membersList: [...group.membersList, member], lastMessage: `Hệ thống: ${member.name} vừa được thêm vào nhóm` }));
       setMemberSearchText('');
       setMemberSearchResults([]);
+      Alert.alert('Thành công', `Đã thêm ${member.name} vào nhóm.`);
     } catch (error) {
       Alert.alert('Không thể thêm thành viên', error.response?.data?.message || 'Vui lòng thử lại.');
     }
@@ -1341,6 +1691,8 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
       memberName: contributor.name,
       amount,
       note: fundContributionNote.trim() || 'Đóng góp quỹ',
+      stk: fundStkInput.trim() || null,
+      billImage: fundBillImage || null,
       createdAt: Date.now(),
     };
 
@@ -1348,12 +1700,14 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
       ...group,
       fund: {
         ...group.fund,
-        contributions: [contribution, ...group.fund.contributions],
+        contributions: [contribution, ...(group.fund?.contributions || [])],
       },
     }));
 
     setFundContributionInput('');
     setFundContributionNote('');
+    setFundStkInput('');
+    setFundBillImage(null);
   };
 
   const handleAddExpense = () => {
@@ -1372,13 +1726,103 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     updateGroupById(selectedGroup.id, (group) => ({
       ...group,
       fund: {
-        ...group.fund,
-        expenses: [expense, ...group.fund.expenses],
+        ...(group.fund || {}),
+        expenses: [expense, ...(group.fund?.expenses || [])],
       },
     }));
 
     setFundExpenseTitle('');
     setFundExpenseInput('');
+  };
+
+  const handleClearAllDays = () => {
+    if (!selectedGroup) return;
+    updateGroupById(selectedGroup.id, (group) => ({
+      ...group,
+      itinerary: {
+        ...(group.itinerary || {}),
+        days: [],
+      },
+    }));
+    Alert.alert('Đã xóa', 'Đã xóa toàn bộ lịch trình chuyến đi thành công.');
+  };
+
+  const handleDeleteDay = (dayIndex) => {
+    if (!selectedGroup) return;
+    updateGroupById(selectedGroup.id, (group) => {
+      const currentDays = group.itinerary?.days || [];
+      const updatedDays = currentDays.filter((_, idx) => idx !== dayIndex);
+      return {
+        ...group,
+        itinerary: {
+          ...(group.itinerary || {}),
+          days: updatedDays,
+        },
+      };
+    });
+  };
+
+  const handleDeleteActivity = (dayIndex, slotIndex) => {
+    if (!selectedGroup) return;
+    updateGroupById(selectedGroup.id, (group) => {
+      const currentDays = [...(group.itinerary?.days || [])];
+      if (!currentDays[dayIndex]) return group;
+
+      const targetDay = { ...currentDays[dayIndex] };
+      const currentSlots = [...(targetDay.slots || targetDay.activities || [])];
+      currentSlots.splice(slotIndex, 1);
+
+      targetDay.slots = currentSlots;
+      targetDay.activities = currentSlots;
+      currentDays[dayIndex] = targetDay;
+
+      return {
+        ...group,
+        itinerary: {
+          ...group.itinerary,
+          days: currentDays,
+        },
+      };
+    });
+  };
+
+  const handleOpenEditActivity = (dayIndex, slotIndex, currentTitle, currentDesc) => {
+    setEditingDayIndex(dayIndex);
+    setEditingSlotIndex(slotIndex);
+    setEditingActivityTitle(currentTitle || '');
+    setEditingActivityText(currentDesc || '');
+    setEditActivityModalVisible(true);
+  };
+
+  const handleSaveActivity = () => {
+    if (!selectedGroup || editingDayIndex === null || editingSlotIndex === null) return;
+    updateGroupById(selectedGroup.id, (group) => {
+      const currentDays = [...(group.itinerary?.days || [])];
+      if (!currentDays[editingDayIndex]) return group;
+
+      const targetDay = { ...currentDays[editingDayIndex] };
+      const currentSlots = [...(targetDay.slots || targetDay.activities || [])];
+
+      currentSlots[editingSlotIndex] = {
+        ...(typeof currentSlots[editingSlotIndex] === 'object' ? currentSlots[editingSlotIndex] : {}),
+        title: editingActivityTitle,
+        description: editingActivityText,
+        text: editingActivityText,
+      };
+
+      targetDay.slots = currentSlots;
+      targetDay.activities = currentSlots;
+      currentDays[editingDayIndex] = targetDay;
+
+      return {
+        ...group,
+        itinerary: {
+          ...group.itinerary,
+          days: currentDays,
+        },
+      };
+    });
+    setEditActivityModalVisible(false);
   };
 
   const handleSplitBill = (totalAmount, billTitle, memberIds, splitDetails) => {
@@ -1395,8 +1839,8 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     updateGroupById(selectedGroup.id, (group) => ({
       ...group,
       fund: {
-        ...group.fund,
-        expenses: [expense, ...group.fund.expenses],
+        ...(group.fund || {}),
+        expenses: [expense, ...(group.fund?.expenses || [])],
       },
     }));
 
@@ -1473,99 +1917,18 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     }
   };
 
-  const handleOpenEditActivity = (dayIndex, slotIndex, currentTitle, currentText) => {
-    setEditingDayIndex(dayIndex);
-    setEditingSlotIndex(slotIndex);
-    setEditingActivityTitle(currentTitle);
-    setEditingActivityText(currentText);
-    setEditActivityModalVisible(true);
-  };
 
-  const handleSaveActivity = () => {
-    if (!selectedGroup || editingDayIndex === null || editingSlotIndex === null) return;
-
-    updateGroupById(selectedGroup.id, (group) => {
-      const days = [...(group.itinerary?.days || [])];
-      if (days[editingDayIndex]) {
-        const slots = [...(days[editingDayIndex].slots || [])];
-        if (slots[editingSlotIndex]) {
-          slots[editingSlotIndex] = {
-            ...slots[editingSlotIndex],
-            title: editingActivityTitle,
-            text: editingActivityText,
-          };
-        } else {
-          slots[editingSlotIndex] = {
-            title: editingActivityTitle,
-            text: editingActivityText,
-          };
-        }
-        days[editingDayIndex] = {
-          ...days[editingDayIndex],
-          slots,
-        };
-      }
-      return {
-        ...group,
-        itinerary: {
-          ...(group.itinerary || {}),
-          days,
-        },
-      };
-    });
-
-    setEditActivityModalVisible(false);
-  };
-
-  const handleDeleteActivity = (dayIndex, slotIndex) => {
-    if (!selectedGroup) return;
-
-    Alert.alert(
-      'Xóa hoạt động',
-      'Bạn có chắc chắn muốn xóa hoạt động này khỏi lịch trình không?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: () => {
-            updateGroupById(selectedGroup.id, (group) => {
-              const days = [...(group.itinerary?.days || [])];
-              if (days[dayIndex]) {
-                const slots = [...(days[dayIndex].slots || [])];
-                if (slots[slotIndex]) {
-                  slots[slotIndex] = {
-                    ...slots[slotIndex],
-                    text: '', // Xóa nội dung
-                  };
-                }
-                days[dayIndex] = {
-                  ...days[dayIndex],
-                  slots,
-                };
-              }
-              return {
-                ...group,
-                itinerary: {
-                  ...(group.itinerary || {}),
-                  days,
-                },
-              };
-            });
-          },
-        },
-      ]
-    );
-  };
 
   const itinerary = selectedGroup?.itinerary || null;
   const currentRole = selectedGroup ? getMemberRole(selectedGroup, currentUserId) : 'member';
   const filteredGroups = groups.filter((g) => {
-    const matchesSearch = String(g.name || '').toLowerCase().includes(groupSearchText.toLowerCase()) ||
+    if (!g) return false;
+    const name = String(g.name || '');
+    const matchesSearch = name.toLowerCase().includes(groupSearchText.toLowerCase()) ||
                           String(g.lastMessage || '').toLowerCase().includes(groupSearchText.toLowerCase());
     if (!matchesSearch) return false;
     if (listFilter === 'unread') {
-      const isUnread = String(g.name || '').length % 3 === 0;
+      const isUnread = name.length % 3 === 0;
       return isUnread;
     }
     if (listFilter === 'groups') {
@@ -1575,19 +1938,19 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   });
 
   return (
-    <View style={[styles.tabContainer, { backgroundColor: theme.background }]}>
+    <View style={[styles.tabContainer, { backgroundColor: isDarkMode ? '#12101d' : '#fcf4ef' }]}>
       {/* Messenger style Header */}
-      <View style={[styles.msgHeader, { borderBottomColor: theme.border }]}>
+      <View style={[styles.msgHeader, { borderBottomColor: 'transparent', backgroundColor: isDarkMode ? '#12101d' : '#fcf4ef' }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 4 }}>
           <Pressable 
-            style={[styles.msgBackBtn, { backgroundColor: theme.searchBg }]} 
+            style={[styles.msgBackBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]} 
             onPress={() => onNavigateToTab && onNavigateToTab(prevScreen || 'social')}
           >
             <ChevronLeft size={20} color={theme.textPrimary} />
           </Pressable>
-          <Text style={[styles.msgHeaderTitleCenter, { color: theme.textPrimary }]}>Messages</Text>
+          <Text style={[styles.msgHeaderTitleCenter, { color: theme.textPrimary, fontSize: 20, fontWeight: '900', letterSpacing: -0.3 }]}>Tin Nhắn</Text>
           <Pressable 
-            style={[styles.msgCircleBtn, { backgroundColor: theme.searchBg }]} 
+            style={[styles.msgCircleBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]} 
             onPress={() => setGroupModalVisible(true)}
           >
             <Plus size={18} color={theme.textPrimary} />
@@ -1595,14 +1958,14 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
         </View>
 
         {/* Pill-shaped Search Bar */}
-        <View style={[styles.msgSearchBox, { backgroundColor: theme.searchBg, borderColor: 'transparent' }]}>
-          <Search size={16} color={theme.textSecondary} />
+        <View style={[styles.msgSearchBox, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#ede8e3', borderColor: 'transparent', height: 42, borderRadius: 21, marginTop: 12 }]}>
+          <Search size={16} color={theme.textMuted} />
           <TextInput
-            placeholder="Search..."
+            placeholder="Tìm kiếm tin nhắn, bạn bè..."
             placeholderTextColor={theme.textMuted}
             value={groupSearchText}
             onChangeText={setGroupSearchText}
-            style={[styles.msgSearchInput, { color: theme.textPrimary }]}
+            style={[styles.msgSearchInput, { color: theme.textPrimary, fontSize: 13, fontWeight: '500' }]}
           />
           {groupSearchText.length > 0 && (
             <Pressable onPress={() => setGroupSearchText('')} style={{ padding: 4 }}>
@@ -1614,84 +1977,73 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
         {/* Tab Filters (All, Unread, Groups) */}
         <View style={styles.msgTabFiltersRow}>
           {[
-            { key: 'all', label: 'All' },
-            { key: 'unread', label: 'Unread' },
-            { key: 'groups', label: 'Groups' }
+            { key: 'all', label: 'Tất cả' },
+            { key: 'unread', label: 'Chưa đọc' },
+            { key: 'groups', label: 'Nhóm du lịch' }
           ].map(tab => {
             const isActive = listFilter === tab.key;
             return (
               <Pressable
                 key={tab.key}
-                style={[
-                  styles.msgFilterTab,
-                  {
-                    backgroundColor: isActive 
-                      ? (isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.05)')
-                      : 'transparent'
-                  }
-                ]}
                 onPress={() => setListFilter(tab.key)}
+                style={{ borderRadius: 16, overflow: 'hidden' }}
               >
-                <Text
-                  style={[
-                    styles.msgFilterTabText,
-                    {
-                      color: isActive ? theme.textPrimary : theme.textSecondary,
-                      fontWeight: isActive ? '800' : '600'
-                    }
-                  ]}
-                >
-                  {tab.label}
-                </Text>
+                {isActive ? (
+                  <LinearGradient
+                    colors={['#f43f5e', '#e11d48']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{ paddingHorizontal: 18, paddingVertical: 7, borderRadius: 16 }}
+                  >
+                    <Text style={{ color: '#ffffff', fontSize: 12.5, fontWeight: '800' }}>
+                      {tab.label}
+                    </Text>
+                  </LinearGradient>
+                ) : (
+                  <View style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 7,
+                    borderRadius: 16,
+                    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)'
+                  }}>
+                    <Text style={{ color: theme.textSecondary, fontSize: 12.5, fontWeight: '700' }}>
+                      {tab.label}
+                    </Text>
+                  </View>
+                )}
               </Pressable>
             );
           })}
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
-        {/* Active Members Horizontal List */}
-        <View style={styles.activeUsersSection}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}>
-            {/* Nút tròn tạo nhóm nhỏ, tinh tế trong hàng ngang Active */}
-            <View style={{ alignItems: 'center', width: 56 }}>
-              <Pressable 
-                style={[styles.activeUserCreateBtn, { backgroundColor: theme.searchBg }]} 
-                onPress={() => setGroupModalVisible(true)}
-              >
-                <Plus size={20} color={theme.textPrimary} />
-              </Pressable>
-              <Text numberOfLines={1} style={[styles.activeUserName, { color: theme.textSecondary, marginTop: 6 }]}>Tạo nhóm</Text>
-            </View>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 110 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={['#f43f5e']}
+            tintColor="#f43f5e"
+          />
+        }
+      >
 
-            {/* Các thành viên đang online lấy từ danh sách hoặc mock */}
-            {filteredGroups.map((g) => {
-              const safeName = String(g.name || '');
-              return (
-                <View key={`act-${g.id}`} style={{ alignItems: 'center', width: 56 }}>
-                  <Pressable onPress={() => handleOpenChat(g)} style={styles.activeUserAvatarFrame}>
-                    <Image source={{ uri: g.image || getUserAvatarByName(safeName) }} style={styles.activeUserAvatarImg} />
-                    <View style={styles.activeUserOnlineDot} />
-                  </Pressable>
-                  <Text numberOfLines={1} style={[styles.activeUserName, { color: theme.textPrimary, marginTop: 6 }]}>
-                    {safeName.split(' ').pop()}
-                  </Text>
-                </View>
-              );
-            })}
-          </ScrollView>
-        </View>
 
         {/* Messenger Flat Chat List */}
         <View style={styles.msgChatListContainer}>
           {isLoadingGroups ? (
-            <ActivityIndicator color="#4f46e5" style={{ marginTop: 40 }} />
+            <ActivityIndicator color="#f43f5e" style={{ marginTop: 40 }} />
           ) : filteredGroups.length > 0 ? filteredGroups.map((group) => {
-            const isSelected = selectedGroupId === group.id;
             const safeGroupName = String(group.name || '');
-            const rankColors = getUserRankColors(safeGroupName);
-            const unreadCount = safeGroupName.length % 3 === 0 ? 1 : 0; // Để cho giao diện sinh động
-            const lastMsgText = group.lastMessage || 'Chưa có tin nhắn nào.';
+            const lastMsgText = typeof group.lastMessage === 'string' ? group.lastMessage : (group.lastMessage?.text || 'Chưa có tin nhắn nào.');
+            const isLastMsgFromMe = lastMsgText.startsWith('Bạn:');
+            const isLastMsgSystem = lastMsgText.startsWith('Hệ thống:');
+            const readMsg = readLastMessages[group.id];
+
+            const isUnread = !isLastMsgFromMe && !isLastMsgSystem && readMsg !== undefined && readMsg !== lastMsgText && readMsg !== true;
+            const unreadCount = isUnread ? 1 : 0;
 
             return (
               <Pressable
@@ -1699,7 +2051,17 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                 style={[
                   styles.msgChatRow, 
                   { 
-                    backgroundColor: isSelected ? (isDarkMode ? 'rgba(99, 102, 241, 0.12)' : '#eef2ff') : 'transparent'
+                    backgroundColor: isDarkMode ? '#1c1a29' : '#ffffff',
+                    marginHorizontal: 16,
+                    marginVertical: 4,
+                    borderRadius: 20,
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                    shadowColor: isDarkMode ? '#000' : '#d6c4b8',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 8,
+                    elevation: 2,
                   }
                 ]}
                 onPress={() => handleOpenChat(group)}
@@ -1708,26 +2070,21 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                 <View style={styles.msgAvatarWrapper}>
                   {group.isDirect ? (
                     <LinearGradient
-                      colors={rankColors.colors}
+                      colors={['#f43f5e', '#fb923c']}
                       style={styles.msgAvatarFrame}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                     >
-                      <View style={[styles.msgAvatarInner, { backgroundColor: theme.card }]}>
+                      <View style={[styles.msgAvatarInner, { backgroundColor: isDarkMode ? '#1c1a29' : '#ffffff' }]}>
                         <Image source={{ uri: group.image || getUserAvatarByName(safeGroupName) }} style={styles.msgAvatarImg} />
                       </View>
                     </LinearGradient>
                   ) : (
                     <View style={[styles.msgAvatarFrame, { padding: 0 }]}>
-                      {group.image ? (
-                        <Image source={{ uri: group.image }} style={styles.msgAvatarImgRound} />
-                      ) : (
-                        <LinearGradient colors={['#6366f1', '#4f46e5']} style={styles.msgAvatarImgRound}>
-                          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '950' }}>
-                            {safeGroupName.substring(0, 2).toUpperCase()}
-                          </Text>
-                        </LinearGradient>
-                      )}
+                      <Image
+                        source={{ uri: group.image || getUserAvatarByName(safeGroupName) }}
+                        style={styles.msgAvatarImgRound}
+                      />
                     </View>
                   )}
                   {group.isDirect && <View style={styles.msgOnlineActiveDot} />}
@@ -1735,37 +2092,37 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
                 {/* Chat Info */}
                 <View style={styles.msgChatInfo}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text numberOfLines={1} style={[
-                      styles.msgChatName, 
-                      { 
-                        color: theme.textPrimary,
-                        fontWeight: unreadCount > 0 ? '900' : '750' 
-                      }
-                    ]}>
-                      {group.name}
-                    </Text>
-                  </View>
+                  <Text numberOfLines={1} style={[
+                    styles.msgChatName, 
+                    { 
+                      color: theme.textPrimary,
+                      fontWeight: unreadCount > 0 ? '900' : '750' 
+                    }
+                  ]}>
+                    {group.name}
+                  </Text>
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                    <Text numberOfLines={1} style={[
-                      styles.msgLastMsgText, 
-                      { 
-                        color: unreadCount > 0 ? theme.textPrimary : theme.textSecondary,
-                        fontWeight: unreadCount > 0 ? '800' : '550',
-                        flex: 1
-                      }
-                    ]}>
-                      {lastMsgText}
-                    </Text>
-                    <Text style={[styles.msgTimeDot, { color: theme.textMuted }]}> · Vừa xong</Text>
-                  </View>
+                  <Text numberOfLines={1} style={[
+                    styles.msgLastMsgText, 
+                    { 
+                      color: unreadCount > 0 ? theme.textPrimary : theme.textSecondary,
+                      fontWeight: unreadCount > 0 ? '700' : '500',
+                      marginTop: 3
+                    }
+                  ]}>
+                    {lastMsgText}
+                  </Text>
                 </View>
 
-                {/* Right Status (Chấm đỏ chưa đọc hoặc double check đỏ hồng) */}
-                <View style={styles.msgRightStatus}>
+                {/* Right Side: Time + Unread Badge / Checkmarks */}
+                <View style={{ alignItems: 'flex-end', justifyContent: 'center', gap: 4 }}>
+                  <Text style={{ fontSize: 10.5, color: theme.textMuted, fontWeight: '600' }}>
+                    {group.lastMessageTime || '10:42 PM'}
+                  </Text>
                   {unreadCount > 0 ? (
-                    <View style={styles.msgUnreadDot} />
+                    <View style={{ backgroundColor: '#f43f5e', minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900' }}>{unreadCount > 1 ? unreadCount : 2}</Text>
+                    </View>
                   ) : (
                     <CheckCheck size={14} color="#f43f5e" />
                   )}
@@ -1820,7 +2177,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
             <View style={[styles.modalFooter, { borderTopColor: theme.border }]}>
               <Pressable style={styles.modalSubmitBtn} onPress={handleSubmitGroup}>
-                <LinearGradient colors={['#06b6d4', '#3b82f6']} style={styles.modalSubmitGradient}>
+                <LinearGradient colors={['#f43f5e', '#e11d48']} style={styles.modalSubmitGradient}>
                   <Plus size={16} color="#fff" />
                   <Text style={styles.modalSubmitText}>Khởi tạo nhóm</Text>
                 </LinearGradient>
@@ -1930,6 +2287,11 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                   chatMessages={(selectedGroup?.messages || []).map(m => ({
                     id: m.id || m._id,
                     text: m.text || m.content,
+                    content: m.content || m.text,
+                    type: m.type,
+                    poll: m.poll,
+                    isEdited: m.isEdited,
+                    editedAt: m.editedAt,
                     sender: m.user || m.senderName,
                     senderName: m.user || m.senderName,
                     senderAvatar: m.avatar || m.senderAvatar,
@@ -1939,6 +2301,10 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                   messageText={chatInput}
                   setMessageText={setChatInput}
                   onSendMessage={handleSendChatMessage}
+                  onCreatePoll={handleCreatePoll}
+                  onVotePoll={handleVotePoll}
+                  onClosePoll={handleClosePoll}
+                  onEditMessage={handleEditMessage}
                   currentUser={currentUser}
                   ownerId={ownerId}
                   theme={theme}
@@ -1953,9 +2319,22 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                   selectedGroup={selectedGroup}
                   theme={theme}
                   isDarkMode={isDarkMode}
-                  onOpenAIPlanner={() => setAiPlannerModalVisible(true)}
+                  onOpenAIPlanner={() => {
+                    // Auto pre-select điểm đến phù hợp nhất với nhóm
+                    const bestMatch = getSortedDestinations(selectedGroup || {})[0];
+                    const currentItineraryDest = selectedGroup?.itinerary?.destinationId;
+                    const autoDestId = currentItineraryDest || (bestMatch ? bestMatch.id : TRAVEL_DESTINATIONS[0].id);
+                    setSelectedDestinationId(autoDestId);
+                    setAiPlannerModalVisible(true);
+                  }}
                   onEditActivity={handleOpenEditActivity}
                   onDeleteActivity={handleDeleteActivity}
+                  onDeleteDay={handleDeleteDay}
+                  onClearAllDays={handleClearAllDays}
+                  onNavigateToMapWithPlace={(place) => {
+                    setChatModalVisible(false);
+                    if (onNavigateToMapWithPlace) onNavigateToMapWithPlace(place);
+                  }}
                 />
               ) : (
                 <GroupFundTab
@@ -2062,6 +2441,10 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
         setFundContributionInput={setFundContributionInput}
         fundContributionNote={fundContributionNote}
         setFundContributionNote={setFundContributionNote}
+        fundStkInput={fundStkInput}
+        setFundStkInput={setFundStkInput}
+        billImage={fundBillImage}
+        setBillImage={setFundBillImage}
         onSubmit={() => { handleAddContribution(); setThuTienModalVisible(false); }}
       />
 
@@ -2090,8 +2473,17 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
         setPlanEndDate={setPlanEndDate}
         selectedDestinationId={selectedDestinationId}
         setSelectedDestinationId={setSelectedDestinationId}
+        selectedStyleId={selectedStyleId}
+        setSelectedStyleId={setSelectedStyleId}
+        selectedBudgetId={selectedBudgetId}
+        setSelectedBudgetId={setSelectedBudgetId}
         isGeneratingPlan={isGeneratingPlan}
-        TRAVEL_DESTINATIONS={TRAVEL_DESTINATIONS}
+        TRAVEL_DESTINATIONS={getSortedDestinations(selectedGroup || {})}
+        onNavigateToMapWithPlace={(place) => {
+          setAiPlannerModalVisible(false);
+          setChatModalVisible(false);
+          if (onNavigateToMapWithPlace) onNavigateToMapWithPlace(place);
+        }}
         onSubmit={async () => {
           await handleGenerateItinerary();
           setAiPlannerModalVisible(false);

@@ -13,8 +13,11 @@ import {
   Dimensions,
   ScrollView,
   Animated,
-  PanResponder
+  PanResponder,
+  Modal,
+  Linking
 } from 'react-native';
+import Svg, { Line, Circle, Path, Defs, LinearGradient as SvgGradient, Stop, G } from 'react-native-svg';
 import { 
   MapPin, 
   Star, 
@@ -27,7 +30,14 @@ import {
   Volume2,
   VolumeX,
   Activity,
-  Wind
+  Wind,
+  Navigation,
+  CornerUpRight,
+  ArrowRight,
+  Car,
+  Bus,
+  Footprints,
+  Plane
 } from 'lucide-react-native';
 
 import { mockMapMarkers } from '../data';
@@ -38,7 +48,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const MAP_CANVAS_SIZE = Math.min(screenWidth - 32, screenHeight * 0.38);
 
-const vietnamMapImg = require('./vietnam_digital_map.png');
+const vietnamMapImg = { uri: 'https://images.unsplash.com/photo-1524230507669-e297d477b24d?auto=format&fit=crop&w=1200&q=80' };
 
 const CROWDED_PROVINCES = [
   'Bắc Ninh', 'Hưng Yên', 'Hải Dương', 'Vĩnh Phúc', 'Hà Nam', 
@@ -225,15 +235,202 @@ const getProvinceImage = (name) => {
   }
 };
 
-export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, onNavigateToProvince, userInfo = { checkedIn: [] }, onCheckIn }) {
+export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, onNavigateToProvince, onOpenPlaceDetail, userInfo = { checkedIn: [] }, onCheckIn, selectedPlaceName }) {
   const [selectedPlace, setSelectedPlace] = useState({ type: 'marker', id: 1, name: 'Vịnh Hạ Long' });
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
+  
+  useEffect(() => {
+    if (selectedPlaceName) {
+      const query = String(selectedPlaceName).toLowerCase().trim();
+      const matchedMarker = mockMapMarkers.find(m => m.title.toLowerCase().includes(query) || m.region.toLowerCase().includes(query));
+      if (matchedMarker) {
+        setSelectedPlace({ type: 'marker', id: matchedMarker.id, name: matchedMarker.title });
+      } else {
+        const matchedProv = provinceLabels.find(p => p.name.toLowerCase().includes(query));
+        if (matchedProv) {
+          setSelectedPlace({ type: 'province', name: matchedProv.name });
+        } else {
+          setSelectedPlace({ type: 'province', name: selectedPlaceName });
+        }
+      }
+    }
+  }, [selectedPlaceName]);
   
   const mapContainerRef = useRef(null);
   
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [mapMode, setMapMode] = useState('normal'); // 'normal' | 'lidar'
+  const [directionsModalVisible, setDirectionsModalVisible] = useState(false);
+  const [activeTransportMode, setActiveTransportMode] = useState('car');
+  const [showRouteLine, setShowRouteLine] = useState(false);
+  const [selectedOriginName, setSelectedOriginName] = useState('Hà Nội (Thủ đô)');
+
+  const openGoogleMapsDirections = (lat, lng, name) => {
+    let url = '';
+    const destinationQuery = lat && lng ? `${lat},${lng}` : encodeURIComponent(name);
+    if (Platform.OS === 'ios') {
+      url = `maps://app?daddr=${destinationQuery}`;
+    } else {
+      url = `google.navigation:q=${destinationQuery}`;
+    }
+    
+    Linking.canOpenURL(url).then(supported => {
+      if (supported) {
+        Linking.openURL(url);
+      } else {
+        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destinationQuery}`);
+      }
+    }).catch(() => {
+      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destinationQuery}`);
+    });
+  };
+
+  const getRouteDirections = (place, transportMode = 'car') => {
+    if (!place) return null;
+    const nameClean = (place.name || place.title || '').replace('Thủ đô ', '').trim();
+    
+    const routes = {
+      'Vịnh Hạ Long': {
+        origin: 'Hà Nội (Vị trí mặc định / GPS)',
+        destination: 'Vịnh Hạ Long, Quảng Ninh',
+        coords: { lat: 20.9500, lng: 107.0333 },
+        distance: '165 km',
+        time: transportMode === 'motorbike' ? '3h 45m' : transportMode === 'bus' ? '2h 30m' : '2h 15m',
+        route: 'Cao tốc Hà Nội - Hải Phòng (CT04) ➔ Cao tốc Hải Phòng - Hạ Long (CT09)',
+        transportOptions: [
+          { key: 'car', label: 'Ô tô', icon: '🚗', time: '2h 15m' },
+          { key: 'motorbike', label: 'Xe máy', icon: '🏍️', time: '3h 45m' },
+          { key: 'bus', label: 'Xe khách', icon: '🚌', time: '2h 30m' },
+        ],
+        steps: [
+          'Xuất phát từ trung tâm Hà Nội theo hướng cầu Thanh Trì hoặc Vĩnh Tuy.',
+          'Nhập vào cao tốc Hà Nội - Hải Phòng (CT04), di chuyển khoảng 75 km.',
+          'Tại nút giao Hải Phòng, chuyển tiếp sang cao tốc Hải Phòng - Hạ Long (CT09).',
+          'Vượt cầu Bạch Đằng, chạy tiếp 25 km đến nút giao Đại Yên.',
+          'Đi theo Quốc lộ 18 tới trung tâm Bãi Cháy / Cảng tàu quốc tế Tuần Châu.'
+        ]
+      },
+      'Phố cổ Hội An': {
+        origin: 'Đà Nẵng (Sân bay Đà Nẵng / Trung tâm)',
+        destination: 'Phố cổ Hội An, Quảng Nam',
+        coords: { lat: 15.8801, lng: 108.3380 },
+        distance: '30 km',
+        time: transportMode === 'motorbike' ? '45m' : transportMode === 'bus' ? '50m' : '35m',
+        route: 'Tuyến đường ven biển Võ Nguyên Giáp ➔ Trường Sa ➔ Lạc Long Quân',
+        transportOptions: [
+          { key: 'car', label: 'Ô tô', icon: '🚗', time: '35m' },
+          { key: 'motorbike', label: 'Xe máy', icon: '🏍️', time: '45m' },
+          { key: 'bus', label: 'Xe buýt', icon: '🚌', time: '50m' },
+        ],
+        steps: [
+          'Khởi hành từ trung tâm Đà Nẵng qua đường Nguyễn Văn Linh / Cầu Rồng.',
+          'Rẽ vào đường Võ Nguyên Giáp chạy dọc bãi biển Mỹ Khê.',
+          'Đi thẳng nối liền đường Trường Sa và đường Lạc Long Quân.',
+          'Qua địa phận Điện Ngọc, rẽ vào đường Hai Bà Trưng (Hội An).',
+          'Điểm đến: Phố đi bộ Trần Hưng Đạo & Phố cổ Hội An.'
+        ]
+      },
+      'Hội An': {
+        origin: 'Đà Nẵng (Sân bay Đà Nẵng / Trung tâm)',
+        destination: 'Phố cổ Hội An, Quảng Nam',
+        coords: { lat: 15.8801, lng: 108.3380 },
+        distance: '30 km',
+        time: transportMode === 'motorbike' ? '45m' : transportMode === 'bus' ? '50m' : '35m',
+        route: 'Tuyến đường ven biển Võ Nguyên Giáp ➔ Trường Sa ➔ Lạc Long Quân',
+        transportOptions: [
+          { key: 'car', label: 'Ô tô', icon: '🚗', time: '35m' },
+          { key: 'motorbike', label: 'Xe máy', icon: '🏍️', time: '45m' },
+          { key: 'bus', label: 'Xe buýt', icon: '🚌', time: '50m' },
+        ],
+        steps: [
+          'Khởi hành từ trung tâm Đà Nẵng qua đường Nguyễn Văn Linh / Cầu Rồng.',
+          'Rẽ vào đường Võ Nguyên Giáp chạy dọc bãi biển Mỹ Khê.',
+          'Đi thẳng nối liền đường Trường Sa và đường Lạc Long Quân.',
+          'Qua địa phận Điện Ngọc, rẽ vào đường Hai Bà Trưng (Hội An).',
+          'Điểm đến: Phố đi bộ Trần Hưng Đạo & Phố cổ Hội An.'
+        ]
+      },
+      'Đảo Phú Quốc': {
+        origin: 'Hà Nội / TP. Hồ Chí Minh',
+        destination: 'Đảo Phú Quốc, Kiên Giang',
+        coords: { lat: 10.2289, lng: 103.9572 },
+        distance: '300 km (Đường bay)',
+        time: transportMode === 'plane' ? '1h 05m' : '2h 15m (Tàu cao tốc)',
+        route: 'Đường bay thẳng ➔ Sân bay Quốc tế Phú Quốc (PQC)',
+        transportOptions: [
+          { key: 'plane', label: 'Máy bay', icon: '✈️', time: '1h 05m' },
+          { key: 'bus', label: 'Tàu cao tốc', icon: '🛳️', time: '2h 15m' },
+        ],
+        steps: [
+          'Đáp chuyến bay thẳng từ Tân Sơn Nhất (TP.HCM) hoặc Nội Bài (Hà Nội).',
+          'Hạ cánh tại Sân bay Quốc tế Phú Quốc (PQC).',
+          'Đón taxi / thuê xe máy theo tuyến đường Nguyễn Văn Cừ.',
+          'Điểm đến: Thị trấn Dương Đông, Grand World hoặc Bãi Sao.'
+        ]
+      },
+      'Mù Cang Chải': {
+        origin: 'Hà Nội',
+        destination: 'Mù Cang Chải, Yên Bái',
+        coords: { lat: 21.8486, lng: 104.1481 },
+        distance: '300 km',
+        time: transportMode === 'motorbike' ? '7h 00m' : transportMode === 'bus' ? '6h 00m' : '5h 30m',
+        route: 'Hà Nội ➔ Đại lộ Thăng Long ➔ QL32 ➔ Đèo Khau Phạ ➔ Mù Cang Chải',
+        transportOptions: [
+          { key: 'car', label: 'Ô tô', icon: '🚗', time: '5h 30m' },
+          { key: 'motorbike', label: 'Xe máy', icon: '🏍️', time: '7h 00m' },
+          { key: 'bus', label: 'Xe khách', icon: '🚌', time: '6h 00m' },
+        ],
+        steps: [
+          'Xuất phát từ Hà Nội theo đường Đại lộ Thăng Long hoặc QL32.',
+          'Chạy qua Sơn Tây, vượt cầu Trung Hà vào địa phận Thanh Sơn (Phú Thọ).',
+          'Theo QL32 tiếp tục đi qua thị xã Nghĩa Lộ (Yên Bái).',
+          'Vượt đèo Khau Phạ - tuyệt tác săn mây và dù lượn lúa chín.',
+          'Điểm đến: Trung tâm Mù Cang Chải & Danh thắng Ruộng bậc thang.'
+        ]
+      },
+      'Hồ Hoàn Kiếm': {
+        origin: 'Vị trí của bạn (Hà Nội)',
+        destination: 'Hồ Hoàn Kiếm, Quận Hoàn Kiếm, Hà Nội',
+        coords: { lat: 21.0285, lng: 105.8542 },
+        distance: '2.5 km',
+        time: transportMode === 'walk' ? '25m' : transportMode === 'motorbike' ? '8m' : '12m',
+        route: 'Tuyến Phố Huế / Hàng Bài ➔ Tràng Tiền ➔ Đinh Tiên Hoàng',
+        transportOptions: [
+          { key: 'motorbike', label: 'Xe máy', icon: '🏍️', time: '8m' },
+          { key: 'car', label: 'Ô tô', icon: '🚗', time: '12m' },
+          { key: 'walk', label: 'Đi bộ', icon: '🚶', time: '25m' },
+        ],
+        steps: [
+          'Di chuyển về phía trung tâm Quận Hoàn Kiếm.',
+          'Rẽ vào tuyến đường Phố Huế hoặc đường Hàng Bài.',
+          'Đi đến ngã tư Tràng Tiền - Đinh Tiên Hoàng.',
+          'Điểm đến: Phố đi bộ Hồ Gươm, Tháp Rùa và Đền Ngọc Sơn.'
+        ]
+      }
+    };
+
+    const coords = getPlaceCoords(place);
+    const found = routes[nameClean] || {
+      origin: 'Vị trí hiện tại của bạn',
+      destination: `${nameClean}, Việt Nam`,
+      coords: { lat: parseFloat(coords.lat) || 16.0471, lng: parseFloat(coords.lon) || 108.2062 },
+      distance: 'Khoảng cách trực tuyến',
+      time: 'Tùy lộ trình',
+      route: `Tuyến đường điều hướng tới ${nameClean}`,
+      transportOptions: [
+        { key: 'car', label: 'Ô tô', icon: '🚗', time: 'Mở GPS' },
+        { key: 'motorbike', label: 'Xe máy', icon: '🏍️', time: 'Mở GPS' },
+      ],
+      steps: [
+        `Khởi hành từ vị trí của bạn hướng tới ${nameClean}.`,
+        `Theo dõi biển chỉ dẫn giao thông hoặc điều hướng ứng dụng GPS.`,
+        `Đến trung tâm ${nameClean} và bắt đầu hành trình tham quan.`
+      ]
+    };
+
+    return found;
+  };
 
   const scanAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -442,13 +639,55 @@ export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, 
           }}>
             {/* Clipped background and mesh overlays */}
             <View style={[StyleSheet.absoluteFill, { borderRadius: 26, overflow: 'hidden' }]}>
-              <Image 
-                source={vietnamMapImg} 
-                style={styles.mapCanvasBgImage} 
-                resizeMode="stretch"
-              />
+              {/* 2D VECTOR SVG MAP OF VIETNAM */}
+              <Svg width="100%" height="100%" viewBox="0 0 400 700" style={StyleSheet.absoluteFill}>
+                <Defs>
+                  <SvgGradient id="vietnamGradDark" x1="0" y1="0" x2="0" y2="1">
+                    <Stop offset="0%" stopColor="#1e293b" stopOpacity="0.95" />
+                    <Stop offset="50%" stopColor="#0f172a" stopOpacity="0.95" />
+                    <Stop offset="100%" stopColor="#1e1b4b" stopOpacity="0.95" />
+                  </SvgGradient>
+                  <SvgGradient id="vietnamGradLight" x1="0" y1="0" x2="0" y2="1">
+                    <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+                    <Stop offset="50%" stopColor="#f1f5f9" stopOpacity="0.95" />
+                    <Stop offset="100%" stopColor="#e2e8f0" stopOpacity="0.95" />
+                  </SvgGradient>
+                  <SvgGradient id="strokeGrad" x1="0" y1="0" x2="1" y2="1">
+                    <Stop offset="0%" stopColor="#38bdf8" />
+                    <Stop offset="50%" stopColor="#818cf8" />
+                    <Stop offset="100%" stopColor="#34d399" />
+                  </SvgGradient>
+                </Defs>
 
+                {/* Ocean Grid Lines */}
+                <Line x1="0" y1="150" x2="400" y2="150" stroke={isDarkMode ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)"} strokeDasharray="4 4" />
+                <Line x1="0" y1="350" x2="400" y2="350" stroke={isDarkMode ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)"} strokeDasharray="4 4" />
+                <Line x1="0" y1="550" x2="400" y2="550" stroke={isDarkMode ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)"} strokeDasharray="4 4" />
+                <Line x1="150" y1="0" x2="150" y2="700" stroke={isDarkMode ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)"} strokeDasharray="4 4" />
+                <Line x1="300" y1="0" x2="300" y2="700" stroke={isDarkMode ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)"} strokeDasharray="4 4" />
 
+                {/* VIETNAM LANDMASS S-SHAPE SVG PATH */}
+                <G id="vietnam-map">
+                  {/* Outer Glow Path */}
+                  <Path
+                    d="M 120,40 C 170,30 220,40 250,55 C 270,65 260,85 240,95 C 220,105 180,115 170,125 C 160,135 150,145 140,150 C 130,155 120,145 110,135 C 95,120 85,90 100,60 Z
+                       M 170,125 C 200,120 230,115 260,130 C 275,140 260,155 235,160 C 215,165 200,175 190,195 C 180,215 190,240 205,270 C 220,300 235,335 240,370 C 245,405 240,440 245,475 C 250,510 255,545 240,575 C 225,605 195,630 160,650 C 130,665 105,655 95,630 C 110,610 135,595 155,570 C 175,540 180,500 175,460 C 170,420 155,380 150,340 C 145,300 155,260 170,225 C 180,200 175,160 170,125 Z"
+                    fill="none"
+                    stroke={isDarkMode ? "rgba(56, 189, 248, 0.4)" : "rgba(37, 99, 235, 0.3)"}
+                    strokeWidth="6"
+                    strokeLinejoin="round"
+                  />
+                  {/* Solid Vector Landmass Fill */}
+                  <Path
+                    d="M 120,40 C 170,30 220,40 250,55 C 270,65 260,85 240,95 C 220,105 180,115 170,125 C 160,135 150,145 140,150 C 130,155 120,145 110,135 C 95,120 85,90 100,60 Z
+                       M 170,125 C 200,120 230,115 260,130 C 275,140 260,155 235,160 C 215,165 200,175 190,195 C 180,215 190,240 205,270 C 220,300 235,335 240,370 C 245,405 240,440 245,475 C 250,510 255,545 240,575 C 225,605 195,630 160,650 C 130,665 105,655 95,630 C 110,610 135,595 155,570 C 175,540 180,500 175,460 C 170,420 155,380 150,340 C 145,300 155,260 170,225 C 180,200 175,160 170,125 Z"
+                    fill={isDarkMode ? "url(#vietnamGradDark)" : "url(#vietnamGradLight)"}
+                    stroke="url(#strokeGrad)"
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                  />
+                </G>
+              </Svg>
 
               {/* Canvas Pressable handler */}
               <Pressable 
@@ -469,26 +708,59 @@ export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, 
             <Text style={[styles.seaText2, { color: isDarkMode ? 'rgba(255,255,255,0.18)' : 'rgba(30, 58, 138, 0.25)' }]}>VỊNH BẮC BỘ</Text>
             <Text style={[styles.seaText3, { color: isDarkMode ? 'rgba(255,255,255,0.18)' : 'rgba(30, 58, 138, 0.25)' }]}>VỊNH THÁI LAN</Text>
 
-            {/* SOVEREIGNTY ISLANDS */}
-            <View style={[styles.islandContainer, { top: '38%', left: '72%' }]}>
+            {/* SOVEREIGNTY ISLANDS — HOÀNG SA */}
+            <Pressable
+              style={[styles.islandContainer, { top: '36%', left: '70%', zIndex: 200 }]}
+              onPress={() => setSelectedPlace({ type: 'island', name: 'Quần đảo Hoàng Sa' })}
+            >
+              {/* Island cluster dots */}
               <View style={styles.islandCluster}>
-                <View style={styles.islandDotTiny} />
-                <View style={[styles.islandDotTiny, { top: 4, left: 6 }]} />
-                <View style={[styles.islandDotTiny, { top: -2, left: 10 }]} />
+                <View style={[styles.islandDotTiny, { backgroundColor: '#dc2626' }]} />
+                <View style={[styles.islandDotTiny, { top: 4, left: 6, backgroundColor: '#dc2626' }]} />
+                <View style={[styles.islandDotTiny, { top: -2, left: 10, backgroundColor: '#ef4444' }]} />
               </View>
-              <Text style={[styles.islandLabel, { color: isDarkMode ? '#cbd5e1' : '#0f172a' }]}>Q.đ Hoàng Sa{"\n"}(Việt Nam)</Text>
-            </View>
+              {/* Flag mini badge */}
+              <View style={styles.islandFlagBadge}>
+                <Text style={styles.islandFlagEmoji}>🇻🇳</Text>
+              </View>
+              <Text style={[styles.islandLabel, {
+                color: isDarkMode ? '#fca5a5' : '#b91c1c',
+                fontWeight: '800',
+              }]}>
+                Q.đ Hoàng Sa{'\n'}
+                <Text style={{ color: isDarkMode ? '#fbbf24' : '#b45309', fontSize: 6 }}>
+                  ⚓ Việt Nam
+                </Text>
+              </Text>
+            </Pressable>
 
-            <View style={[styles.islandContainer, { top: '68%', left: '70%' }]}>
+            {/* SOVEREIGNTY ISLANDS — TRƯỜNG SA */}
+            <Pressable
+              style={[styles.islandContainer, { top: '66%', left: '68%', zIndex: 200 }]}
+              onPress={() => setSelectedPlace({ type: 'island', name: 'Quần đảo Trường Sa' })}
+            >
               <View style={styles.islandCluster}>
-                <View style={styles.islandDotTiny} />
-                <View style={[styles.islandDotTiny, { top: 6, left: -4 }]} />
-                <View style={[styles.islandDotTiny, { top: 2, left: 10 }]} />
-                <View style={[styles.islandDotTiny, { top: -6, left: 6 }]} />
-                <View style={[styles.islandDotTiny, { top: 8, left: 8 }]} />
+                <View style={[styles.islandDotTiny, { backgroundColor: '#dc2626' }]} />
+                <View style={[styles.islandDotTiny, { top: 6, left: -4, backgroundColor: '#ef4444' }]} />
+                <View style={[styles.islandDotTiny, { top: 2, left: 10, backgroundColor: '#dc2626' }]} />
+                <View style={[styles.islandDotTiny, { top: -6, left: 6, backgroundColor: '#b91c1c' }]} />
+                <View style={[styles.islandDotTiny, { top: 8, left: 8, backgroundColor: '#ef4444' }]} />
               </View>
-              <Text style={[styles.islandLabel, { color: isDarkMode ? '#cbd5e1' : '#0f172a' }]}>Q.đ Trường Sa{"\n"}(Việt Nam)</Text>
-            </View>
+              {/* Flag mini badge */}
+              <View style={styles.islandFlagBadge}>
+                <Text style={styles.islandFlagEmoji}>🇻🇳</Text>
+              </View>
+              <Text style={[styles.islandLabel, {
+                color: isDarkMode ? '#fca5a5' : '#b91c1c',
+                fontWeight: '800',
+              }]}>
+                Q.đ Trường Sa{'\n'}
+                <Text style={{ color: isDarkMode ? '#fbbf24' : '#b45309', fontSize: 6 }}>
+                  ⚓ Việt Nam
+                </Text>
+              </Text>
+            </Pressable>
+
 
             {/* SPECIAL PHU QUOC ISLAND PIN & SOVEREIGNTY LABEL */}
             {(() => {
@@ -697,6 +969,79 @@ export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, 
                 </View>
               </>
             )}
+            {showRouteLine && activeMarker && (
+              <View style={[StyleSheet.absoluteFill, { zIndex: 120 }]} pointerEvents="none">
+                <Svg width="100%" height="100%">
+                  {/* Outer Glow Line */}
+                  <Line
+                    x1={MAP_CANVAS_SIZE * 0.40}
+                    y1={MAP_CANVAS_SIZE * 0.19}
+                    x2={MAP_CANVAS_SIZE * (parseFloat(activeMarker.left || 50) / 100)}
+                    y2={MAP_CANVAS_SIZE * (parseFloat(activeMarker.top || 50) / 100)}
+                    stroke="#06b6d4"
+                    strokeWidth="6"
+                    strokeOpacity="0.4"
+                    strokeLinecap="round"
+                  />
+                  {/* Inner Dashed Line */}
+                  <Line
+                    x1={MAP_CANVAS_SIZE * 0.40}
+                    y1={MAP_CANVAS_SIZE * 0.19}
+                    x2={MAP_CANVAS_SIZE * (parseFloat(activeMarker.left || 50) / 100)}
+                    y2={MAP_CANVAS_SIZE * (parseFloat(activeMarker.top || 50) / 100)}
+                    stroke="#38bdf8"
+                    strokeWidth="3"
+                    strokeDasharray="6, 4"
+                    strokeLinecap="round"
+                  />
+                  {/* Origin Dot (Hà Nội) */}
+                  <Circle
+                    cx={MAP_CANVAS_SIZE * 0.40}
+                    cy={MAP_CANVAS_SIZE * 0.19}
+                    r="5"
+                    fill="#ef4444"
+                    stroke="#ffffff"
+                    strokeWidth="1.5"
+                  />
+                  {/* Destination Dot */}
+                  <Circle
+                    cx={MAP_CANVAS_SIZE * (parseFloat(activeMarker.left || 50) / 100)}
+                    cy={MAP_CANVAS_SIZE * (parseFloat(activeMarker.top || 50) / 100)}
+                    r="6"
+                    fill="#38bdf8"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                  />
+                </Svg>
+              </View>
+            )}
+
+            {/* ROUTE LINE HUD BANNER OVER MAP */}
+            {showRouteLine && (
+              <View style={[
+                styles.routeHudBanner,
+                { backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.95)', borderColor: '#06b6d4' }
+              ]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 6 }}>
+                  <Navigation size={13} color="#06b6d4" />
+                  <Text style={[styles.routeHudText, { color: theme.textPrimary }]} numberOfLines={1}>
+                    Lộ trình: Hà Nội ➔ {selectedPlace.name || activeMarker.title}
+                  </Text>
+                </View>
+                <Pressable 
+                  onPress={() => setDirectionsModalVisible(true)}
+                  style={styles.routeHudDetailBtn}
+                >
+                  <Text style={styles.routeHudDetailText}>Chi tiết</Text>
+                </Pressable>
+                <Pressable 
+                  onPress={() => setShowRouteLine(false)}
+                  style={{ padding: 4 }}
+                >
+                  <X size={14} color={theme.textMuted} />
+                </Pressable>
+              </View>
+            )}
 
           </View>
 
@@ -706,6 +1051,7 @@ export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, 
         {(() => {
           const safePlace = selectedPlace || { type: 'marker', id: 1, name: 'Vịnh Hạ Long' };
           const isMarker = safePlace.type === 'marker';
+          const isIsland = safePlace.type === 'island';
           let title = '';
           let region = '';
           let image = '';
@@ -714,7 +1060,19 @@ export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, 
           let specs = null;
           let desc = '';
 
-          if (isMarker) {
+          if (isIsland) {
+            const isHoangSa = safePlace.name === 'Quần đảo Hoàng Sa';
+            title = safePlace.name;
+            region = 'Biển Đông — Chủ quyền Việt Nam';
+            image = isHoangSa
+              ? 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80'
+              : 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=400&q=80';
+            rating = '5.0';
+            weather = { temp: '30°C', desc: 'Nắng gió biển khơi', icon: '🌊', uv: '9', humidity: '82%', wind: '22 km/h' };
+            desc = isHoangSa
+              ? '🇻🇳 Quần đảo Hoàng Sa thuộc chủ quyền không thể tranh cãi của Việt Nam, nằm ở vĩ độ 15°45′–17°15′B, với hơn 30 đảo, đá, bãi san hô. Hải quân Việt Nam đã anh dũng bảo vệ năm 1974.'
+              : '🇻🇳 Quần đảo Trường Sa là lãnh thổ thiêng liêng của Việt Nam, nằm ở vĩ độ 6°30′–12°B. Lực lượng Hải quân Nhân dân Việt Nam đang ngày đêm canh giữ bảo vệ chủ quyền Tổ quốc.';
+          } else if (isMarker) {
             const marker = mockMapMarkers.find(m => m.id === safePlace.id) || mockMapMarkers[0];
             title = marker.title;
             region = marker.region;
@@ -776,7 +1134,7 @@ export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, 
               </Text>
 
               {/* Action Buttons Row */}
-              <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
                 <Pressable
                   style={({ pressed }) => [
                     styles.exploreActionBtn,
@@ -800,9 +1158,58 @@ export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, 
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                   >
-                    <Compass size={16} color="#fff" style={{ marginRight: 6 }} />
+                    <Compass size={13} color="#fff" style={{ marginRight: 3 }} />
                     <Text style={styles.exploreBtnText} numberOfLines={1}>
-                      {isMarker ? '360° VR Tour' : 'Xem Ảnh Du Lịch'}
+                      {isMarker ? '360° VR' : 'Xem Ảnh'}
+                    </Text>
+                  </LinearGradient>
+                </Pressable>
+
+                {/* Cẩm Nang Button */}
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.exploreActionBtn,
+                    { flex: 1, opacity: pressed ? 0.8 : 1 }
+                  ]}
+                  onPress={() => {
+                    if (onOpenPlaceDetail) {
+                      onOpenPlaceDetail(safePlace.name || title);
+                    }
+                  }}
+                >
+                  <LinearGradient
+                    colors={['#f59e0b', '#d97706']}
+                    style={styles.exploreBtnGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={{ fontSize: 11, marginRight: 3 }}>📖</Text>
+                    <Text style={styles.exploreBtnText} numberOfLines={1}>
+                      Cẩm nang
+                    </Text>
+                  </LinearGradient>
+                </Pressable>
+
+                {/* Directions Button */}
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.exploreActionBtn,
+                    { flex: 1, opacity: pressed ? 0.8 : 1 }
+                  ]}
+                  onPress={() => {
+                    setShowRouteLine(true);
+                    setDirectionsModalVisible(true);
+                  }}
+                >
+                  <LinearGradient
+                    colors={['#6366f1', '#4f46e5']}
+                    style={styles.exploreBtnGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Navigation size={13} color="#fff" style={{ marginRight: 3 }} />
+                    <Text style={styles.exploreBtnText} numberOfLines={1}>
+                      Chỉ đường
                     </Text>
                   </LinearGradient>
                 </Pressable>
@@ -825,9 +1232,9 @@ export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, 
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                       >
-                        <MapPin size={16} color="#fff" style={{ marginRight: 6 }} />
+                        <MapPin size={13} color="#fff" style={{ marginRight: 3 }} />
                         <Text style={styles.exploreBtnText} numberOfLines={1}>
-                          {isCheckingIn ? 'Xác thực GPS...' : isCheckedIn ? 'Đã Check-in' : 'Check-in GPS (+200 XP)'}
+                          {isCheckingIn ? '...' : isCheckedIn ? 'Đã check' : 'Check-in'}
                         </Text>
                       </LinearGradient>
                     </Pressable>
@@ -839,6 +1246,187 @@ export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, 
         })()}
 
       </View>
+
+      {/* DIRECTIONS ROUTE MODAL */}
+      <Modal
+        visible={directionsModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setDirectionsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheetContainer, { backgroundColor: isDarkMode ? '#111827' : '#ffffff' }]}>
+            {/* Drag Handle */}
+            <View style={styles.modalDragHandle} />
+
+            {/* Modal Header */}
+            <View style={styles.modalHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={[styles.modalHeaderIconBg, { backgroundColor: 'rgba(99, 102, 241, 0.15)' }]}>
+                  <Navigation size={20} color="#6366f1" />
+                </View>
+                <View>
+                  <Text style={[styles.modalHeaderTitle, { color: theme.textPrimary }]}>Chỉ Đường & Lộ Trình</Text>
+                  <Text style={[styles.modalHeaderSubtitle, { color: theme.textSecondary }]}>Hướng dẫn di chuyển chi tiết GPS</Text>
+                </View>
+              </View>
+              <Pressable 
+                onPress={() => setDirectionsModalVisible(false)}
+                style={[styles.modalCloseBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
+              >
+                <X size={18} color={theme.textPrimary} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              {(() => {
+                const routeInfo = getRouteDirections(selectedPlace, activeTransportMode);
+                if (!routeInfo) return null;
+
+                return (
+                  <View>
+                    {/* Departure Origin Selector */}
+                    <Text style={[styles.sectionTitle, { color: theme.textPrimary, marginTop: 0 }]}>Chọn điểm xuất phát (Bắt đầu)</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                      {[
+                        { key: 'Hà Nội (Thủ đô)', icon: '🏛️', label: 'Hà Nội' },
+                        { key: 'Đà Nẵng (Miền Trung)', icon: '🌉', label: 'Đà Nẵng' },
+                        { key: 'TP. HCM (Miền Nam)', icon: '🏙️', label: 'TP. HCM' },
+                      ].map(item => {
+                        const isSelected = selectedOriginName === item.key;
+                        return (
+                          <Pressable
+                            key={item.key}
+                            style={[
+                              styles.transportTab,
+                              {
+                                backgroundColor: isSelected 
+                                  ? '#3b82f6' 
+                                  : (isDarkMode ? 'rgba(31, 41, 55, 0.8)' : 'rgba(243, 244, 246, 0.9)'),
+                                borderColor: isSelected ? '#3b82f6' : theme.border,
+                                paddingVertical: 6
+                              }
+                            ]}
+                            onPress={() => setSelectedOriginName(item.key)}
+                          >
+                            <Text style={{ fontSize: 13 }}>{item.icon}</Text>
+                            <Text style={[styles.transportTabText, { color: isSelected ? '#ffffff' : theme.textPrimary, fontSize: 10 }]}>
+                              {item.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+
+                    {/* Origin -> Destination Card */}
+                    <View style={[styles.routeCard, { backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.7)' : 'rgba(243, 244, 246, 0.9)', borderColor: theme.border }]}>
+                      {/* Departure */}
+                      <View style={styles.routeNodeRow}>
+                        <View style={[styles.nodeDot, { backgroundColor: '#3b82f6' }]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.nodeLabel, { color: theme.textSecondary }]}>Điểm đi</Text>
+                          <Text style={[styles.nodeValue, { color: theme.textPrimary }]}>{selectedOriginName}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.routeDottedLine} />
+
+                      {/* Destination */}
+                      <View style={styles.routeNodeRow}>
+                        <View style={[styles.nodeDot, { backgroundColor: '#ef4444' }]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.nodeLabel, { color: theme.textSecondary }]}>Điểm đến</Text>
+                          <Text style={[styles.nodeValue, { color: theme.textPrimary }]}>{routeInfo.destination}</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Quick Summary Badges */}
+                    <View style={{ flexDirection: 'row', gap: 10, marginVertical: 12 }}>
+                      <View style={[styles.routeBadge, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
+                        <Text style={[styles.routeBadgeText, { color: '#3b82f6' }]}>📏 {routeInfo.distance}</Text>
+                      </View>
+                      <View style={[styles.routeBadge, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
+                        <Text style={[styles.routeBadgeText, { color: '#10b981' }]}>⏱️ {routeInfo.time}</Text>
+                      </View>
+                    </View>
+
+                    {/* Transport Mode Selector */}
+                    <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Phương tiện di chuyển</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                      {routeInfo.transportOptions.map(item => {
+                        const isSelected = activeTransportMode === item.key;
+                        return (
+                          <Pressable
+                            key={item.key}
+                            style={[
+                              styles.transportTab,
+                              {
+                                backgroundColor: isSelected 
+                                  ? '#3b82f6' 
+                                  : (isDarkMode ? 'rgba(31, 41, 55, 0.8)' : 'rgba(243, 244, 246, 0.9)'),
+                                borderColor: isSelected ? '#3b82f6' : theme.border
+                              }
+                            ]}
+                            onPress={() => setActiveTransportMode(item.key)}
+                          >
+                            <Text style={{ fontSize: 14 }}>{item.icon}</Text>
+                            <Text style={[styles.transportTabText, { color: isSelected ? '#ffffff' : theme.textPrimary }]}>
+                              {item.label}
+                            </Text>
+                            <Text style={[styles.transportTimeText, { color: isSelected ? 'rgba(255,255,255,0.85)' : theme.textSecondary }]}>
+                              {item.time}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+
+                    {/* Step-by-Step Directions */}
+                    <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Chi tiết các bước di chuyển</Text>
+                    <View style={[styles.stepsContainer, { backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.5)' : 'rgba(249, 250, 251, 0.8)', borderColor: theme.border }]}>
+                      {routeInfo.steps.map((step, idx) => (
+                        <View key={idx} style={styles.stepRow}>
+                          <View style={styles.stepBadge}>
+                            <Text style={styles.stepBadgeText}>{idx + 1}</Text>
+                          </View>
+                          <Text style={[styles.stepText, { color: theme.textPrimary }]}>{step}</Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    {/* Bottom Action Buttons */}
+                    <View style={{ marginTop: 18 }}>
+                      {/* Show Route on Digital Map Button */}
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.primaryDirectionBtn,
+                          { opacity: pressed ? 0.85 : 1 }
+                        ]}
+                        onPress={() => {
+                          setShowRouteLine(true);
+                          setDirectionsModalVisible(false);
+                        }}
+                      >
+                        <LinearGradient
+                          colors={['#10b981', '#059669']}
+                          style={styles.btnGradientInner}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                        >
+                          <Compass size={16} color="#fff" style={{ marginRight: 6 }} />
+                          <Text style={styles.btnTextWhite}>Bắt đầu xem lộ trình trên Bản đồ Vivu360</Text>
+                        </LinearGradient>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })()}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -974,9 +1562,11 @@ const styles = StyleSheet.create({
 
   // Islands
   islandContainer: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  islandCluster: { width: 20, height: 15, position: 'relative', justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
-  islandDotTiny: { position: 'absolute', width: 4, height: 4, borderRadius: 2, backgroundColor: '#60a5fa' },
+  islandCluster: { width: 20, height: 15, position: 'relative', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
+  islandDotTiny: { position: 'absolute', width: 4, height: 4, borderRadius: 2, backgroundColor: '#dc2626' },
   islandLabel: { fontSize: 7, fontWeight: '900', textAlign: 'center', lineHeight: 8 },
+  islandFlagBadge: { marginBottom: 2, marginTop: 0 },
+  islandFlagEmoji: { fontSize: 9 },
 
   // Province labels
   provContainer: { position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 3, zIndex: 10 },
@@ -1434,5 +2024,223 @@ const styles = StyleSheet.create({
   phuQuocSovereigntyLabel: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Route HUD Banner
+  routeHudBanner: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  routeHudText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  routeHudDetailBtn: {
+    backgroundColor: '#06b6d4',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginRight: 4,
+  },
+  routeHudDetailText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalSheetContainer: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalDragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(156, 163, 175, 0.5)',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  modalHeaderIconBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  modalHeaderSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Route Card inside Modal
+  routeCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 12,
+  },
+  routeNodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  nodeDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  nodeLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  nodeValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 1,
+  },
+  routeDottedLine: {
+    width: 2,
+    height: 18,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: '#94a3b8',
+    marginLeft: 5,
+    marginVertical: 4,
+  },
+  routeBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  routeBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  // Transport Tabs
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  transportTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  transportTabText: {
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  transportTimeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+
+  // Steps List
+  stepsContainer: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  stepBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#3b82f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  stepBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  stepText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+
+  // Modal Action Buttons
+  primaryDirectionBtn: {
+    height: 44,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  btnGradientInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  btnTextWhite: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
   },
 });

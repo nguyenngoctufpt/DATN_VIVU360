@@ -21,3 +21,8 @@ export async function searchFriends(query, excludeFirebaseUid) {
   });
   return response.data.data;
 }
+
+export async function getUserStats(identifier) {
+  const response = await api.get(`/users/${encodeURIComponent(identifier)}/stats`);
+  return response.data.data;
+}
