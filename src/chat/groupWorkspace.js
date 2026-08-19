@@ -21,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { loadAppData, saveAppData } from '../services/appDataService';
 import { searchFriends } from '../services/userService';
 import { addChatMembers, createChatGroup, getChatGroups, getChatMessages, getGroupNotifications, recallChatMessage, removeChatMember, renameChatGroup, sendChatMessage, updateChatGroupWorkspace, updateChatMessage } from '../services/chatService';
+import { createPoll, getPollsForGroup, votePoll } from '../services/pollService';
 import { isSystemChatEntry, looksLikeSystemAnnouncement, normalizeGroupPreviewText, normalizeSystemAnnouncementText } from '../utils/chatText';
 import { getSafeAvatarSource, getSafeImageSource } from '../utils/image';
 import { parseLocationShareMessage, stripLocationShareMetadata } from '../utils/sharedLocation';
@@ -78,6 +79,7 @@ const WORKSPACE_TABS = [
   { key: 'chat', label: 'Chat', Icon: MessageCircle },
   { key: 'planner', label: 'Lịch trình', Icon: CalendarDays },
   { key: 'fund', label: 'Quỹ du lịch', Icon: Wallet },
+  { key: 'polls', label: 'Bình chọn', Icon: Sparkles },
 ];
 
 const CONTRIBUTION_PROOF_SAMPLES = [
@@ -608,6 +610,40 @@ const mergeChatEntries = (...collections) => {
 };
 
 const normalizeLocalMessageEntry = (message, membersList, currentUser, ownerId) => {
+  if (message?.type === 'poll' || message?.poll) {
+    const creatorId = message?.senderId || message?.poll?.createdBy || message?.actorId || null;
+    const groupMember = findMemberProfile(membersList, creatorId);
+    const isMe = String(creatorId) === String(ownerId);
+    const creatorName = isMe
+      ? (currentUser?.name || groupMember?.name || message?.user || 'Tôi')
+      : (groupMember?.name || message?.user || 'Thành viên');
+    const creatorAvatar = isMe
+      ? (currentUser?.avatar || groupMember?.avatar || message?.avatar || '')
+      : (groupMember?.avatar || message?.avatar || '');
+    const pollId = String(message?.pollId || message?.poll?._id || message?.id || '').replace(/^poll-/, '');
+    const pollObj = message?.poll || {
+      _id: pollId,
+      title: message?.text?.replace(/^\[Bình chọn\]\s*/i, '') || 'Bình chọn',
+      options: [],
+      isActive: true,
+      createdBy: creatorId,
+      createdAt: message?.createdAt || Date.now(),
+    };
+
+    return {
+      ...message,
+      id: message?.id || message?._id || `poll-${pollId || Date.now()}`,
+      pollId,
+      type: 'poll',
+      senderId: creatorId,
+      user: creatorName,
+      avatar: creatorAvatar,
+      poll: pollObj,
+      createdAt: message?.createdAt || pollObj.createdAt || Date.now(),
+      text: message?.text || `[Bình chọn] ${pollObj.title || ''}`,
+    };
+  }
+
   const senderId = message?.senderId || message?.actorId || null;
   const groupMember = findMemberProfile(membersList, senderId);
   const senderProfile = String(senderId) === String(ownerId)
@@ -622,14 +658,15 @@ const normalizeLocalMessageEntry = (message, membersList, currentUser, ownerId) 
   );
 
   return {
-    id: message?.id || message?._id || `${message?.type || 'entry'}-${senderId || senderProfile.name || 'system'}-${message?.createdAt || rawText || Date.now()}` ,
+    ...message,
+    id: message?.id || message?._id || `${message?.type || 'entry'}-${senderId || senderProfile.name || 'system'}-${message?.createdAt || rawText || Date.now()}`,
     type: systemEntry ? (message?.type === 'notification' ? 'notification' : 'system') : (message?.type || 'text'),
     senderId,
-    user: systemEntry ? 'H\u1ec7 th\u1ed1ng' : senderProfile.name || message?.user || 'Th\u00e0nh vi\u00ean Vivu360',
-    actorName: senderProfile.name || 'Th\u00e0nh vi\u00ean',
+    user: systemEntry ? 'Hệ thống' : senderProfile.name || message?.user || 'Thành viên Vivu360',
+    actorName: senderProfile.name || 'Thành viên',
     avatar: systemEntry ? '' : senderProfile.avatar || message?.avatar || '',
     text: systemEntry
-      ? normalizeSystemAnnouncementText(rawText, senderProfile.name || 'Th\u00e0nh vi\u00ean')
+      ? normalizeSystemAnnouncementText(rawText, senderProfile.name || 'Thành viên')
       : rawText,
     createdAt: message?.createdAt || message?.id || Date.now(),
     isEdited: message.isEdited || false,
@@ -677,6 +714,31 @@ const normalizeApiNotification = (notification, currentUser, ownerId, membersLis
     text: normalizeSystemAnnouncementText(notification.message || '', actorProfile.name || 'Th\u00e0nh vi\u00ean'),
     createdAt: notification.createdAt,
     notificationType: notification.type || 'group_update',
+  };
+};
+
+const normalizePollEntry = (poll, membersList = [], currentUser, ownerId) => {
+  const creatorId = poll?.createdBy || '';
+  const groupMember = findMemberProfile(membersList, creatorId);
+  const isMe = String(creatorId) === String(ownerId);
+  const creatorName = isMe
+    ? (currentUser?.name || groupMember?.name || 'Tôi')
+    : (groupMember?.name || 'Thành viên');
+  const creatorAvatar = isMe
+    ? (currentUser?.avatar || groupMember?.avatar || '')
+    : (groupMember?.avatar || '');
+  const pollId = String(poll?._id || poll?.id || '').replace(/^poll-/, '');
+
+  return {
+    id: `poll-${pollId}`,
+    pollId: pollId,
+    type: 'poll',
+    senderId: creatorId,
+    user: creatorName,
+    avatar: creatorAvatar,
+    poll: { ...poll, _id: pollId },
+    createdAt: poll?.createdAt || Date.now(),
+    text: `[Bình chọn] ${poll?.title || ''}`,
   };
 };
 
@@ -811,6 +873,13 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const [editMessageContent, setEditMessageContent] = useState('');
   const [editMessageId, setEditMessageId] = useState(null);
 
+  // Poll states
+  const [pollModalVisible, setPollModalVisible] = useState(false);
+  const [pollTitle, setPollTitle] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+  const [polls, setPolls] = useState([]);
+  const [isCreatingPoll, setIsCreatingPoll] = useState(false);
+
   const messageStreamRef = useRef(null);
   const currentUserId = getCurrentUserMemberId(currentUser, ownerId);
   const currentUserMember = selectedGroup?.membersList.find((member) => member.id === currentUserId) || createMember({ id: currentUserId, name: currentUser?.name, avatar: currentUser?.avatar, email: currentUser?.email });
@@ -877,18 +946,39 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     let active = true;
     const loadMessages = () =>
       Promise.all([
-        getChatMessages(selectedGroupId, ownerId),
+        getChatMessages(selectedGroupId, ownerId).catch(() => []),
         getGroupNotifications(selectedGroupId, ownerId).catch(() => []),
+        getPollsForGroup(selectedGroupId).catch(() => []),
       ])
-        .then(([messages, notifications]) => {
+        .then(([messages, notifications, fetchedPolls]) => {
           if (!active) return;
+          if (Array.isArray(fetchedPolls)) {
+            setPolls(fetchedPolls);
+          }
           setGroups((prevGroups) =>
             prevGroups.map((group) => {
-              if (group.id !== selectedGroupId) return group;
+              if (String(group.id) !== String(selectedGroupId)) return group;
+
+              const pollEntries = (fetchedPolls || []).map((poll) =>
+                normalizePollEntry(poll, group.membersList, currentUser, ownerId)
+              );
+
+              // Filter out duplicate plain text [BÌNH CHỌN] messages if a poll exists
+              const rawApiMessages = (messages || []).filter((msg) => {
+                const content = String(msg.content || '').trim();
+                if (content.startsWith('[BÌNH CHỌN]') || content.startsWith('[Bình chọn]')) {
+                  const title = content.replace(/^\[(BÌNH CHỌN|Bình chọn)\]\s*/i, '').trim();
+                  if ((fetchedPolls || []).some((p) => p.title.trim() === title)) {
+                    return false;
+                  }
+                }
+                return true;
+              });
 
               const mergedEntries = mergeChatEntries(
-                messages.map((message) => normalizeApiMessage(message, currentUser, ownerId, group.membersList)),
-                notifications.map((notification) => normalizeApiNotification(notification, currentUser, ownerId, group.membersList))
+                rawApiMessages.map((message) => normalizeApiMessage(message, currentUser, ownerId, group.membersList)),
+                (notifications || []).map((notification) => normalizeApiNotification(notification, currentUser, ownerId, group.membersList)),
+                pollEntries
               );
               const latestEntry = mergedEntries[mergedEntries.length - 1] || null;
 
@@ -906,7 +996,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
             })
           );
         })
-        .catch((error) => console.warn('Kh\u00f4ng th\u1ec3 t\u1ea3i d\u1eef li\u1ec7u chat nh\u00f3m:', error.message));
+        .catch((error) => console.warn('Không thể tải dữ liệu chat nhóm:', error.message));
     loadMessages();
     const timer = setInterval(loadMessages, 3000);
     return () => { active = false; clearInterval(timer); };
@@ -923,6 +1013,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
 
     return () => clearTimeout(timer);
   }, [ownerId, groupsOwnerId, groups]);
+
 
   useEffect(() => {
     if (!chatModalVisible || workspaceTab !== 'chat' || !messageStreamRef.current) return;
@@ -997,14 +1088,14 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const updateGroupById = (groupId, updater) => {
     setGroups((prevGroups) =>
       prevGroups.map((group) => {
-        if (group.id !== groupId) return group;
+        if (String(group.id) !== String(groupId)) return group;
         return normalizeGroup(updater(group), currentUser, ownerId);
       })
     );
   };
 
   const removeGroupById = (groupId) => {
-    setGroups((prevGroups) => prevGroups.filter((group) => group.id !== groupId));
+    setGroups((prevGroups) => prevGroups.filter((group) => String(group.id) !== String(groupId)));
   };
 
   const applyWorkspaceUpdate = (groupId, nextGroupState, notification) => {
@@ -1080,13 +1171,121 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     try {
       const sent = await sendChatMessage(selectedGroup.id, ownerId, trimmedMessage);
       const newMessage = normalizeApiMessage({ ...sent, sender: { name: currentUser?.name, avatar: currentUser?.avatar } }, currentUser, ownerId, selectedGroup.membersList);
-      updateGroupById(selectedGroup.id, (group) => ({ ...group, lastMessage: `${newMessage.user}: ${trimmedMessage}`, messages: [...group.messages, newMessage] }));
+      updateGroupById(selectedGroup.id, (group) => ({
+        ...group,
+        lastMessage: `${newMessage.user}: ${trimmedMessage}`,
+        messages: mergeChatEntries(group.messages, [newMessage]),
+      }));
       setChatInput('');
     } catch (error) {
       Alert.alert('Gửi tin nhắn thất bại', error.response?.data?.message || 'Vui lòng thử lại.');
     } finally {
       setIsSendingMessage(false);
     }
+  };
+
+  // Poll handlers
+  const handleAddPollOption = () => {
+    setPollOptions([...pollOptions, '']);
+  };
+
+  const handleRemovePollOption = (index) => {
+    if (pollOptions.length > 2) {
+      setPollOptions(pollOptions.filter((_, i) => i !== index));
+    } else {
+      Alert.alert('Lỗi', 'Bình chọn phải có ít nhất 2 lựa chọn');
+    }
+  };
+
+  const handleUpdatePollOption = (index, text) => {
+    const updated = [...pollOptions];
+    updated[index] = text;
+    setPollOptions(updated);
+  };
+
+  const handleCreatePoll = async () => {
+    const validOptions = pollOptions.filter(opt => opt.trim());
+    
+    if (!pollTitle.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập tiêu đề bình chọn');
+      return;
+    }
+
+    if (validOptions.length < 2) {
+      Alert.alert('Lỗi', 'Bình chọn phải có ít nhất 2 lựa chọn');
+      return;
+    }
+
+    setIsCreatingPoll(true);
+    try {
+      const creatorId = currentUserId || ownerId;
+      const newPoll = await createPoll(
+        selectedGroup.id,
+        pollTitle,
+        validOptions,
+        creatorId
+      );
+
+      // Reset form
+      setPollTitle('');
+      setPollOptions(['', '']);
+      setPollModalVisible(false);
+
+      if (newPoll) {
+        // Update polls list
+        setPolls((prev) => [newPoll, ...prev.filter((p) => String(p._id || p.id) !== String(newPoll._id || newPoll.id))]);
+
+        // Add poll message entry directly to chat
+        const pollEntry = normalizePollEntry(newPoll, selectedGroup.membersList, currentUser, ownerId);
+        updateGroupById(selectedGroup.id, (group) => ({
+          ...group,
+          lastMessage: `[Bình chọn] ${newPoll.title}`,
+          messages: mergeChatEntries(group.messages, [pollEntry]),
+        }));
+      }
+
+      Alert.alert('Thành công', 'Bình chọn đã được tạo');
+    } catch (error) {
+      Alert.alert('Lỗi', error.response?.data?.message || error.message || 'Không thể tạo bình chọn');
+    } finally {
+      setIsCreatingPoll(false);
+    }
+  };
+
+  const handleVotePoll = async (pollId, optionId) => {
+    try {
+      const voterId = currentUserId || ownerId;
+      const cleanPollId = String(pollId || '').replace(/^poll-/, '');
+      const cleanOptionId = String(optionId || '');
+      const updatedPoll = await votePoll(cleanPollId, cleanOptionId, voterId);
+      if (!updatedPoll) return;
+
+      setPolls((prev) => {
+        const exists = prev.some((p) => String(p._id || p.id) === cleanPollId);
+        if (exists) {
+          return prev.map((p) => (String(p._id || p.id) === cleanPollId ? updatedPoll : p));
+        }
+        return [updatedPoll, ...prev];
+      });
+
+      updateGroupById(selectedGroup.id, (group) => ({
+        ...group,
+        messages: group.messages.map((msg) =>
+          (msg.type === 'poll' || msg.poll) && (String(msg.pollId || msg.poll?._id || msg.poll?.id || msg.id).replace(/^poll-/, '') === cleanPollId)
+            ? { ...msg, poll: updatedPoll }
+            : msg
+        ),
+      }));
+    } catch (error) {
+      console.warn('Lỗi khi bình chọn:', error.response?.data?.message || error.message);
+      Alert.alert('Lỗi', error.response?.data?.message || 'Không thể bình chọn. Vui lòng thử lại.');
+    }
+  };
+
+  const openPollModal = () => {
+    setPollTitle('');
+    setPollOptions(['', '']);
+    setPollModalVisible(true);
   };
 
   const handleOpenUserProfile = (username) => {
@@ -1717,22 +1916,35 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                 </Pressable>
               </View>
 
-              <View style={[styles.workspaceTabBar, { borderBottomColor: theme.border, backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.78)' : 'rgba(255, 255, 255, 0.8)' }]}>
-                {WORKSPACE_TABS.map((tabItem) => {
-                  const isActive = workspaceTab === tabItem.key;
-                  const Icon = tabItem.Icon;
+              <View style={[styles.workspaceTabBarWrapper, { borderBottomColor: theme.border, backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.78)' : 'rgba(255, 255, 255, 0.8)' }]}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.workspaceTabBar}
+                >
+                  {WORKSPACE_TABS.map((tabItem) => {
+                    const isActive = workspaceTab === tabItem.key;
+                    const Icon = tabItem.Icon;
 
-                  return (
-                    <Pressable
-                      key={tabItem.key}
-                      style={[styles.workspaceTabButton, isActive ? styles.workspaceTabButtonActive : null, { backgroundColor: isActive ? 'rgba(59, 130, 246, 0.12)' : 'transparent', borderColor: isActive ? 'rgba(59, 130, 246, 0.3)' : 'transparent' }]}
-                      onPress={() => setWorkspaceTab(tabItem.key)}
-                    >
-                      <Icon size={15} color={isActive ? '#3b82f6' : theme.textSecondary} />
-                      <Text style={[styles.workspaceTabText, { color: isActive ? '#3b82f6' : theme.textSecondary }]}>{tabItem.label}</Text>
-                    </Pressable>
-                  );
-                })}
+                    return (
+                      <Pressable
+                        key={tabItem.key}
+                        style={[
+                          styles.workspaceTabButton,
+                          isActive ? styles.workspaceTabButtonActive : null,
+                          {
+                            backgroundColor: isActive ? 'rgba(59, 130, 246, 0.16)' : (isDarkMode ? 'rgba(30, 41, 59, 0.6)' : 'rgba(241, 245, 249, 0.8)'),
+                            borderColor: isActive ? '#3b82f6' : theme.border,
+                          }
+                        ]}
+                        onPress={() => setWorkspaceTab(tabItem.key)}
+                      >
+                        <Icon size={15} color={isActive ? '#3b82f6' : theme.textSecondary} />
+                        <Text style={[styles.workspaceTabText, { color: isActive ? '#3b82f6' : theme.textSecondary }]}>{tabItem.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               </View>
 
               {workspaceTab === 'chat' ? (
@@ -1745,6 +1957,127 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                     </View>
 
                     {selectedGroup.messages.map((message) => {
+                      if (message.type === 'poll' || message.poll) {
+                        const targetId = String(message.pollId || message.poll?._id || message.poll?.id || message.id || '').replace(/^poll-/, '');
+                        const currentPoll = (Array.isArray(polls) ? polls.find((p) => String(p._id || p.id) === targetId) : null) || message.poll || {
+                          _id: targetId,
+                          title: message.text ? message.text.replace(/^\[Bình chọn\]\s*/i, '') : 'Bình chọn',
+                          options: [],
+                          isActive: true,
+                          createdAt: message.createdAt,
+                        };
+
+                        const isMe = String(currentPoll.createdBy || message.senderId) === String(ownerId);
+                        const messageTime = getFormattedMsgTime(currentPoll.createdAt || message.createdAt);
+                        const totalVotes = (currentPoll.options || []).reduce((sum, o) => sum + (o.votes?.length || 0), 0);
+
+                        return (
+                          <View key={message.id} style={{ marginVertical: 8, width: '100%' }}>
+                            <View
+                              style={[
+                                styles.pollCard,
+                                {
+                                  backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.95)',
+                                  borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.35)' : 'rgba(59, 130, 246, 0.25)',
+                                  borderWidth: 1,
+                                  borderRadius: 16,
+                                  padding: 14,
+                                  shadowColor: '#000',
+                                  shadowOffset: { width: 0, height: 2 },
+                                  shadowOpacity: 0.08,
+                                  shadowRadius: 8,
+                                  elevation: 3,
+                                }
+                              ]}
+                            >
+                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                  <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(245, 158, 11, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Sparkles size={15} color="#f59e0b" />
+                                  </View>
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '700' }}>
+                                      {isMe ? 'Bạn đã tạo bình chọn' : `${message.user || 'Thành viên'} đã tạo bình chọn`}
+                                    </Text>
+                                    <Text style={{ fontSize: 10, color: theme.textMuted }}>{messageTime}</Text>
+                                  </View>
+                                </View>
+                                <View
+                                  style={{
+                                    backgroundColor: currentPoll.isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.15)',
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 3,
+                                    borderRadius: 8,
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 10, fontWeight: '800', color: currentPoll.isActive ? '#10b981' : theme.textMuted }}>
+                                    {currentPoll.isActive ? 'Đang mở' : 'Đã đóng'}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              <Text style={[styles.pollTitle, { color: isDarkMode ? '#fbbf24' : '#d97706', fontSize: 14.5, fontWeight: '900', marginBottom: 12 }]}>
+                                📊 {currentPoll.title}
+                              </Text>
+
+                              {(currentPoll.options || []).map((option) => {
+                                const optionVotes = option.votes?.length || 0;
+                                const percentage = totalVotes > 0 ? ((optionVotes / totalVotes) * 100).toFixed(0) : 0;
+                                const userVoted = (option.votes || []).includes(ownerId);
+
+                                return (
+                                  <Pressable
+                                    key={option.id}
+                                    style={[
+                                      styles.pollOption,
+                                      {
+                                        backgroundColor: userVoted ? (isDarkMode ? 'rgba(59, 130, 246, 0.22)' : 'rgba(59, 130, 246, 0.12)') : theme.searchBg,
+                                        borderColor: userVoted ? '#3b82f6' : theme.searchBorder,
+                                        borderRadius: 12,
+                                        marginBottom: 8,
+                                        padding: 10,
+                                        borderWidth: userVoted ? 1.5 : 1,
+                                      }
+                                    ]}
+                                    onPress={() => currentPoll.isActive && handleVotePoll(currentPoll._id, option.id)}
+                                    disabled={!currentPoll.isActive}
+                                  >
+                                    <View style={{ flex: 1 }}>
+                                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                        <Text style={[styles.pollOptionText, { color: theme.textPrimary, fontWeight: userVoted ? '900' : '700', fontSize: 12.5 }]}>
+                                          {option.text}
+                                        </Text>
+                                        {userVoted && <CheckCheck size={14} color="#3b82f6" />}
+                                      </View>
+                                      <View style={[styles.pollProgressBar, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', height: 6, borderRadius: 3 }]}>
+                                        <View
+                                          style={[
+                                            styles.pollProgressFill,
+                                            { width: `${percentage}%`, backgroundColor: userVoted ? '#3b82f6' : '#06b6d4', height: 6, borderRadius: 3 }
+                                          ]}
+                                        />
+                                      </View>
+                                      <Text style={[styles.pollStats, { color: theme.textSecondary, marginTop: 4, fontSize: 10.5 }]}>
+                                        {optionVotes} bình chọn ({percentage}%)
+                                      </Text>
+                                    </View>
+                                  </Pressable>
+                                );
+                              })}
+
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: theme.border }}>
+                                <Text style={{ fontSize: 11, color: theme.textMuted, fontWeight: '700' }}>
+                                  Tổng số: {totalVotes} phiếu
+                                </Text>
+                                <Text style={{ fontSize: 11, color: '#3b82f6', fontWeight: '800' }}>
+                                  {(currentPoll.options || []).some((o) => (o.votes || []).includes(ownerId)) ? '✓ Bạn đã bình chọn' : 'Chưa bình chọn'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        );
+                      }
+
                       if (isSystemChatEntry(message)) {
                         return (
                           <View key={message.id} style={[styles.systemBubble, { backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.55)' : 'rgba(255,255,255,0.78)', borderColor: theme.border }]}>
@@ -1944,6 +2277,105 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                       </View>
                     </View>
                   </View>
+                </ScrollView>
+              ) : workspaceTab === 'polls' ? (
+                <ScrollView style={styles.workspaceScroll} contentContainerStyle={{ padding: 16, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+                  <View style={[styles.workspaceCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
+                    <View style={styles.workspaceSectionHeader}>
+                      <View>
+                        <Text style={[styles.workspaceTitle, { color: theme.textPrimary }]}>Tạo Bình Chọn Mới</Text>
+                        <Text style={[styles.workspaceSubtitle, { color: theme.textSecondary }]}>
+                          Tạo bình chọn để nhóm cùng bàn bạc và quyết định
+                        </Text>
+                      </View>
+                      <Sparkles size={18} color="#f59e0b" />
+                    </View>
+
+                    <Pressable
+                      style={styles.primaryActionBtn}
+                      onPress={openPollModal}
+                    >
+                      <LinearGradient colors={['#f59e0b', '#d97706']} style={styles.primaryActionGradient}>
+                        <Plus size={16} color="#fff" />
+                        <Text style={styles.primaryActionText}>Tạo Bình Chọn</Text>
+                      </LinearGradient>
+                    </Pressable>
+                  </View>
+
+                  <Text style={[styles.workspaceTitle, { color: theme.textPrimary, paddingHorizontal: 0, marginTop: 12, marginBottom: 12 }]}>Các Bình Chọn Hiện Tại</Text>
+
+                  {(() => {
+                    const allGroupPolls = Array.from(
+                      new Map([
+                        ...polls.map((p) => [String(p._id || p.id), p]),
+                        ...(selectedGroup?.messages || [])
+                          .filter((m) => (m.type === 'poll' || m.poll) && (m.poll || m.pollId))
+                          .map((m) => [
+                            String(m.poll?._id || m.poll?.id || m.pollId || m.id).replace(/^poll-/, ''),
+                            m.poll || { _id: String(m.pollId || m.id).replace(/^poll-/, ''), title: m.text?.replace(/^\[Bình chọn\]\s*/i, '') || 'Bình chọn', options: [], isActive: true, createdAt: m.createdAt },
+                          ]),
+                      ]).values()
+                    );
+
+                    if (allGroupPolls.length === 0) {
+                      return (
+                        <View style={[styles.workspaceCard, { backgroundColor: theme.cardGlass, borderColor: theme.border, alignItems: 'center', paddingVertical: 40 }]}>
+                          <Text style={[styles.workspaceSubtitle, { color: theme.textMuted }]}>Chưa có bình chọn nào</Text>
+                          <Text style={[{ color: theme.textMuted, fontSize: 11, marginTop: 8 }]}>Tạo bình chọn đầu tiên để nhóm cùng quyết định</Text>
+                        </View>
+                      );
+                    }
+
+                    return allGroupPolls.map((poll) => (
+                      <View key={poll._id || poll.id} style={[styles.workspaceCard, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}>
+                        <View style={{ marginBottom: 16 }}>
+                          <Text style={[styles.workspaceTitle, { color: theme.textPrimary, fontSize: 15.5, fontWeight: '900' }]}>📊 {poll.title}</Text>
+                          {!poll.isActive && <Text style={[styles.workspaceSubtitle, { color: theme.textMuted, marginTop: 4 }]}>⭕ Bình chọn đã kết thúc</Text>}
+                        </View>
+
+                        {(poll.options || []).map((option) => {
+                          const totalVotes = (poll.options || []).reduce((sum, o) => sum + (o.votes?.length || 0), 0);
+                          const optionVotes = option.votes?.length || 0;
+                          const percentage = totalVotes > 0 ? ((optionVotes / totalVotes) * 100).toFixed(0) : 0;
+                          const userVoted = (option.votes || []).includes(ownerId);
+
+                          return (
+                            <Pressable
+                              key={option.id}
+                              style={[
+                                styles.secondaryActionBtn,
+                                {
+                                  backgroundColor: userVoted ? 'rgba(59, 130, 246, 0.16)' : theme.searchBg,
+                                  borderColor: userVoted ? 'rgba(59, 130, 246, 0.32)' : theme.searchBorder,
+                                  marginTop: 10,
+                                  paddingVertical: 14,
+                                  flexDirection: 'column',
+                                  alignItems: 'flex-start',
+                                },
+                              ]}
+                              onPress={() => poll.isActive && handleVotePoll(poll._id || poll.id, option.id)}
+                              disabled={!poll.isActive}
+                            >
+                              <Text style={[{ fontSize: 13.5, fontWeight: '800', color: theme.textPrimary, marginBottom: 8 }]}>
+                                {option.text}
+                              </Text>
+                              <View style={[styles.progressTrack, { width: '100%', marginTop: 8, marginBottom: 6, backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                                <View
+                                  style={[
+                                    styles.progressFill,
+                                    { width: `${percentage}%`, backgroundColor: userVoted ? '#3b82f6' : '#06b6d4' }
+                                  ]}
+                                />
+                              </View>
+                              <Text style={[{ fontSize: 11.5, fontWeight: '800', color: theme.textSecondary }]}>
+                                {optionVotes} bình chọn ({percentage}%)
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    ));
+                  })()}
                 </ScrollView>
               ) : (
                 <ScrollView style={styles.workspaceScroll} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
@@ -2329,6 +2761,77 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
           </View>
         </View>
       </Modal>
+
+      {/* Poll Modal */}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={pollModalVisible}
+        onRequestClose={() => setPollModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, { backgroundColor: theme.cardGlass, borderColor: theme.border, maxHeight: '90%' }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.modalHeaderTitle, { color: theme.textPrimary }]}>Tạo Bình Chọn</Text>
+              <Pressable style={styles.closeModalBtn} onPress={() => setPollModalVisible(false)}>
+                <X size={20} color={theme.textPrimary} />
+              </Pressable>
+            </View>
+            <ScrollView style={{ flex: 1, padding: 16 }}>
+              <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Tiêu đề Bình Chọn</Text>
+              <TextInput
+                style={[styles.formInputGroup, { color: theme.textPrimary, backgroundColor: theme.searchBg, borderColor: theme.searchBorder, marginTop: 6 }]}
+                value={pollTitle}
+                onChangeText={setPollTitle}
+                placeholder="Nội dung bình chọn"
+                placeholderTextColor={theme.textMuted}
+              />
+
+              <Text style={[styles.inputLabel, { color: theme.textPrimary, marginTop: 16 }]}>Các Lựa Chọn</Text>
+              {pollOptions.map((option, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                  <TextInput
+                    style={[styles.formInputGroup, { flex: 1, color: theme.textPrimary, backgroundColor: theme.searchBg, borderColor: theme.searchBorder }]}
+                    value={option}
+                    onChangeText={(text) => handleUpdatePollOption(idx, text)}
+                    placeholder={`Lựa chọn ${idx + 1}`}
+                    placeholderTextColor={theme.textMuted}
+                  />
+                  {pollOptions.length > 2 && (
+                    <Pressable
+                      style={{ marginLeft: 8, padding: 8, backgroundColor: 'rgba(239, 68, 68, 0.2)', borderRadius: 6 }}
+                      onPress={() => handleRemovePollOption(idx)}
+                    >
+                      <X size={18} color="#ef4444" />
+                    </Pressable>
+                  )}
+                </View>
+              ))}
+
+              <Pressable
+                style={{ marginTop: 12, padding: 12, backgroundColor: 'rgba(59, 130, 246, 0.15)', borderRadius: 6, alignItems: 'center' }}
+                onPress={handleAddPollOption}
+              >
+                <Text style={{ color: '#3b82f6', fontWeight: '600' }}>+ Thêm Lựa Chọn</Text>
+              </Pressable>
+            </ScrollView>
+
+            <View style={[styles.modalFooter, { borderTopColor: theme.border }]}>
+              <Pressable
+                style={[styles.modalCancelBtn, { marginRight: 8 }]}
+                onPress={() => setPollModalVisible(false)}
+              >
+                <Text style={{ color: theme.textPrimary, fontWeight: '600' }}>Hủy</Text>
+              </Pressable>
+              <Pressable style={styles.modalSubmitBtn} onPress={handleCreatePoll} disabled={isCreatingPoll}>
+                <LinearGradient colors={['#06b6d4', '#3b82f6']} style={styles.modalSubmitGradient}>
+                  <Text style={styles.modalSubmitText}>{isCreatingPoll ? 'Đang tạo...' : 'Xong'}</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -2491,19 +2994,21 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginLeft: 6,
   },
+  workspaceTabBarWrapper: {
+    borderBottomWidth: 1,
+  },
   workspaceTabBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 8,
-    borderBottomWidth: 1,
   },
   workspaceTabButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
@@ -2515,7 +3020,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  workspaceTabText: { fontSize: 11, fontWeight: '800' },
+  workspaceTabText: { fontSize: 12, fontWeight: '800' },
   messageStream: { flex: 1, padding: 16 },
   systemJoinMsg: {
     padding: 12,
@@ -2991,4 +3496,51 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   leaveGroupText: { color: '#ef4444', fontSize: 12.5, fontWeight: '900' },
+  // Poll styles
+  pollCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  pollTitle: {
+    fontSize: 15.5,
+    fontWeight: '900',
+    marginBottom: 4,
+    letterSpacing: -0.3,
+  },
+  pollCreator: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  pollOption: {
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 10,
+  },
+  pollOptionText: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  pollProgressBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  pollProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  pollStats: {
+    fontSize: 11.5,
+    fontWeight: '800',
+  },
 });
