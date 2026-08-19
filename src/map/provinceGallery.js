@@ -21,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { extractPinterestImage, getImageSource, fetchRealProvinceImages } from './pinterestExtractor';
 import { getSafeImageSource } from '../utils/image';
-import { getCamNangByLocation } from '../services/camNangService';
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

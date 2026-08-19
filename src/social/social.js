@@ -1,9 +1,9 @@
 ﻿import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal, Dimensions, Share, Alert, Platform, StatusBar, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal, Dimensions, Share, Alert, Platform, StatusBar, Animated, ActivityIndicator, TouchableWithoutFeedback } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { searchFriends } from '../services/userService';
 import { getFriendships, sendFriendRequest, acceptFriendRequest, rejectFriendRequest } from '../services/friendshipService';
-import { getFeed, createPost, togglePostLike, addPostComment } from '../services/postService';
+import { getFeed, createPost, togglePostLike, addPostComment, editPost, deletePost } from '../services/postService';
 import { getSocialNotifications, markSocialNotificationsRead } from '../services/socialNotificationService';
 import { getOrCreateDirectChat } from '../services/chatService';
 import {
@@ -36,11 +36,19 @@ import {
   Map,
   Settings,
   Ticket,
-  User
+  User,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Flag,
+  UserX
 } from 'lucide-react-native';
 
 import { UserProfileModal } from './userProfile';
 import { getSafeAvatarSource, getSafeImageSource, hasImageUri } from '../utils/image';
+import ReportModal from '../components/ReportModal';
+import { reportPost } from '../services/reportService';
+const EMPTY_BLOCKED_USER_IDS = [];
 
 const getUserRankColors = (name) => {
   const lvl = getUserLevelByName(name);
@@ -236,7 +244,16 @@ const initialPosts = [];
 
 const initialGroups = [];
 
-export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNavigateToTab, onLogout, language = 'vi', blockedUserIds = [] }) {
+export function SocialScreen({
+  ownerId,
+  isDarkMode,
+  theme,
+  currentUser,
+  onNavigateToTab,
+  onLogout,
+  language = 'vi',
+  blockedUserIds = EMPTY_BLOCKED_USER_IDS
+}) {
   const [posts, setPosts] = useState(initialPosts);
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
   const [menuVisible, setMenuVisible] = useState(false);
@@ -341,6 +358,20 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   const [friendResults, setFriendResults] = useState([]);
   const [isSearchingFriends, setIsSearchingFriends] = useState(false);
   const [friendSearchError, setFriendSearchError] = useState('');
+
+  // Dropdown states
+  const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+  const menuButtonRef = useRef(null);
+  const [menuWidth, setMenuWidth] = useState(200);
+
+  // Edit state
+  const [editingPost, setEditingPost] = useState(null);
+
+  // Report state
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportingPostId, setReportingPostId] = useState(null);
+  const [reportedPosts, setReportedPosts] = useState(new Set());
 
   const relationFor = userId => friendships.find(item => item.users?.includes(userId));
 
@@ -449,11 +480,39 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
     return filteredPosts;
   }, [filteredPosts]);
 
+  const openDropdown = () => {
+    if (!selectedPost) return;
+
+    if (menuButtonRef.current) {
+      menuButtonRef.current.measure((x, y, width, height, pageX, pageY) => {
+        if (x !== undefined && y !== undefined) {
+          setDropdownPosition({
+            top: pageY + height + 6,
+            right: pageX + width - menuWidth - 4,
+          });
+          setDropdownVisible(true);
+          return;
+        }
+        fallbackDropdownPosition();
+      });
+    } else {
+      fallbackDropdownPosition();
+    }
+  };
+
+  const fallbackDropdownPosition = () => {
+    setDropdownPosition({ top: 160, left: Dimensions.get('window').width - 210 });
+    setDropdownVisible(true);
+  };
+
   // Likes toggle handler
   const handleLikePost = async (postId) => {
     try {
       const result = await togglePostLike(ownerId, postId);
       setPosts(items => items.map(post => post.id === postId ? { ...post, likedByUser: result.likedByMe, likes: result.likesCount } : post));
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost(prev => ({ ...prev, likedByUser: result.likedByMe, likes: result.likesCount }));
+      }
     } catch (error) {
       Alert.alert('Bài viết', 'Không thể cập nhật lượt thích.');
     }
@@ -471,13 +530,53 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
     const finalImg = newImgUrl.trim() || defaultImages[Math.floor(Math.random() * defaultImages.length)];
 
     try {
-      await createPost(ownerId, { content: newContent, category: newCategory, location: newLocation.trim() || 'Việt Nam', images: [finalImg] });
-      await refreshSocialData();
-      setNewTitle('');
-      setNewContent('');
-      setNewLocation('');
-      setNewImgUrl('');
-      setActiveView('feed');
+      if (editingPost) {
+        // Cập nhật bài viết
+        const updated = await editPost(ownerId, editingPost.id, {
+          content: newContent,
+          category: newCategory,
+          location: newLocation.trim() || 'Việt Nam',
+          images: [finalImg],
+          title: newTitle
+        });
+
+        // Cập nhật state posts
+        setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, ...updated } : p));
+
+        // Tạo bài viết mới hợp nhất (giữ nguyên user cũ)
+        const updatedPost = { ...editingPost, ...updated };
+
+        // Reset edit state và form
+        setEditingPost(null);
+        setNewTitle('');
+        setNewContent('');
+        setNewLocation('');
+        setNewImgUrl('');
+
+        // Đóng composer
+        setActiveView('feed');
+
+        // Sau animation, mở lại modal chi tiết với bài đã sửa
+        setTimeout(() => {
+          setSelectedPost(updatedPost);
+          setCommentModalVisible(true);
+        }, 350);
+      } else {
+        // Tạo bài viết mới
+        await createPost(ownerId, {
+          content: newContent,
+          category: newCategory,
+          location: newLocation.trim() || 'Việt Nam',
+          images: [finalImg],
+          title: newTitle,
+        });
+        await refreshSocialData();
+        setNewTitle('');
+        setNewContent('');
+        setNewLocation('');
+        setNewImgUrl('');
+        setActiveView('feed');
+      }
     } catch (error) {
       Alert.alert('Đăng bài', 'Không thể đăng bài. Vui lòng thử lại.');
     }
@@ -542,6 +641,79 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
       }
     } catch (error) {
       console.log('Sharing error: ', error);
+    }
+  };
+
+  // Edit post
+  const handleEditPost = () => {
+    if (!selectedPost) return;
+
+    // Đóng modal chi tiết
+    setCommentModalVisible(false);
+
+    // Lưu bài viết đang sửa
+    setEditingPost(selectedPost);
+
+    // Điền dữ liệu hiện tại vào form
+    setNewTitle(selectedPost.title || '');
+    setNewCategory(selectedPost.category || 'Thời sự');
+    setNewContent(selectedPost.content || '');
+    setNewLocation(selectedPost.location || '');
+    setNewImgUrl(selectedPost.image || '');
+
+    // Mở composer (slider lên)
+    setActiveView('createPost');
+  };
+
+  // Delete post
+  const handleDeletePost = () => {
+    Alert.alert(
+      'Xóa bài viết',
+      "Bạn có chắc chắn muốn xóa bài viết này? Hành động này không thể hoàn tác.",
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deletePost(ownerId, selectedPost.id);
+              // Cập nhật state posts: loại bỏ bài viết
+              setPosts(prev => prev.filter(p => p.id !== selectedPost.id));
+              // Đóng modal chi tiết
+              setCommentModalVisible(false);
+              // Reset selectedPost
+              setSelectedPost(null);
+            } catch (error) {
+              Alert.alert('Lỗi', 'Không thể xóa bài viết. Vui lòng thử lại.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Report post
+  const handleReportSubmit = async (postId, reason, description) => {
+    try {
+      await reportPost(postId, reason, description, ownerId);
+      
+      setReportedPosts(prev => new Set(prev).add(postId));
+      setReportModalVisible(false);
+      setReportingPostId(null);
+      
+      // Hiển thị thông báo thành công
+      Alert.alert('Thành công', 'Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét.');
+    } catch (error) {
+      // Nếu lỗi 409 (đã báo cáo), cũng thêm vào Set và thông báo
+      if (error.message.includes('đã báo cáo') || error.message.includes('409')) {
+          setReportedPosts(prev => new Set(prev).add(postId));
+          Alert.alert('Thông báo', 'Bạn đã báo cáo bài viết này trước đó.');
+      } else {
+          Alert.alert('Lỗi', error.message);
+      }
+      setReportModalVisible(false);
+      setReportingPostId(null);
     }
   };
 
@@ -896,12 +1068,102 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
                     <Text style={[styles.postUserName, { color: theme.textPrimary }]}>{selectedPost.user?.name || selectedPost.source}</Text>
                     <Text style={{ fontSize: 10.5, color: theme.textMuted }}>{selectedPost.time} • Tác giả ký sự</Text>
                   </View>
+
+                  <View ref={menuButtonRef} style={{ padding: 8 }}>
+                    <Pressable
+                      onPress={openDropdown}
+                    >
+                      <MoreVertical size={20} color={theme.textSecondary} />
+                    </Pressable>
+                  </View>
+
                   <View style={styles.tripDetailCompanionGroup}>
                     {(selectedPost.companions || []).map((cAv, idx) => (
                       <Image key={idx} source={getSafeAvatarSource(cAv)} style={[styles.detailCompanionAvatarCircle, { marginLeft: idx > 0 ? -8 : 0 }]} />
                     ))}
                   </View>
                 </View>
+
+                {selectedPost && (
+                  <Modal visible={dropdownVisible} transparent animationType="fade" onRequestClose={() => setDropdownVisible(false)}>
+                    <TouchableWithoutFeedback onPress={() => setDropdownVisible(false)}>
+                      <View style={{ flex: 1 }}>
+                        <View
+                          style={[
+                            styles.dropdownMenu,
+                            {
+                              position: 'absolute',
+                              top: dropdownPosition.top,
+                              right: dropdownPosition.right,
+                              backgroundColor: theme.card,
+                              borderColor: theme.border,
+                            },
+                          ]}
+                          onLayout={(e) => {
+                            const { width } = e.nativeEvent.layout;
+                            setMenuWidth(width);
+                          }}
+                        >
+                          {selectedPost.user?.firebaseUid === ownerId ? (
+                            <>
+                              <Pressable
+                                style={styles.dropdownItem}
+                                onPress={() => {
+                                  setDropdownVisible(false);
+                                  handleEditPost();
+                                }}
+                              >
+                                <Edit size={16} color={theme.textPrimary} />
+                                <Text style={[styles.dropdownItemText, { color: theme.textPrimary }]}>Chỉnh sửa bài viết</Text>
+                              </Pressable>
+                              <Pressable
+                                style={[styles.dropdownItem, { borderTopWidth: 1, borderTopColor: theme.border }]}
+                                onPress={() => {
+                                  setDropdownVisible(false);
+                                  handleDeletePost();
+                                }}
+                              >
+                                <Trash2 size={16} color="#ef4444" />
+                                <Text style={[styles.dropdownItemText, { color: '#ef4444' }]}>Xóa bài viết</Text>
+                              </Pressable>
+                            </>
+                          ) : (
+                            <>
+                              {!reportedPosts.has(selectedPost.id) ? (
+                                <Pressable
+                                  style={styles.dropdownItem}
+                                  onPress={() => {
+                                    setDropdownVisible(false);
+                                    setReportingPostId(selectedPost.id);
+                                    setReportModalVisible(true);
+                                  }}
+                                >
+                                  <Flag size={16} color={theme.textPrimary} />
+                                  <Text style={[styles.dropdownItemText, { color: theme.textPrimary }]}>Báo cáo bài viết</Text>
+                                </Pressable>
+                              ) : (
+                                <View style={styles.dropdownItem}>
+                                  <Flag size={16} color={theme.textMuted} />
+                                  <Text style={[styles.dropdownItemText, { color: theme.textMuted }]}>Đã báo cáo</Text>
+                                </View>
+                              )}
+                              <Pressable
+                                style={[styles.dropdownItem, { borderTopWidth: 1, borderTopColor: theme.border }]}
+                                onPress={() => {
+                                  setDropdownVisible(false);
+                                  Alert.alert('Chặn', 'Chức năng chặn người dùng đang được phát triển.');
+                                }}
+                              >
+                                <UserX size={16} color={theme.textPrimary} />
+                                <Text style={[styles.dropdownItemText, { color: theme.textPrimary }]}>Chặn người dùng</Text>
+                              </Pressable>
+                            </>
+                          )}
+                        </View>
+                      </View>
+                    </TouchableWithoutFeedback>
+                  </Modal>
+                )}
 
                 {/* Main Excerpt text */}
                 <View style={{ padding: 16 }}>
@@ -990,6 +1252,19 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
         theme={theme}
         currentUser={currentUser}
         onMessage={handleStartDirectChat}
+      />
+
+      <ReportModal
+        visible={reportModalVisible}
+        onClose={() => {
+          setReportModalVisible(false);
+          setReportingPostId(null);
+        }}
+        onSubmit={handleReportSubmit}
+        isDarkMode={isDarkMode}
+        theme={theme}
+        postId={reportingPostId}
+        currentUserId={ownerId}
       />
 
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
@@ -1177,11 +1452,21 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
         ]}>
           {/* Navigation Header */}
           <View style={[styles.chatHeader, { backgroundColor: theme.card, borderBottomColor: theme.border, height: Platform.OS === 'android' ? 68 + (StatusBar.currentHeight || 24) : 88, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 40, alignItems: 'center' }]}>
-            <Pressable style={styles.backChatBtn} onPress={() => setActiveView('feed')}>
+            <Pressable
+              style={styles.backChatBtn}
+              onPress={() => {
+                setActiveView('feed');
+                setEditingPost(null);
+                setNewTitle('');
+                setNewContent('');
+                setNewLocation('');
+                setNewImgUrl('');
+              }}
+            >
               <X size={20} color={theme.textPrimary} />
             </Pressable>
             <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={[styles.chatHeaderName, { color: theme.textPrimary }]}>Tạo bài viết mới</Text>
+              <Text style={[styles.chatHeaderName, { color: theme.textPrimary }]}>{editingPost ? 'Chỉnh sửa bài viết' : 'Tạo bài viết'}</Text>
               <Text style={{ fontSize: 10.5, color: theme.textMuted, fontWeight: '600' }}>Bảng tin du lịch Vivu360</Text>
             </View>
             <Pressable 
@@ -2302,6 +2587,30 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
   },
+
+  // Dropdown menu
+  dropdownMenu: {
+    width: 200,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  dropdownItemText: {
+    fontSize: 13,
+    fontWeight: '600',
+  }
 });
 
 
