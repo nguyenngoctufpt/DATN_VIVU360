@@ -46,8 +46,10 @@ import {
 
 import { UserProfileModal } from './userProfile';
 import { getSafeAvatarSource, getSafeImageSource, hasImageUri } from '../utils/image';
-import { err } from 'react-native-svg';
+import ReportModal from '../components/ReportModal';
+import { reportPost } from '../services/reportService';
 const EMPTY_BLOCKED_USER_IDS = [];
+
 const getUserRankColors = (name) => {
   const lvl = getUserLevelByName(name);
   const levelNum = parseInt(lvl.replace(/[^0-9]/g, ''), 10) || 1;
@@ -365,6 +367,11 @@ export function SocialScreen({
 
   // Edit state
   const [editingPost, setEditingPost] = useState(null);
+
+  // Report state
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportingPostId, setReportingPostId] = useState(null);
+  const [reportedPosts, setReportedPosts] = useState(new Set());
 
   const relationFor = userId => friendships.find(item => item.users?.includes(userId));
 
@@ -684,6 +691,30 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
         }
       ]
     );
+  };
+
+  // Report post
+  const handleReportSubmit = async (postId, reason, description) => {
+    try {
+      await reportPost(postId, reason, description, ownerId);
+      
+      setReportedPosts(prev => new Set(prev).add(postId));
+      setReportModalVisible(false);
+      setReportingPostId(null);
+      
+      // Hiển thị thông báo thành công
+      Alert.alert('Thành công', 'Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét.');
+    } catch (error) {
+      // Nếu lỗi 409 (đã báo cáo), cũng thêm vào Set và thông báo
+      if (error.message.includes('đã báo cáo') || error.message.includes('409')) {
+          setReportedPosts(prev => new Set(prev).add(postId));
+          Alert.alert('Thông báo', 'Bạn đã báo cáo bài viết này trước đó.');
+      } else {
+          Alert.alert('Lỗi', error.message);
+      }
+      setReportModalVisible(false);
+      setReportingPostId(null);
+    }
   };
 
   return (
@@ -1098,12 +1129,24 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
                             </>
                           ) : (
                             <>
-                              <Pressable
-                                style={styles.dropdownItem}
-                              >
-                                <Flag size={16} color={theme.textPrimary} />
-                                <Text style={[styles.dropdownItemText, { color: theme.textPrimary }]}>Báo cáo bài viết</Text>
-                              </Pressable>
+                              {!reportedPosts.has(selectedPost.id) ? (
+                                <Pressable
+                                  style={styles.dropdownItem}
+                                  onPress={() => {
+                                    setDropdownVisible(false);
+                                    setReportingPostId(selectedPost.id);
+                                    setReportModalVisible(true);
+                                  }}
+                                >
+                                  <Flag size={16} color={theme.textPrimary} />
+                                  <Text style={[styles.dropdownItemText, { color: theme.textPrimary }]}>Báo cáo bài viết</Text>
+                                </Pressable>
+                              ) : (
+                                <View style={styles.dropdownItem}>
+                                  <Flag size={16} color={theme.textMuted} />
+                                  <Text style={[styles.dropdownItemText, { color: theme.textMuted }]}>Đã báo cáo</Text>
+                                </View>
+                              )}
                               <Pressable
                                 style={[styles.dropdownItem, { borderTopWidth: 1, borderTopColor: theme.border }]}
                                 onPress={() => {
@@ -1209,6 +1252,19 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
         theme={theme}
         currentUser={currentUser}
         onMessage={handleStartDirectChat}
+      />
+
+      <ReportModal
+        visible={reportModalVisible}
+        onClose={() => {
+          setReportModalVisible(false);
+          setReportingPostId(null);
+        }}
+        onSubmit={handleReportSubmit}
+        isDarkMode={isDarkMode}
+        theme={theme}
+        postId={reportingPostId}
+        currentUserId={ownerId}
       />
 
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
