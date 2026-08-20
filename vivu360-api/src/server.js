@@ -13,6 +13,7 @@ const friendshipsRouter = require("./routes/friendships");
 const notificationsRouter = require("./routes/notifications");
 const articlesRouter = require("./routes/articles");
 const socialNotificationsRouter = require("./routes/socialNotifications");
+const reportsRouter = require("./routes/reports");
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
@@ -35,23 +36,24 @@ app.use("/api/friendships", friendshipsRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/social-notifications", socialNotificationsRouter);
 app.use("/api/articles", articlesRouter);
+app.use("/api/reports", reportsRouter);
 
-app.use((req, res) => res.status(404).json({ success: false, message: "Endpoint kh\u00f4ng t\u1ed3n t\u1ea1i" }));
+app.use((req, res) => res.status(404).json({ success: false, message: "Endpoint kh�ng t?n t?i" }));
 app.use((error, req, res, next) => {
   console.error(error.message);
   res.status(error.name === "ValidationError" ? 400 : 500).json({
     success: false,
-    message: error.name === "ValidationError" ? error.message : "L\u1ed7i m\u00e1y ch\u1ee7",
+    message: error.name === "ValidationError" ? error.message : "L?i m�y ch?",
   });
 });
 
 async function start() {
   const server = app.listen(port, () => {
-    console.log(`🚀 Vivu360 API listening on http://localhost:${port}`);
+    console.log(`?? Vivu360 API listening on http://localhost:${port}`);
   });
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
-      console.log(`⚡ Vivu360 API đã hoạt động sẵn tại http://localhost:${port}`);
+      console.log(`?? Vivu360 API d� ho?t d?ng s?n t?i http://localhost:${port}`);
     } else {
       console.error(err);
     }
