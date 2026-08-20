@@ -1,8 +1,7 @@
 import api from './api';
+import { loadAppData } from './appDataService';
 
 const auth = userId => ({ headers: { 'x-user-id': String(userId || 'guest_user').trim() } });
-
-import { loadAppData } from './appDataService';
 
 export async function getFeed(userId) {
   try {
@@ -59,16 +58,10 @@ export async function addPostComment(userId, postId, text) {
   return response.data.data;
 }
 
-export async function deletePost(userId, postId) {
-  const response = await api.delete(`/posts/${postId}`, auth(userId));
-  return response.data;
-}
-
 export async function updatePost(userId, postId, fields) {
   const response = await api.put(`/posts/${postId}`, fields, auth(userId));
   return response.data.data;
 }
-
 
 export function mapMongoPostToFeedPost(mPost) {
   if (!mPost) return null;
@@ -82,12 +75,12 @@ export function mapMongoPostToFeedPost(mPost) {
     id: mPost._id || mPost.id,
     _id: mPost._id || mPost.id,
     authorId: mPost.authorId || mPost.user?.firebaseUid || null,
-    title: mPost.title || (mPost.content ? (mPost.content.length > 50 ? mPost.content.slice(0, 50) + '...' : mPost.content) : 'Bản tin du lịch'),
-    category: mPost.category || 'Check-in 360° 📸',
+    title: mPost.title || (mPost.content ? (mPost.content.length > 50 ? mPost.content.slice(0, 50) + '...' : mPost.content) : 'B?n tin du l?ch'),
+    category: mPost.category || 'Check-in 360�',
     privacy: mPost.privacy || 'public',
-    source: mPost.author?.name || mPost.user?.name || 'Thành viên Vivu360',
-    time: mPost.createdAt ? new Date(mPost.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' + new Date(mPost.createdAt).toLocaleDateString() : 'Vừa xong',
-    location: mPost.location || 'Việt Nam',
+    source: mPost.author?.name || mPost.user?.name || 'Th�nh vi�n Vivu360',
+    time: mPost.createdAt ? new Date(mPost.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' � ' + new Date(mPost.createdAt).toLocaleDateString() : 'V?a xong',
+    location: mPost.location || 'Vi?t Nam',
     content: mPost.content || '',
     image: firstImage,
     images: firstImage ? [firstImage] : [],
@@ -96,15 +89,14 @@ export function mapMongoPostToFeedPost(mPost) {
     likedByUser: mPost.likedByMe || false,
     comments: (mPost.comments || []).map(c => ({
       id: c._id || c.id || Date.now(),
-      user: c.author?.name || c.user || 'Bạn đọc',
+      user: c.author?.name || c.user || 'B?n d?c',
       text: c.text || c.content || ''
     })),
     user: {
       firebaseUid: mPost.authorId || mPost.user?.firebaseUid,
-      name: mPost.author?.name || mPost.user?.name || 'Thành viên Vivu360',
+      name: mPost.author?.name || mPost.user?.name || 'Th�nh vi�n Vivu360',
       avatar: userAvatar,
-      level: mPost.author?.level || mPost.user?.level || 'Cấp 1',
+      level: mPost.author?.level || mPost.user?.level || 'C?p 1',
     }
   };
 }
-
