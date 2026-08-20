@@ -1282,7 +1282,16 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
           </View>
 
           {/* Scroll Content Form */}
-          <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
+          <ScrollView
+  style={{ flex: 1 }}
+  contentContainerStyle={{
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 140,
+  }}
+  showsVerticalScrollIndicator={false}
+  keyboardShouldPersistTaps="handled"
+>
             {/* User Identity info */}
             <View style={[styles.modalUserRow, { marginBottom: 20 }]}>
               <Image source={getSafeAvatarSource(currentUser.avatar)} style={styles.postAvatar} />
