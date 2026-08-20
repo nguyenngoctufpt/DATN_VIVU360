@@ -61,6 +61,7 @@ export async function extractPinterestImage(url) {
 export function getImageSource(uri) {
   if (!uri) return null;
   const cleanUri = uri.trim();
+  if (!cleanUri) return null;
   const headers = {};
   if (cleanUri.includes('wordpress.com') || cleanUri.includes('longvietarch')) {
     headers['Referer'] = 'https://longvietarch.wordpress.com/';
@@ -229,5 +230,6 @@ export async function fetchRealProvinceImages(provinceName, count = 8) {
   // 4. Return whatever we gathered, or null if empty
   return images.length > 0 ? images.slice(0, count) : null;
 }
+
 
 

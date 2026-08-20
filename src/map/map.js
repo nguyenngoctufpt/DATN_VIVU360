@@ -44,6 +44,7 @@ import { mockMapMarkers } from '../data';
 import { TOUR_DATA } from './virtualTour';
 import { getImageSource } from './pinterestExtractor';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getSafeImageSource } from '../utils/image';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const MAP_CANVAS_SIZE = Math.min(screenWidth - 32, screenHeight * 0.38);
@@ -786,7 +787,7 @@ export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, 
                     ]}>
                       {isSelected ? (
                         <Image 
-                          source={getImageSource(marker.image) || { uri: marker.image }} 
+                          source={getImageSource(marker.image) || getSafeImageSource(marker.image)} 
                           style={styles.pinImageThumbnail} 
                           resizeMode="cover"
                         />
@@ -900,7 +901,7 @@ export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, 
                   ]}>
                     {isSelected ? (
                       <Image 
-                        source={getImageSource(marker.image) || { uri: marker.image }} 
+                        source={getImageSource(marker.image) || getSafeImageSource(marker.image)} 
                         style={styles.pinImageThumbnail} 
                         resizeMode="cover"
                       />
@@ -1099,7 +1100,7 @@ export function MapScreen({ isDarkMode, setIsDarkMode, theme, onNavigateToTour, 
               }
             ]}>
               <View style={styles.cardHeaderRow}>
-                <Image source={{ uri: image }} style={styles.cardCoverPhoto} />
+                <Image source={getSafeImageSource(image)} style={styles.cardCoverPhoto} />
                 <View style={styles.cardTextContent}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                     <Text style={[styles.cardTitleText, { color: theme.textPrimary }]} numberOfLines={1}>{title}</Text>
@@ -2244,3 +2245,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 });
+
+
+

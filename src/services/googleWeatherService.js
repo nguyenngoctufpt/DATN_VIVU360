@@ -99,7 +99,7 @@ export async function fetchGoogleWeatherForecast({
           date: toIsoDate(item?.displayDate),
           description:
             weatherCondition?.description?.text ||
-            'Th?i ti?t ?ang ???c c?p nh?t',
+            'Thời tiết đang được cập nhật',
           weatherType: weatherCondition?.type || 'TYPE_UNSPECIFIED',
           iconText: WEATHER_TYPE_TO_EMOJI[weatherCondition?.type] || '???',
           maxTemp: readTemperature(item?.maxTemperature),

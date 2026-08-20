@@ -13,12 +13,15 @@ import {
   Alert,
   Dimensions,
   Platform,
-  StatusBar
+  StatusBar,
+  Linking
 } from 'react-native';
 import { ArrowLeft, Plus, X, Sparkles, AlertCircle, MapPin, ChevronRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { extractPinterestImage, getImageSource, fetchRealProvinceImages } from './pinterestExtractor';
+import { getSafeImageSource } from '../utils/image';
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -262,6 +265,18 @@ export function ProvinceGalleryScreen({ theme, isDarkMode, provinceName, onBack,
   }, [provinceName]);
 
   const [photos, setPhotos] = useState(initialPhotos);
+  const [camNang, setCamNang] = useState(null);
+  const [cnActiveTab, setCnActiveTab] = useState('info'); // 'info' | 'history' | 'packing'
+
+  useEffect(() => {
+    let active = true;
+    getCamNangByLocation(provinceName)
+      .then((data) => {
+        if (active) setCamNang(data);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [provinceName]);
 
   useEffect(() => {
     let active = true;
@@ -303,7 +318,7 @@ export function ProvinceGalleryScreen({ theme, isDarkMode, provinceName, onBack,
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* HERO IMAGE */}
         <View style={styles.heroWrapper}>
-          <Image source={getImageSource(photos[0]) || { uri: photos[0] }} style={styles.heroImage} resizeMode="cover" />
+          <Image source={getImageSource(photos[0]) || getSafeImageSource(photos[0])} style={styles.heroImage} resizeMode="cover" />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.85)']}
             style={styles.heroGradient}
@@ -313,32 +328,139 @@ export function ProvinceGalleryScreen({ theme, isDarkMode, provinceName, onBack,
             <Text style={styles.heroSubtitle}>Bộ sưu tập ảnh phong cảnh Việt Nam ({photos.length} ảnh)</Text>
           </View>
 
-          {/* 360° VR Tour floating glassmorphic button */}
-          {tourId && onNavigateToTour && (
-            <Pressable 
+          {/* 360° VR Tour & Directions floating glassmorphic buttons */}
+          <View style={{ position: 'absolute', bottom: 12, right: 12, flexDirection: 'row', gap: 8 }}>
+            <Pressable
               style={styles.vrFloatingBtn}
-              onPress={() => onNavigateToTour(tourId, 0)}
+              onPress={() => {
+                if (onOpenMapDirections) {
+                  onOpenMapDirections(provinceName);
+                } else {
+                  const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(provinceName + ' Việt Nam')}`;
+                  Linking.openURL(url).catch(() => {});
+                }
+              }}
             >
               <LinearGradient
-                colors={['rgba(6, 182, 212, 0.85)', 'rgba(59, 130, 246, 0.85)']}
+                colors={['rgba(16, 185, 129, 0.9)', 'rgba(5, 150, 105, 0.9)']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.vrFloatingBtnGradient}
               >
-                <Sparkles size={14} color="#fff" />
-                <Text style={styles.vrFloatingBtnText}>Tham quan 360° VR</Text>
+                <MapPin size={14} color="#fff" />
+                <Text style={styles.vrFloatingBtnText}>Chỉ đường</Text>
               </LinearGradient>
             </Pressable>
-          )}
+
+            {tourId && onNavigateToTour && (
+              <Pressable 
+                style={styles.vrFloatingBtn}
+                onPress={() => onNavigateToTour(tourId, 0)}
+              >
+                <LinearGradient
+                  colors={['rgba(6, 182, 212, 0.85)', 'rgba(59, 130, 246, 0.85)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.vrFloatingBtnGradient}
+                >
+                  <Sparkles size={14} color="#fff" />
+                  <Text style={styles.vrFloatingBtnText}>Tham quan 360° VR</Text>
+                </LinearGradient>
+              </Pressable>
+            )}
+          </View>
         </View>
 
         {/* TRAVEL INFO CARD */}
         <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <View style={styles.cardHeader}>
             <Sparkles size={18} color="#06b6d4" style={{ marginRight: 8 }} />
-            <Text style={[styles.infoTitle, { color: theme.textPrimary }]}>Thông tin Du lịch</Text>
+            <Text style={[styles.infoTitle, { color: theme.textPrimary }]}>📖 Cẩm Nang Du Lịch {provinceName}</Text>
           </View>
-          <Text style={[styles.infoDesc, { color: theme.textSecondary }]}>{details.description}</Text>
+
+          {/* 3 Tabs Segmented Control */}
+          <View style={{ flexDirection: 'row', backgroundColor: isDarkMode ? '#0f172a' : '#f1f5f9', borderRadius: 12, padding: 3, marginBottom: 14, gap: 4 }}>
+            <Pressable
+              style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 9, backgroundColor: cnActiveTab === 'info' ? '#3b82f6' : 'transparent' }}
+              onPress={() => setCnActiveTab('info')}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '700', color: cnActiveTab === 'info' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') }}>
+                ℹ️ Thông tin
+              </Text>
+            </Pressable>
+            <Pressable
+              style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 9, backgroundColor: cnActiveTab === 'history' ? '#8b5cf6' : 'transparent' }}
+              onPress={() => setCnActiveTab('history')}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '700', color: cnActiveTab === 'history' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') }}>
+                🏛️ Lịch sử
+              </Text>
+            </Pressable>
+            <Pressable
+              style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 9, backgroundColor: cnActiveTab === 'packing' ? '#10b981' : 'transparent' }}
+              onPress={() => setCnActiveTab('packing')}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '700', color: cnActiveTab === 'packing' ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#64748b') }}>
+                🎒 Đồ mang theo
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Tab Content */}
+          {cnActiveTab === 'info' && (
+            <View style={{ gap: 10, marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
+                  <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>🕘 Giờ mở - đóng</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textPrimary, marginTop: 2 }}>
+                    {camNang?.openingHours || '07:00'} - {camNang?.closingHours || '18:00'}
+                  </Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
+                  <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>🎫 Giá vé tham quan</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#10b981', marginTop: 2 }}>
+                    {camNang?.ticketPrice || 'Miễn phí / Tự túc'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
+                <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '700' }}>📐 Diện tích & Quy mô</Text>
+                <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textPrimary, marginTop: 2 }}>
+                  {camNang?.areaSize || 'Quy mô vùng du lịch'}
+                </Text>
+              </View>
+
+              <Text style={[styles.infoDesc, { color: theme.textSecondary, marginTop: 4 }]}>
+                {camNang?.description || details.description}
+              </Text>
+            </View>
+          )}
+
+          {cnActiveTab === 'history' && (
+            <View style={{ backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', padding: 12, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: '#8b5cf6', marginBottom: 14 }}>
+              <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#8b5cf6', marginBottom: 6 }}>🏛️ Lịch Sử Hình Thành & Phát Triển:</Text>
+              <Text style={{ fontSize: 12, lineHeight: 18, color: theme.textSecondary }}>
+                {camNang?.history || `${provinceName} có bề dày lịch sử lâu đời gắn liền với tiến trình văn hóa và dựng nước, giữ nước của dân tộc Việt Nam.`}
+              </Text>
+            </View>
+          )}
+
+          {cnActiveTab === 'packing' && (
+            <View style={{ gap: 6, marginBottom: 14 }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: theme.textPrimary, marginBottom: 4 }}>🎒 Check-list đồ dùng NÊN mang theo:</Text>
+              {Array.isArray(camNang?.itemsToBring) && camNang.itemsToBring.length > 0 ? (
+                camNang.itemsToBring.map((item, idx) => (
+                  <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
+                    <Text style={{ color: '#10b981', fontWeight: '900', fontSize: 11 }}>✔</Text>
+                    <Text style={{ fontSize: 11.5, fontWeight: '600', color: theme.textPrimary }}>{item}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={{ fontSize: 12, color: theme.textSecondary }}>Danh sách đồ dùng đang được cập nhật.</Text>
+              )}
+            </View>
+          )}
 
           {/* ATTRACTIONS SECTION */}
           <Text style={[styles.sectionSubtitle, { color: theme.textPrimary }]}>📍 Điểm tham quan nổi bật:</Text>
@@ -436,7 +558,7 @@ export function ProvinceGalleryScreen({ theme, isDarkMode, provinceName, onBack,
         <View style={styles.gridContainer}>
           {photos.map((photo, index) => (
             <View key={index} style={[styles.gridItem, { borderColor: theme.border }]}>
-              <Image source={getImageSource(photo) || { uri: photo }} style={styles.gridImage} resizeMode="cover" />
+              <Image source={getImageSource(photo) || getSafeImageSource(photo)} style={styles.gridImage} resizeMode="cover" />
             </View>
           ))}
         </View>
@@ -693,3 +815,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 });
+
+
+

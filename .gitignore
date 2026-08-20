@@ -1,22 +1,25 @@
-# expo
-.expo/*
+# node_modules
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# web
-web-build/
+# expo
+.expo/
 dist/
+web-build/
 
 # native
-ios/
-android/
-
-# dependencies
-node_modules/
+*.orig.*
+*.rej
+.idea/
+.vscode/
 
 # local env files
 .env*.local
 
-# sqlite db
+# Local build verification and databases
+.expo-*-check/
+.expo-export-check*/
 travel.db*
+
