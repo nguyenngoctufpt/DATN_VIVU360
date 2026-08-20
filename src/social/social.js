@@ -3,7 +3,14 @@ import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal,
 import { LinearGradient } from 'expo-linear-gradient';
 import { searchFriends } from '../services/userService';
 import { getFriendships, sendFriendRequest, acceptFriendRequest, rejectFriendRequest } from '../services/friendshipService';
-import { getFeed, createPost, togglePostLike, addPostComment } from '../services/postService';
+import {
+  getFeed,
+  createPost,
+  togglePostLike,
+  addPostComment,
+  uploadPostImage,
+} from '../services/postService';
+import * as ImagePicker from 'expo-image-picker';
 import { getSocialNotifications, markSocialNotificationsRead } from '../services/socialNotificationService';
 import { getOrCreateDirectChat } from '../services/chatService';
 import {
@@ -345,6 +352,8 @@ export function SocialScreen({
   const [newContent, setNewContent] = useState('');
   const [newLocation, setNewLocation] = useState('');
   const [newImgUrl, setNewImgUrl] = useState('');
+  const [selectedPostImage, setSelectedPostImage] = useState(null);
+const [isUploadingPostImage, setIsUploadingPostImage] = useState(false);
 
   const [searchText, setSearchText] = useState('');
   const [friendResults, setFriendResults] = useState([]);
@@ -467,30 +476,91 @@ export function SocialScreen({
       Alert.alert('Bài viết', 'Không thể cập nhật lượt thích.');
     }
   };
+  const handlePickPostImage = async () => {
+  try {
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-  // Submit Post
-  const handleSubmitPost = async () => {
-    if (!newContent.trim()) return;
-
-    const defaultImages = [
-      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=600&q=80'
-    ];
-    const finalImg = newImgUrl.trim() || defaultImages[Math.floor(Math.random() * defaultImages.length)];
-
-    try {
-      await createPost(ownerId, { content: newContent, category: newCategory, location: newLocation.trim() || 'Việt Nam', images: [finalImg] });
-      await refreshSocialData();
-      setNewTitle('');
-      setNewContent('');
-      setNewLocation('');
-      setNewImgUrl('');
-      setActiveView('feed');
-    } catch (error) {
-      Alert.alert('Đăng bài', 'Không thể đăng bài. Vui lòng thử lại.');
+    if (!permissionResult.granted) {
+      Alert.alert(
+        'Quyền truy cập ảnh',
+        'Vui lòng cho phép Vivu360 truy cập thư viện ảnh.'
+      );
+      return;
     }
-  };
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets?.length > 0) {
+      setSelectedPostImage(result.assets[0]);
+      setNewImgUrl('');
+    }
+  } catch (error) {
+    console.warn('Không thể chọn ảnh:', error);
+    Alert.alert('Ảnh bài viết', 'Không thể mở thư viện ảnh.');
+  }
+};
+
+    // Submit Post
+const handleSubmitPost = async () => {
+  if (!newContent.trim()) {
+    Alert.alert('Đăng bài', 'Vui lòng nhập nội dung bài viết.');
+    return;
+  }
+
+  try {
+    setIsUploadingPostImage(true);
+
+    let finalImg = '';
+
+    // Nếu người dùng đã chọn ảnh từ thư viện thì upload trước
+    if (selectedPostImage) {
+      finalImg = await uploadPostImage(
+  ownerId,
+  selectedPostImage
+);
+    }
+
+    await createPost(ownerId, {
+      content: newContent.trim(),
+      category: newCategory,
+      location: newLocation.trim() || 'Việt Nam',
+      images: finalImg ? [finalImg] : [],
+    });
+
+    await refreshSocialData();
+
+    // Reset form sau khi đăng thành công
+    setNewTitle('');
+    setNewContent('');
+    setNewLocation('');
+    setNewImgUrl('');
+    setSelectedPostImage(null);
+
+    setActiveView('feed');
+
+  } catch (error) {
+    console.log('===== LỖI ĐĂNG BÀI =====');
+    console.log('message:', error.message);
+    console.log('status:', error.response?.status);
+    console.log('data:', error.response?.data);
+    console.log('========================');
+
+    Alert.alert(
+      'Đăng bài thất bại',
+      error.response?.data?.message ||
+        error.message ||
+        'Không thể đăng bài. Vui lòng thử lại.'
+    );
+
+  } finally {
+    setIsUploadingPostImage(false);
+  }
+};
 
   // Open User Profile view modal
   const handleOpenUserProfile = (user) => {
@@ -1205,7 +1275,9 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
               ]}
               onPress={handleSubmitPost}
             >
-              <Text style={{ color: '#fff', fontSize: 12.5, fontWeight: '800' }}>Đăng bài</Text>
+              <Text style={{ color: '#fff', fontSize: 12.5, fontWeight: '800' }}>
+  {isUploadingPostImage ? 'Đang đăng...' : 'Đăng bài'}
+</Text>
             </Pressable>
           </View>
 
@@ -1308,20 +1380,88 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
               />
             </View>
 
-            {/* Image URL Input */}
-            <Text style={[styles.inputLabel, { color: theme.textSecondary, marginBottom: 6, fontWeight: '700' }]}>
-              Link ảnh bài viết (tùy chọn)
-            </Text>
-            <View style={[styles.formInputGroup, { backgroundColor: theme.searchBg, borderColor: theme.searchBorder, marginBottom: 30 }]}>
-              <ImageIcon size={18} color="#10b981" />
-              <TextInput
-                placeholder="Dán link hình ảnh minh họa bài viết..."
-                placeholderTextColor={theme.textMuted}
-                value={newImgUrl}
-                onChangeText={setNewImgUrl}
-                style={[styles.formTextInput, { color: theme.textPrimary }]}
-              />
-            </View>
+           {/* Chọn ảnh bài viết từ thư viện */}
+<Text
+  style={[
+    styles.inputLabel,
+    {
+      color: theme.textSecondary,
+      marginBottom: 6,
+      fontWeight: '700',
+    },
+  ]}
+>
+  Ảnh bài viết (tùy chọn)
+</Text>
+
+{/* Nút chọn ảnh */}
+<Pressable
+  onPress={handlePickPostImage}
+  style={[
+    styles.formInputGroup,
+    {
+      backgroundColor: theme.searchBg,
+      borderColor: theme.searchBorder,
+      marginBottom: selectedPostImage ? 12 : 30,
+    },
+  ]}
+>
+  <ImageIcon size={18} color="#10b981" />
+
+  <Text
+    style={[
+      styles.formTextInput,
+      {
+        color: selectedPostImage
+          ? theme.textPrimary
+          : theme.textMuted,
+      },
+    ]}
+  >
+    {selectedPostImage
+      ? 'Đã chọn ảnh - Nhấn để chọn ảnh khác'
+      : 'Chọn ảnh từ thư viện điện thoại...'}
+  </Text>
+</Pressable>
+
+{/* Xem trước ảnh đã chọn */}
+{selectedPostImage && (
+  <View
+    style={{
+      position: 'relative',
+      marginBottom: 30,
+    }}
+  >
+    <Image
+      source={{ uri: selectedPostImage.uri }}
+      style={{
+        width: '100%',
+        height: 220,
+        borderRadius: 14,
+        backgroundColor: theme.searchBg,
+      }}
+      resizeMode="cover"
+    />
+
+    {/* Nút X để bỏ ảnh */}
+    <Pressable
+      onPress={() => setSelectedPostImage(null)}
+      style={{
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <X size={18} color="#ffffff" />
+    </Pressable>
+  </View>
+)}
           </ScrollView>
         </Animated.View>
       )}

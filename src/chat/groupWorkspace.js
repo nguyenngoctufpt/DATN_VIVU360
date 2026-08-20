@@ -20,7 +20,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { loadAppData, saveAppData } from '../services/appDataService';
 import { searchFriends } from '../services/userService';
-import { addChatMembers, createChatGroup, getChatGroups, getChatMessages, getGroupNotifications, recallChatMessage, removeChatMember, renameChatGroup, sendChatMessage, updateChatGroupWorkspace, updateChatMessage } from '../services/chatService';
+import {
+  addChatMembers,
+  createChatGroup,
+  getChatGroups,
+  getChatMessages,
+  getGroupNotifications,
+  recallChatMessage,
+  removeChatMember,
+  renameChatGroup,
+  sendChatMessage,
+  uploadChatImage,
+  sendChatImageMessage,
+  updateChatGroupWorkspace,
+  updateChatMessage,
+} from '../services/chatService';
 import { createPoll, getPollsForGroup, votePoll } from '../services/pollService';
 import { isSystemChatEntry, looksLikeSystemAnnouncement, normalizeGroupPreviewText, normalizeSystemAnnouncementText } from '../utils/chatText';
 import { getSafeAvatarSource, getSafeImageSource } from '../utils/image';
@@ -665,6 +679,7 @@ const normalizeLocalMessageEntry = (message, membersList, currentUser, ownerId) 
     user: systemEntry ? 'Hệ thống' : senderProfile.name || message?.user || 'Thành viên Vivu360',
     actorName: senderProfile.name || 'Thành viên',
     avatar: systemEntry ? '' : senderProfile.avatar || message?.avatar || '',
+    mediaUrl: message?.mediaUrl || '',
     text: systemEntry
       ? normalizeSystemAnnouncementText(rawText, senderProfile.name || 'Thành viên')
       : rawText,
@@ -689,6 +704,7 @@ const normalizeApiMessage = (message, currentUser, ownerId, membersList = []) =>
     user: isSystemMessage ? 'H\u1ec7 th\u1ed1ng' : senderProfile.name || 'Th\u00e0nh vi\u00ean Vivu360',
     actorName: senderProfile.name || 'Th\u00e0nh vi\u00ean',
     avatar: isSystemMessage ? '' : senderProfile.avatar || '',
+    mediaUrl: message.mediaUrl || '',
     text: isSystemMessage
       ? normalizeSystemAnnouncementText(rawText, senderProfile.name || 'Th\u00e0nh vi\u00ean')
       : rawText,
@@ -859,6 +875,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const [isSearchingMembers, setIsSearchingMembers] = useState(false);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isUploadingChatImage, setIsUploadingChatImage] = useState(false);
 
   const [fundGoalInput, setFundGoalInput] = useState('');
   const [selectedFundMemberId, setSelectedFundMemberId] = useState(getCurrentUserMemberId(currentUser, ownerId));
@@ -1183,6 +1200,89 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
       setIsSendingMessage(false);
     }
   };
+
+  const handlePickChatImage = async () => {
+  if (!selectedGroup || isUploadingChatImage) {
+    return;
+  }
+
+  try {
+    const permission =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        'Quyền truy cập ảnh',
+        'Vui lòng cho phép Vivu360 truy cập thư viện ảnh.'
+      );
+      return;
+    }
+
+    const result =
+      await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+    if (result.canceled || !result.assets?.length) {
+      return;
+    }
+
+    setIsUploadingChatImage(true);
+
+    const imageAsset = result.assets[0];
+
+    const imageUrl = await uploadChatImage(
+      selectedGroup.id,
+      ownerId,
+      imageAsset
+    );
+
+    const sent = await sendChatImageMessage(
+      selectedGroup.id,
+      ownerId,
+      imageUrl
+    );
+
+    const newMessage = normalizeApiMessage(
+      {
+        ...sent,
+        sender: {
+          name: currentUser?.name,
+          avatar: currentUser?.avatar,
+        },
+      },
+      currentUser,
+      ownerId,
+      selectedGroup.membersList
+    );
+
+    updateGroupById(selectedGroup.id, group => ({
+      ...group,
+      lastMessage: `${newMessage.user}: Đã gửi một ảnh`,
+      messages: mergeChatEntries(
+        group.messages,
+        [newMessage]
+      ),
+    }));
+
+  } catch (error) {
+    console.log('===== LỖI GỬI ẢNH CHAT =====');
+    console.log('message:', error.message);
+    console.log('status:', error.response?.status);
+    console.log('data:', error.response?.data);
+
+    Alert.alert(
+      'Gửi ảnh thất bại',
+      error.response?.data?.message ||
+        error.message ||
+        'Không thể gửi ảnh. Vui lòng thử lại.'
+    );
+  } finally {
+    setIsUploadingChatImage(false);
+  }
+};
 
   // Poll handlers
   const handleAddPollOption = () => {
@@ -2099,7 +2199,23 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                                 onLongPress={() => handleLongPress(message)}
                               >
                                 <LinearGradient colors={['#06b6d4', '#3b82f6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.msgBubble, styles.msgBubbleMe]}>
-                                  {sharedLocation ? renderSharedLocationCard(sharedLocation, true) : <Text style={styles.msgTextMe}>{displayMessageText}</Text>}
+                                  {message.type === 'image' && message.mediaUrl ? (
+  <Image
+    source={{ uri: message.mediaUrl }}
+    style={{
+      width: 220,
+      height: 220,
+      borderRadius: 14,
+    }}
+    resizeMode="cover"
+  />
+) : sharedLocation ? (
+  renderSharedLocationCard(sharedLocation, true)
+) : (
+  <Text style={styles.msgTextMe}>
+    {displayMessageText}
+  </Text>
+)}
                                 </LinearGradient>
                                 <View style={styles.msgMetaMe}>
                                   <Text style={[styles.msgTimeTextMe, { color: theme.textMuted }]}>{messageTime}</Text>
@@ -2141,7 +2257,28 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                                     },
                                   ]}
                                 >
-                                  {sharedLocation ? renderSharedLocationCard(sharedLocation, false) : <Text style={[styles.msgTextContent, { color: theme.textPrimary }]}>{displayMessageText}</Text>}
+                                  {message.type === 'image' && message.mediaUrl ? (
+  <Image
+    source={{ uri: message.mediaUrl }}
+    style={{
+      width: 220,
+      height: 220,
+      borderRadius: 14,
+    }}
+    resizeMode="cover"
+  />
+) : sharedLocation ? (
+  renderSharedLocationCard(sharedLocation, false)
+) : (
+  <Text
+    style={[
+      styles.msgTextContent,
+      { color: theme.textPrimary },
+    ]}
+  >
+    {displayMessageText}
+  </Text>
+)}
                                 </View>
                                 <Text style={[styles.msgTimeTextOther, { color: theme.textMuted }]}>{messageTime}</Text>
                                 {message.isEdited && <Text style={[styles.msgTimeTextOther, { fontSize: 9 }]}> (đã sửa)</Text>}
@@ -2170,11 +2307,28 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                   <View style={[styles.chatInputWrapper, { backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)', borderTopColor: theme.border }]}>
                     <View style={styles.chatInputInnerRow}>
                       <Pressable
-                        style={[styles.chatInputAttachBtn, { backgroundColor: theme.searchBg }]}
-                        onPress={() => Alert.alert('Đính kèm tệp', 'Tính năng đính kèm tệp đang được chuẩn bị cho nhóm chat.')}
-                      >
-                        <Paperclip size={16} color={theme.textSecondary} />
-                      </Pressable>
+  disabled={isUploadingChatImage}
+  style={[
+    styles.chatInputAttachBtn,
+    { backgroundColor: theme.searchBg },
+    isUploadingChatImage && {
+      opacity: 0.5,
+    },
+  ]}
+  onPress={handlePickChatImage}
+>
+  {isUploadingChatImage ? (
+    <ActivityIndicator
+      size="small"
+      color="#3b82f6"
+    />
+  ) : (
+    <Paperclip
+      size={16}
+      color={theme.textSecondary}
+    />
+  )}
+</Pressable>
                       <Pressable
                         style={[styles.chatInputAttachBtn, { backgroundColor: theme.searchBg, marginRight: 4 }]}
                         onPress={() => Alert.alert('Chụp ảnh', 'Tính năng chia sẻ ảnh trực tiếp đang được hoàn thiện.')}
