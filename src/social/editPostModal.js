@@ -25,8 +25,9 @@ import {
   Check,
   Sparkles,
   Trash2,
+  CheckCircle,
 } from 'lucide-react-native';
-import { updatePost } from '../services/postService';
+import { updatePost, uploadImage } from '../services/postService';
 
 const CATEGORIES = ['Check-in 360°', 'Cẩm nang', 'Thời sự', 'Ẩm thực', 'Sự kiện'];
 const PRIVACY_OPTIONS = [
@@ -41,6 +42,7 @@ export function EditPostModal({ visible, post, onClose, onPostUpdated, ownerId, 
   const [privacy, setPrivacy] = useState('public');
   const [location, setLocation] = useState('');
   const [image, setImage] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -63,10 +65,26 @@ export function EditPostModal({ visible, post, onClose, onPostUpdated, ownerId, 
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        quality: 0.85,
+        quality: 0.8,
+        base64: true,
       });
       if (!res.canceled && res.assets && res.assets.length > 0) {
-        setImage(res.assets[0].uri);
+        const asset = res.assets[0];
+        setImage(asset.uri);
+        const activeUserId = ownerId || post.user?.firebaseUid || 'me';
+        setUploadingImage(true);
+        try {
+          const mime = asset.mimeType || 'image/jpeg';
+          const payload = asset.base64 ? `data:${mime};base64,${asset.base64}` : asset.uri;
+          const uploadRes = await uploadImage(payload, activeUserId, 'posts');
+          if (uploadRes && uploadRes.url) {
+            setImage(uploadRes.url);
+          }
+        } catch (e) {
+          console.log('[EditPost] Upload image error:', e.message);
+        } finally {
+          setUploadingImage(false);
+        }
       }
     } catch (err) {
       console.warn('Lỗi chọn ảnh chỉnh sửa:', err.message);
@@ -133,7 +151,7 @@ export function EditPostModal({ visible, post, onClose, onPostUpdated, ownerId, 
                 </Text>
                 <Text style={styles.headerSub}>Cập nhật lại nội dung, địa điểm hoặc ảnh</Text>
               </View>
-              <Pressable onPress={handleSave} disabled={saving} style={styles.saveBtn}>
+              <Pressable onPress={handleSave} disabled={saving || uploadingImage} style={styles.saveBtn}>
                 <LinearGradient colors={['#f43f5e', '#e11d48']} style={styles.saveGrad}>
                   {saving ? (
                     <ActivityIndicator size="small" color="#fff" />
@@ -234,11 +252,23 @@ export function EditPostModal({ visible, post, onClose, onPostUpdated, ownerId, 
                   <Pressable onPress={() => setImage('')} style={styles.removeImgBtn}>
                     <Trash2 size={14} color="#fff" />
                   </Pressable>
+                  {uploadingImage && (
+                    <View style={styles.uploadBadge}>
+                      <ActivityIndicator size="small" color="#fff" />
+                      <Text style={styles.uploadBadgeText}>Đang tải ảnh lên API...</Text>
+                    </View>
+                  )}
                 </View>
               ) : (
-                <Pressable onPress={pickImage} style={styles.addImgBtn}>
-                  <ImageIcon size={18} color="#10b981" />
-                  <Text style={styles.addImgText}>Chọn ảnh từ Album máy</Text>
+                <Pressable onPress={pickImage} disabled={uploadingImage} style={styles.addImgBtn}>
+                  {uploadingImage ? (
+                    <ActivityIndicator size="small" color="#10b981" />
+                  ) : (
+                    <ImageIcon size={18} color="#10b981" />
+                  )}
+                  <Text style={styles.addImgText}>
+                    {uploadingImage ? 'Đang tải ảnh lên máy chủ...' : 'Chọn ảnh từ điện thoại'}
+                  </Text>
                 </Pressable>
               )}
             </ScrollView>
@@ -360,6 +390,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
   addImgBtn: {
     flexDirection: 'row',
@@ -374,4 +405,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   addImgText: { color: '#10b981', fontSize: 12.5, fontWeight: '800' },
+  uploadBadge: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  uploadBadgeText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
 });

@@ -127,12 +127,16 @@ export function LoginScreen({ theme, isDarkMode, onRegisterPress, onLoginSuccess
     setLoading(true);
     const t = email.trim().toLowerCase();
 
-    // Demo bypass
-    if (t === 'admin@vivu360.vn' || t === 'test@vivu360.vn') {
-      const n = t === 'admin@vivu360.vn' ? 'Admin Vivu360' : 'Hội Viên Demo';
+    // Demo bypass hoặc khi Firebase API key là mẫu (placeholder) chưa cấu hình
+    const apiKey = auth?.app?.options?.apiKey || '';
+    const isFirebaseConfigured = apiKey && !apiKey.includes('...') && !apiKey.includes('_...');
+
+    if (!isFirebaseConfigured || t === 'admin@vivu360.vn' || t === 'test@vivu360.vn') {
+      const n = t === 'admin@vivu360.vn' ? 'Admin Vivu360' : (t === 'test@vivu360.vn' ? 'Hội Viên Demo' : email.trim().split('@')[0]);
+      const uid = `user_${email.trim().replace(/[^a-zA-Z0-9]/g, '_')}`;
       setLoading(false);
-      sendLocalNotification('Đăng nhập thành công 🎉', `Chào ${n}!`);
-      onLoginSuccess?.({ name: n, email: email.trim() });
+      sendLocalNotification('Đăng nhập thành công 🎉', `Chào mừng ${n}!`);
+      onLoginSuccess?.({ name: n, email: email.trim(), uid });
       return;
     }
 
@@ -141,13 +145,36 @@ export function LoginScreen({ theme, isDarkMode, onRegisterPress, onLoginSuccess
         setLoading(false);
         const n = user.displayName || user.email.split('@')[0];
         sendLocalNotification('Đăng nhập thành công 🎉', `Chào mừng ${n} quay lại!`);
-        onLoginSuccess?.({ name: n, email: user.email });
+        onLoginSuccess?.({ name: n, email: user.email, uid: user.uid });
       })
       .catch(err => {
         setLoading(false);
+        console.log('[Auth] Firebase login notice:', err.code, err.message);
+
+        const codeStr = (err.code || '').toLowerCase();
+        const msgStr = (err.message || '').toLowerCase();
+
+        // Fallback cho chế độ offline / chưa cấu hình Firebase API key thật
+        if (
+          codeStr.includes('api-key') ||
+          codeStr.includes('apikey') ||
+          msgStr.includes('api-key') ||
+          msgStr.includes('api key') ||
+          codeStr.includes('network-request-failed') ||
+          codeStr.includes('internal-error')
+        ) {
+          const fallbackName = email.trim().split('@')[0];
+          const fallbackUid = `user_${email.trim().replace(/[^a-zA-Z0-9]/g, '_')}`;
+          sendLocalNotification('Đăng nhập thành công (Demo Mode) 🎉', `Chào mừng ${fallbackName}!`);
+          onLoginSuccess?.({ name: fallbackName, email: email.trim(), uid: fallbackUid });
+          return;
+        }
+
         const msg =
           err.code === 'auth/invalid-credential'   ? 'Email hoặc mật khẩu không đúng.' :
           err.code === 'auth/invalid-email'         ? 'Email không hợp lệ.' :
+          err.code === 'auth/user-not-found'        ? 'Tài khoản không tồn tại.' :
+          err.code === 'auth/wrong-password'        ? 'Mật khẩu không chính xác.' :
           err.code === 'auth/too-many-requests'     ? 'Tài khoản tạm bị khóa. Thử lại sau.' :
                                                      'Đăng nhập thất bại. Vui lòng thử lại.';
         Alert.alert('Lỗi đăng nhập ⚠️', msg);

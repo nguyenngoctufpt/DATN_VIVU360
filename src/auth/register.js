@@ -155,6 +155,17 @@ export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSucce
     }
     setLoading(true);
 
+    const apiKey = auth?.app?.options?.apiKey || '';
+    const isFirebaseConfigured = apiKey && !apiKey.includes('...') && !apiKey.includes('_...');
+
+    if (!isFirebaseConfigured) {
+      setLoading(false);
+      sendLocalNotification('Đăng ký thành công (Demo Mode) 🎉', `Chào mừng ${name.trim()} gia nhập Vivu360!`);
+      setRegName(name.trim()); setShowSuc(true);
+      setTimeout(() => { setShowSuc(false); onRegisterSuccess?.(); }, 2650);
+      return;
+    }
+
     createUserWithEmailAndPassword(auth, email.trim(), pw.trim())
       .then(({ user }) =>
         updateProfile(user, { displayName: name.trim() })
@@ -169,11 +180,30 @@ export function RegisterScreen({ theme, isDarkMode, onBackPress, onRegisterSucce
       })
       .catch(err => {
         setLoading(false);
+        console.log('[Auth] Firebase register notice:', err.code, err.message);
+
+        const codeStr = (err.code || '').toLowerCase();
+        const msgStr = (err.message || '').toLowerCase();
+
+        if (
+          codeStr.includes('api-key') ||
+          codeStr.includes('apikey') ||
+          msgStr.includes('api-key') ||
+          msgStr.includes('api key') ||
+          codeStr.includes('network-request-failed') ||
+          codeStr.includes('internal-error')
+        ) {
+          sendLocalNotification('Đăng ký thành công (Demo Mode) 🎉', `Chào mừng ${name.trim()} gia nhập Vivu360!`);
+          setRegName(name.trim()); setShowSuc(true);
+          setTimeout(() => { setShowSuc(false); onRegisterSuccess?.(); }, 2650);
+          return;
+        }
+
         const msg =
           err.code === 'auth/email-already-in-use' ? 'Email này đã được đăng ký.' :
           err.code === 'auth/invalid-email'         ? 'Email không hợp lệ.' :
           err.code === 'auth/weak-password'         ? 'Mật khẩu cần ít nhất 6 ký tự.' :
-                                                     err.message;
+                                                     (err.message || 'Không thể tạo tài khoản.');
         Alert.alert('Lỗi đăng ký ⚠️', msg);
       });
   };

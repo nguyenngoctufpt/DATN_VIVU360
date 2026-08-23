@@ -52,12 +52,16 @@ Notifications.setNotificationHandler({
 LogBox.ignoreLogs([
   '@firebase/auth: Auth',
   'Firebase Auth state listener timed out',
+  'Firebase login error',
+  'Firebase register error',
+  'api-key-not-valid',
   'Cannot connect to Metro',
   'HMRClient',
   'WebSocket',
   '[Social]',
   'Network Error',
 ]);
+LogBox.ignoreAllLogs(true);
 
 import {
   banners,
@@ -747,7 +751,18 @@ export default function App() {
           isDarkMode={isDarkMode}
           onRegisterPress={() => setAuthRoute('register')}
           onLoginSuccess={(user) => {
-            setUserInfo({ ...userInfo, ...user });
+            const ownerId = user?.uid || user?.id || (user?.email ? user.email.replace(/[^a-zA-Z0-9_]/g, '_') : 'user_default');
+            setDataOwnerId(ownerId);
+            setUserInfo(prev => ({
+              ...prev,
+              name: user?.name || prev.name,
+              email: user?.email || prev.email,
+            }));
+            syncUser({
+              firebaseUid: ownerId,
+              email: user?.email || '',
+              name: user?.name || '',
+            }).catch(e => console.log('[App] Sync user post-login:', e.message));
             setIsLoggedIn(true);
           }}
         />

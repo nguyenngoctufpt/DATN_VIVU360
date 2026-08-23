@@ -3,6 +3,11 @@ import { loadAppData } from './appDataService';
 
 const auth = userId => ({ headers: { 'x-user-id': String(userId || 'guest_user').trim() } });
 
+export async function uploadImage(imagePayload, userId, folder = 'posts') {
+  const response = await api.post('/upload', { image: imagePayload, folder }, auth(userId));
+  return response.data.data;
+}
+
 export async function getFeed(userId) {
   try {
     const response = await api.get('/posts/feed', auth(userId));
@@ -75,28 +80,28 @@ export function mapMongoPostToFeedPost(mPost) {
     id: mPost._id || mPost.id,
     _id: mPost._id || mPost.id,
     authorId: mPost.authorId || mPost.user?.firebaseUid || null,
-    title: mPost.title || (mPost.content ? (mPost.content.length > 50 ? mPost.content.slice(0, 50) + '...' : mPost.content) : 'B?n tin du l?ch'),
-    category: mPost.category || 'Check-in 360�',
+    title: mPost.title || (mPost.content ? (mPost.content.length > 50 ? mPost.content.slice(0, 50) + '...' : mPost.content) : 'Bản tin du lịch'),
+    category: mPost.category || 'Check-in 360°',
     privacy: mPost.privacy || 'public',
-    source: mPost.author?.name || mPost.user?.name || 'Th�nh vi�n Vivu360',
-    time: mPost.createdAt ? new Date(mPost.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' � ' + new Date(mPost.createdAt).toLocaleDateString() : 'V?a xong',
-    location: mPost.location || 'Vi?t Nam',
+    source: mPost.author?.name || mPost.user?.name || 'Thành viên Vivu360',
+    time: mPost.createdAt ? new Date(mPost.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' + new Date(mPost.createdAt).toLocaleDateString() : 'Vừa xong',
+    location: mPost.location || 'Việt Nam',
     content: mPost.content || '',
     image: firstImage,
-    images: firstImage ? [firstImage] : [],
+    images: mPost.images || (firstImage ? [firstImage] : []),
     likes: mPost.likesCount !== undefined ? mPost.likesCount : (Array.isArray(mPost.likes) ? mPost.likes.length : 0),
     commentsCount: mPost.commentsCount !== undefined ? mPost.commentsCount : (Array.isArray(mPost.comments) ? mPost.comments.length : 0),
     likedByUser: mPost.likedByMe || false,
     comments: (mPost.comments || []).map(c => ({
       id: c._id || c.id || Date.now(),
-      user: c.author?.name || c.user || 'B?n d?c',
+      user: c.author?.name || c.user || 'Bạn đọc',
       text: c.text || c.content || ''
     })),
     user: {
       firebaseUid: mPost.authorId || mPost.user?.firebaseUid,
-      name: mPost.author?.name || mPost.user?.name || 'Th�nh vi�n Vivu360',
+      name: mPost.author?.name || mPost.user?.name || 'Thành viên Vivu360',
       avatar: userAvatar,
-      level: mPost.author?.level || mPost.user?.level || 'C?p 1',
+      level: mPost.author?.level || mPost.user?.level || 'Cấp 1',
     }
   };
 }

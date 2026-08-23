@@ -29,9 +29,9 @@ import {
   Lock,
   ArrowLeft,
   Sparkles,
+  CloudUpload,
 } from 'lucide-react-native';
-import { createPost as apiCreatePost, mapMongoPostToFeedPost } from '../services/postService';
-import { createPost } from '../services/postService';
+import { createPost, uploadImage, mapMongoPostToFeedPost } from '../services/postService';
 
 const { width } = Dimensions.get('window');
 
@@ -83,6 +83,8 @@ export function CreatePostModal({
   const [content, setContent] = useState('');
   const [location, setLocation] = useState('');
   const [imgUrl, setImgUrl] = useState('');
+  const [uploadedApiUrl, setUploadedApiUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handlePickImage = async () => {
@@ -95,10 +97,32 @@ export function CreatePostModal({
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        quality: 0.85,
+        quality: 0.8,
+        base64: true,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setImgUrl(result.assets[0].uri);
+        const asset = result.assets[0];
+        setImgUrl(asset.uri);
+        setUploadedApiUrl('');
+
+        const activeOwnerId = ownerId || currentUser?.firebaseUid || currentUser?.id || 'me';
+        setIsUploading(true);
+
+        try {
+          const mime = asset.mimeType || 'image/jpeg';
+          const payload = asset.base64
+            ? `data:${mime};base64,${asset.base64}`
+            : asset.uri;
+
+          const uploadResult = await uploadImage(payload, activeOwnerId, 'posts');
+          if (uploadResult && uploadResult.url) {
+            setUploadedApiUrl(uploadResult.url);
+          }
+        } catch (uploadErr) {
+          console.log('[CreatePost] Tải ảnh lên API thất bại, sẽ dùng đường dẫn tạm:', uploadErr.message);
+        } finally {
+          setIsUploading(false);
+        }
       }
     } catch (e) {
       Alert.alert('Lỗi', 'Không thể chọn ảnh từ thiết bị.');
@@ -121,7 +145,7 @@ export function CreatePostModal({
       'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=800&q=80',
     ];
-    const finalImg = imgUrl.trim() || defaultImages[Math.floor(Math.random() * defaultImages.length)];
+    const finalImg = uploadedApiUrl || imgUrl.trim() || defaultImages[Math.floor(Math.random() * defaultImages.length)];
     const postTitle = title.trim() || (trimmedContent.length > 40 ? trimmedContent.slice(0, 40) + '...' : 'Bản tin du lịch 360°');
     const postLocation = location.trim() || 'Việt Nam';
 
@@ -160,6 +184,7 @@ export function CreatePostModal({
     setTitle('');
     setLocation('');
     setImgUrl('');
+    setUploadedApiUrl('');
     setContent('');
     setPrivacy('public');
     setIsSubmitting(false);
@@ -216,9 +241,9 @@ export function CreatePostModal({
             </View>
 
             <Pressable
-              style={[styles.submitBtnWrap, isSubmitting && { opacity: 0.6 }]}
+              style={[styles.submitBtnWrap, (isSubmitting || isUploading) && { opacity: 0.6 }]}
               onPress={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploading}
             >
               <LinearGradient
                 colors={['#f43f5e', '#e11d48']}
@@ -422,29 +447,48 @@ export function CreatePostModal({
 
             {/* Image Upload Box */}
             <Text style={[styles.sectionLabel, { color: theme.textPrimary }]}>🖼️ Hình ảnh bài viết</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 14 }}>
               <Pressable
                 onPress={handlePickImage}
+                disabled={isUploading}
                 style={[
                   styles.uploadBtn,
                   {
                     backgroundColor: isDarkMode ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)',
                     borderColor: '#6366f1',
+                    opacity: isUploading ? 0.6 : 1,
                   }
                 ]}
               >
-                <Camera size={20} color="#6366f1" />
-                <Text style={styles.uploadBtnText}>Tải ảnh từ Album máy</Text>
+                {isUploading ? (
+                  <ActivityIndicator size="small" color="#6366f1" />
+                ) : (
+                  <Camera size={20} color="#6366f1" />
+                )}
+                <Text style={styles.uploadBtnText}>
+                  {isUploading ? 'Đang tải ảnh lên máy chủ...' : 'Tải ảnh từ điện thoại'}
+                </Text>
               </Pressable>
             </View>
 
-            {/* Preview Image Thumbnail */}
+            {/* Preview Image Thumbnail & Status */}
             {imgUrl.length > 0 && (
               <View style={styles.previewContainer}>
                 <Image source={{ uri: imgUrl }} style={styles.previewImage} />
-                <Pressable style={styles.removeImgBtn} onPress={() => setImgUrl('')}>
+                <Pressable style={styles.removeImgBtn} onPress={() => { setImgUrl(''); setUploadedApiUrl(''); }}>
                   <X size={14} color="#ffffff" />
                 </Pressable>
+                {isUploading ? (
+                  <View style={styles.uploadBadge}>
+                    <ActivityIndicator size="small" color="#ffffff" />
+                    <Text style={styles.uploadBadgeText}>Đang lưu ảnh lên API...</Text>
+                  </View>
+                ) : uploadedApiUrl ? (
+                  <View style={[styles.uploadBadge, { backgroundColor: 'rgba(16,185,129,0.85)' }]}>
+                    <CheckCircle size={14} color="#ffffff" />
+                    <Text style={styles.uploadBadgeText}>Đã lưu trữ trên API máy chủ</Text>
+                  </View>
+                ) : null}
               </View>
             )}
 
@@ -660,7 +704,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     borderRadius: 18,
     overflow: 'hidden',
-    height: 180,
+    height: 190,
     marginBottom: 16,
   },
   previewImage: {
@@ -677,5 +721,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.65)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
+  },
+  uploadBadge: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  uploadBadgeText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
