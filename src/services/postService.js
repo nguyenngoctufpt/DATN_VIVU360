@@ -36,3 +36,13 @@ export async function addPostComment(userId, postId, text) {
   const response = await api.post(`/posts/${postId}/comments`, { text }, auth(userId));
   return response.data.data;
 }
+
+export async function editComment(userId, postId, commentId, text) {
+  const response = await api.put(`/posts/${postId}/comments/${commentId}`, { text }, auth(userId));
+  return response.data.data;
+}
+
+export async function deleteComment(userId, postId, commentId) {
+  const response = await api.delete(`/posts/${postId}/comments/${commentId}`, auth(userId));
+  return response.data;
+}

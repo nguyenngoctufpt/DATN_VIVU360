@@ -3,7 +3,7 @@ import { View, Text, Image, Pressable, ScrollView, StyleSheet, TextInput, Modal,
 import { LinearGradient } from 'expo-linear-gradient';
 import { searchFriends } from '../services/userService';
 import { getFriendships, sendFriendRequest, acceptFriendRequest, rejectFriendRequest } from '../services/friendshipService';
-import { getFeed, createPost, togglePostLike, addPostComment, editPost, deletePost } from '../services/postService';
+import { getFeed, createPost, togglePostLike, addPostComment, editPost, deletePost, editComment, deleteComment } from '../services/postService';
 import { getSocialNotifications, markSocialNotificationsRead } from '../services/socialNotificationService';
 import { getOrCreateDirectChat } from '../services/chatService';
 import {
@@ -264,10 +264,22 @@ export function SocialScreen({
   const blockedUserIdSet = useMemo(() => new Set(blockedUserIds || []), [blockedUserIds]);
 
   const normalizeFeed = feed => feed.map(post => ({
-    ...post, id: post._id, image: post.images?.[0] || '', likes: post.likesCount || 0,
-    likedByUser: Boolean(post.likedByMe), time: new Date(post.createdAt).toLocaleString('vi-VN'),
-    title: post.category || 'Hành trình mới', user: post.author || {},
-    comments: (post.comments || []).map(comment => ({ id: comment._id, user: comment.author?.name || 'Thành viên Vivu360', avatar: comment.author?.avatar, text: comment.text, createdAt: comment.createdAt })),
+    ...post,
+    id: post._id,
+    image: post.images?.[0] || '',
+    likes: post.likesCount || 0,
+    likedByUser: Boolean(post.likedByMe),
+    time: new Date(post.createdAt).toLocaleString('vi-VN'),
+    title: post.category || 'Hành trình mới',
+    user: post.author || {},
+    comments: (post.comments || []).map(comment => ({
+      id: comment._id,
+      user: comment.author?.name || 'Thành viên Vivu360',
+      avatar: comment.author?.avatar,
+      text: comment.text,
+      createdAt: comment.createdAt,
+      authorId: comment.author?.firebaseUid
+    })),
   }));
 
   const refreshSocialData = async () => {
@@ -372,6 +384,11 @@ export function SocialScreen({
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [reportingPostId, setReportingPostId] = useState(null);
   const [reportedPosts, setReportedPosts] = useState(new Set());
+
+  const [commentMenuVisible, setCommentMenuVisible] = useState(false);
+  const [selectedComment, setSelectedComment] = useState(null);
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editCommentText, setEditCommentText] = useState('');
 
   const relationFor = userId => friendships.find(item => item.users?.includes(userId));
 
@@ -608,19 +625,103 @@ export function SocialScreen({
     setCommentModalVisible(true);
   };
 
+  const openCommentMenu = (comment) => {
+    setSelectedComment(comment);
+    setCommentMenuVisible(true);
+  };
+
   // Submit dynamic comment
   const handleSendComment = async () => {
     if (!commentInput.trim() || !selectedPost) return;
     const text = commentInput.trim();
     try {
       const saved = await addPostComment(ownerId, selectedPost.id, text);
-      const newComment = { id: saved._id, user: saved.author?.name || currentUser.name, avatar: saved.author?.avatar, text: saved.text, createdAt: saved.createdAt };
+      const newComment = {
+        id: saved._id,
+        user: saved.author?.name || currentUser.name,
+        avatar: saved.author?.avatar,
+        text: saved.text,
+        createdAt: saved.createdAt,
+        authorId: saved.author?.firebaseUid || ownerId
+      };
       setPosts(items => items.map(post => post.id === selectedPost.id ? { ...post, comments: [...(post.comments || []), newComment], commentsCount: (post.comments || []).length + 1 } : post));
       setSelectedPost(post => ({ ...post, comments: [...(post.comments || []), newComment], commentsCount: (post.comments || []).length + 1 }));
       setCommentInput('');
     } catch (error) {
       Alert.alert('Bình luận', 'Không thể gửi bình luận. Vui lòng thử lại.');
     }
+  };
+
+  const handleEditComment = () => {
+    if (!selectedComment) return;
+    setEditingCommentId(selectedComment.id);
+    setEditCommentText(selectedComment.text);
+    setCommentMenuVisible(false);
+  };
+
+  const handleSaveEditedComment = async () => {
+    if (!editCommentText.trim() || !selectedPost || !editingCommentId) return;
+    try {
+      const updated = await editComment(ownerId, selectedPost.id, editingCommentId, editCommentText.trim());
+      // Cập nhật state
+      const updateComment = (comments) =>
+        comments.map(c =>
+          c.id === editingCommentId ? { ...c, text: updated.text } : c
+        );
+      setPosts(items =>
+        items.map(post =>
+          post.id === selectedPost.id
+            ? { ...post, comments: updateComment(post.comments) }
+            : post
+        )
+      );
+      setSelectedPost(post => ({
+        ...post,
+        comments: updateComment(post.comments)
+      }));
+      setEditingCommentId(null);
+      setEditCommentText('');
+    } catch (error) {
+      Alert.alert('Lỗi', 'Không thể sửa bình luận. Vui lòng thử lại.');
+    }
+  };
+
+  const handleDeleteComment = () => {
+    if (!selectedComment || !selectedPost) return;
+    Alert.alert(
+      'Xóa bình luận',
+      'Bạn có chắc muốn xóa bình luận này?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteComment(ownerId, selectedPost.id, selectedComment.id);
+              // Cập nhật state
+              const filterComments = (comments) => comments.filter(c => c.id !== selectedComment.id);
+              setPosts(items =>
+                items.map(post =>
+                  post.id === selectedPost.id
+                    ? { ...post, comments: filterComments(post.comments), commentsCount: post.comments.length - 1 }
+                    : post
+                )
+              );
+              setSelectedPost(post => ({
+                ...post,
+                comments: filterComments(post.comments),
+                commentsCount: post.comments.length - 1
+              }));
+              setCommentMenuVisible(false);
+              setSelectedComment(null);
+            } catch (error) {
+              Alert.alert('Lỗi', 'Không thể xóa bình luận. Vui lòng thử lại.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   // Native Post Sharing handler
@@ -1191,29 +1292,42 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
                       Chưa có ý kiến nào. Hãy là người đầu tiên! 💬
                     </Text>
                   ) : (
-                    selectedPost.comments && selectedPost.comments.map((comment) => (
-                      <View key={comment.id} style={{ flexDirection: 'row', gap: 10 }}>
-                        <Pressable onPress={() => { setCommentModalVisible(false); handleOpenUserProfile(comment.user); }}>
-                          <Image
-                            source={getSafeAvatarSource(comment.user === currentUser.name ? currentUser.avatar : getUserAvatarByName(comment.user))}
-                            style={styles.authorAvatarMini}
-                          />
-                        </Pressable>
-                        <View style={{ flex: 1, backgroundColor: theme.searchBg, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: theme.border }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Pressable onPress={() => { setCommentModalVisible(false); handleOpenUserProfile(comment.user); }}>
-                              <Text style={[styles.postUserName, { color: theme.textPrimary, fontSize: 11.5 }]}>{comment.user}</Text>
-                            </Pressable>
-                            {isSourceVerified(comment.user) && (
-                              <CheckCircle size={10} color="#fff" fill="#1877f2" />
-                            )}
+                    selectedPost.comments && selectedPost.comments.map((comment) => {
+                      return (
+                        <View key={comment.id} style={{ flexDirection: 'row', gap: 10 }}>
+                          <Pressable onPress={() => { setCommentModalVisible(false); handleOpenUserProfile(comment.user); }}>
+                            <Image
+                              source={getSafeAvatarSource(comment.user === currentUser.name ? currentUser.avatar : getUserAvatarByName(comment.user))}
+                              style={styles.authorAvatarMini}
+                            />
+                          </Pressable>
+                          <View style={{ flex: 1, backgroundColor: theme.searchBg, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: theme.border }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <Pressable onPress={() => { setCommentModalVisible(false); handleOpenUserProfile(comment.user); }}>
+                                  <Text style={[styles.postUserName, { color: theme.textPrimary, fontSize: 11.5 }]}>{comment.user}</Text>
+                                </Pressable>
+                                {isSourceVerified(comment.user) && (
+                                  <CheckCircle size={10} color="#fff" fill="#1877f2" />
+                                )}
+                              </View>
+
+                              {comment.authorId === ownerId && (
+                                <Pressable
+                                  onPress={() => openCommentMenu(comment)}
+                                  style={{ padding: 4 }}
+                                >
+                                  <MoreVertical size={14} color={theme.textSecondary} />
+                                </Pressable>
+                              )}
+                            </View>
+                            <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 2, fontWeight: '500', lineHeight: 15 }}>
+                              {comment.text}
+                            </Text>
                           </View>
-                          <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 2, fontWeight: '500', lineHeight: 15 }}>
-                            {comment.text}
-                          </Text>
                         </View>
-                      </View>
-                    ))
+                      )
+                    })
                   )}
                 </View>
               </ScrollView>
@@ -1421,6 +1535,77 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
                 </View>
               )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MENU BÌNH LUẬN */}
+      <Modal
+        visible={commentMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCommentMenuVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setCommentMenuVisible(false)}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+            <View style={[styles.commentMenuCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Pressable
+                style={styles.commentMenuItem}
+                onPress={handleEditComment}
+              >
+                <Edit size={18} color={theme.textPrimary} />
+                <Text style={[styles.commentMenuItemText, { color: theme.textPrimary }]}>Sửa bình luận</Text>
+              </Pressable>
+              <View style={[styles.commentMenuDivider, { backgroundColor: theme.border }]} />
+              <Pressable
+                style={styles.commentMenuItem}
+                onPress={handleDeleteComment}
+              >
+                <Trash2 size={18} color="#ef4444" />
+                <Text style={[styles.commentMenuItemText, { color: '#ef4444' }]}>Xóa bình luận</Text>
+              </Pressable>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* MODAL CHỈNH SỬA BÌNH LUẬN */}
+      <Modal
+        visible={!!editingCommentId}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditingCommentId(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.editCommentModal, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.editCommentHeader}>
+              <Text style={[styles.editCommentTitle, { color: theme.textPrimary }]}>Sửa bình luận</Text>
+              <Pressable onPress={() => setEditingCommentId(null)}>
+                <X size={20} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+            <TextInput
+              style={[styles.editCommentInput, { color: theme.textPrimary, backgroundColor: theme.searchBg, borderColor: theme.border }]}
+              value={editCommentText}
+              onChangeText={setEditCommentText}
+              placeholder="Nhập nội dung mới..."
+              placeholderTextColor={theme.textMuted}
+              multiline
+            />
+            <View style={styles.editCommentActions}>
+              <Pressable
+                style={[styles.editCommentCancelBtn, { borderColor: theme.border }]}
+                onPress={() => setEditingCommentId(null)}
+              >
+                <Text style={[styles.editCommentCancelText, { color: theme.textSecondary }]}>Hủy</Text>
+              </Pressable>
+              <Pressable
+                style={styles.editCommentSaveBtn}
+                onPress={handleSaveEditedComment}
+              >
+                <Text style={styles.editCommentSaveText}>Lưu</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2610,7 +2795,89 @@ const styles = StyleSheet.create({
   dropdownItemText: {
     fontSize: 13,
     fontWeight: '600',
-  }
+  },
+
+  // Comment menu styles
+  commentMenuCard: {
+    width: 220,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  commentMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  commentMenuItemText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  commentMenuDivider: {
+    height: 1,
+    marginHorizontal: 12,
+  },
+
+  // Edit comment modal
+  editCommentModal: {
+    width: '90%',
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignSelf: 'center',
+  },
+  editCommentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  editCommentTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  editCommentInput: {
+    height: 100,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 14,
+    textAlignVertical: 'top',
+  },
+  editCommentActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 16,
+  },
+  editCommentCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  editCommentCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  editCommentSaveBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#3b82f6',
+  },
+  editCommentSaveText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });
 
 
