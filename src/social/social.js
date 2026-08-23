@@ -664,10 +664,12 @@ export function SocialScreen({
     try {
       const updated = await editComment(ownerId, selectedPost.id, editingCommentId, editCommentText.trim());
       // Cập nhật state
-      const updateComment = (comments) =>
-        comments.map(c =>
+      const updateComment = (comments) => {
+        const safeComments = Array.isArray(comments) ? comments : [];
+        return safeComments.map(c =>
           c.id === editingCommentId ? { ...c, text: updated.text } : c
         );
+      };
       setPosts(items =>
         items.map(post =>
           post.id === selectedPost.id
@@ -700,19 +702,33 @@ export function SocialScreen({
             try {
               await deleteComment(ownerId, selectedPost.id, selectedComment.id);
               // Cập nhật state
-              const filterComments = (comments) => comments.filter(c => c.id !== selectedComment.id);
+              const filterComments = (comments) => {
+                const safeComments = Array.isArray(comments) ? comments : [];
+                return safeComments.filter(c => c.id !== selectedComment.id);
+              };
               setPosts(items =>
-                items.map(post =>
-                  post.id === selectedPost.id
-                    ? { ...post, comments: filterComments(post.comments), commentsCount: post.comments.length - 1 }
-                    : post
-                )
+                items.map(post => {
+                  if (post.id !== selectedPost.id) return post;
+
+                  const safeComments = Array.isArray(post.comments) ? post.comments : [];
+
+                  return {
+                    ...post,
+                    comments: safeComments.filter(c => c.id !== selectedComment.id),
+                    commentsCount: Math.max(safeComments.length - 1, 0)
+                  };
+                })
               );
-              setSelectedPost(post => ({
-                ...post,
-                comments: filterComments(post.comments),
-                commentsCount: post.comments.length - 1
-              }));
+              setSelectedPost(post => {
+                if (!post) return post;
+                const safeComments = Array.isArray(post.comments) ? post.comments : [];
+
+                return {
+                  ...post,
+                  comments: safeComments.filter(c => c.id !== selectedComment.id),
+                  commentsCount: Math.max(safeComments.length - 1, 0)
+                };
+              });
               setCommentMenuVisible(false);
               setSelectedComment(null);
             } catch (error) {
