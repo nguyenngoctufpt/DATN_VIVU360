@@ -25,15 +25,20 @@ import {
   getChatGroups,
   getChatMessages,
   getGroupNotifications,
+  recallChatMessage,
   removeChatMember,
   renameChatGroup,
   sendChatMessage,
+  uploadChatImage,
+  sendChatImageMessage,
   updateChatGroupWorkspace,
+  updateChatMessage,
   askGroupAssistant,
   createGroupPoll,
   voteGroupPoll,
   closeGroupPoll,
 } from '../services/chatService';
+import { createPoll, getPollsForGroup, votePoll } from '../services/pollService';
 import { fetchGoogleWeatherForecast } from '../services/googleWeatherService';
 import { isSystemChatEntry, looksLikeSystemAnnouncement, normalizeGroupPreviewText, normalizeSystemAnnouncementText } from '../utils/chatText';
 import {
@@ -357,14 +362,7 @@ const getUserAvatarByName = (name) => {
   return `https://i.pravatar.cc/150?img=${imgIndex}`;
 };
 
-const getUserLevelByName = (name) => {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
 
-  return `Cấp ${Math.abs(hash % 12) + 3}`;
-};
 
 const getFormattedMsgTime = (msgId) => {
   if (!msgId || msgId < 10000000000) return '10:24';
@@ -377,32 +375,6 @@ const getFormattedMsgTime = (msgId) => {
   }
 };
 
-const getUserRankColors = (name) => {
-  const level = getUserLevelByName(name);
-  const levelNum = parseInt(level.replace(/[^0-9]/g, ''), 10) || 1;
-
-  if (levelNum >= 12) {
-    return {
-      colors: ['#eab308', '#ca8a04'],
-      textColor: '#ffffff',
-      iconColor: '#fef08a',
-    };
-  }
-
-  if (levelNum >= 8) {
-    return {
-      colors: ['#94a3b8', '#475569'],
-      textColor: '#ffffff',
-      iconColor: '#cbd5e1',
-    };
-  }
-
-  return {
-    colors: ['#b45309', '#78350f'],
-    textColor: '#ffffff',
-    iconColor: '#fed7aa',
-  };
-};
 
 const getTagColors = (tag, isDarkMode) => {
   const cleanTag = String(tag || '').trim().toLowerCase();
@@ -879,6 +851,7 @@ const normalizeLocalMessageEntry = (message, membersList, currentUser, ownerId) 
     user: systemEntry ? 'H\u1ec7 th\u1ed1ng' : senderProfile.name || message?.user || 'Th\u00e0nh vi\u00ean Vivu360',
     actorName: senderProfile.name || 'Th\u00e0nh vi\u00ean',
     avatar: systemEntry ? '' : senderProfile.avatar || message?.avatar || '',
+    mediaUrl: message?.mediaUrl || '',
     text: systemEntry
       ? normalizeSystemAnnouncementText(rawText, senderProfile.name || 'Th\u00e0nh vi\u00ean')
       : rawText,
@@ -901,6 +874,7 @@ const normalizeApiMessage = (message, currentUser, ownerId, membersList = []) =>
     user: isSystemMessage ? 'Hệ thống' : senderProfile.name || 'Thành viên Vivu360',
     actorName: senderProfile.name || 'Thành viên',
     avatar: isSystemMessage ? '' : senderProfile.avatar || '',
+    mediaUrl: message.mediaUrl || '',
     text: isSystemMessage
       ? normalizeSystemAnnouncementText(rawText, senderProfile.name || 'Thành viên')
       : rawText,
@@ -1106,6 +1080,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
   const [isSearchingMembers, setIsSearchingMembers] = useState(false);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isUploadingChatImage, setIsUploadingChatImage] = useState(false);
 
   const [planDaysInput, setPlanDaysInput] = useState('3');
   const [planStartDate, setPlanStartDate] = useState(getTodayIso());
@@ -1400,6 +1375,192 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
     }
   };
 
+  const handlePickChatImage = async () => {
+  if (!selectedGroup || isUploadingChatImage) {
+    return;
+  }
+
+  try {
+    const permission =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        'Quyền truy cập ảnh',
+        'Vui lòng cho phép Vivu360 truy cập thư viện ảnh.'
+      );
+      return;
+    }
+
+    const result =
+      await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+    if (result.canceled || !result.assets?.length) {
+      return;
+    }
+
+    setIsUploadingChatImage(true);
+
+    const imageAsset = result.assets[0];
+
+    const imageUrl = await uploadChatImage(
+      selectedGroup.id,
+      ownerId,
+      imageAsset
+    );
+
+    const sent = await sendChatImageMessage(
+      selectedGroup.id,
+      ownerId,
+      imageUrl
+    );
+
+    const newMessage = normalizeApiMessage(
+      {
+        ...sent,
+        sender: {
+          name: currentUser?.name,
+          avatar: currentUser?.avatar,
+        },
+      },
+      currentUser,
+      ownerId,
+      selectedGroup.membersList
+    );
+
+    updateGroupById(selectedGroup.id, group => ({
+      ...group,
+      lastMessage: `${newMessage.user}: Đã gửi một ảnh`,
+      messages: mergeChatEntries(
+        group.messages,
+        [newMessage]
+      ),
+    }));
+
+  } catch (error) {
+    console.log('===== LỖI GỬI ẢNH CHAT =====');
+    console.log('message:', error.message);
+    console.log('status:', error.response?.status);
+    console.log('data:', error.response?.data);
+
+    Alert.alert(
+      'Gửi ảnh thất bại',
+      error.response?.data?.message ||
+        error.message ||
+        'Không thể gửi ảnh. Vui lòng thử lại.'
+    );
+  } finally {
+    setIsUploadingChatImage(false);
+  }
+};
+
+  // Poll handlers
+  const handleAddPollOption = () => {
+    setPollOptions([...pollOptions, '']);
+  };
+
+  const handleRemovePollOption = (index) => {
+    if (pollOptions.length > 2) {
+      setPollOptions(pollOptions.filter((_, i) => i !== index));
+    } else {
+      Alert.alert('Lỗi', 'Bình chọn phải có ít nhất 2 lựa chọn');
+    }
+  };
+
+  const handleUpdatePollOption = (index, text) => {
+    const updated = [...pollOptions];
+    updated[index] = text;
+    setPollOptions(updated);
+  };
+
+  const handleCreatePoll = async () => {
+    const validOptions = pollOptions.filter(opt => opt.trim());
+    
+    if (!pollTitle.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập tiêu đề bình chọn');
+      return;
+    }
+
+    if (validOptions.length < 2) {
+      Alert.alert('Lỗi', 'Bình chọn phải có ít nhất 2 lựa chọn');
+      return;
+    }
+
+    setIsCreatingPoll(true);
+    try {
+      const creatorId = currentUserId || ownerId;
+      const newPoll = await createPoll(
+        selectedGroup.id,
+        pollTitle,
+        validOptions,
+        creatorId
+      );
+
+      // Reset form
+      setPollTitle('');
+      setPollOptions(['', '']);
+      setPollModalVisible(false);
+
+      if (newPoll) {
+        // Update polls list
+        setPolls((prev) => [newPoll, ...prev.filter((p) => String(p._id || p.id) !== String(newPoll._id || newPoll.id))]);
+
+        // Add poll message entry directly to chat
+        const pollEntry = normalizePollEntry(newPoll, selectedGroup.membersList, currentUser, ownerId);
+        updateGroupById(selectedGroup.id, (group) => ({
+          ...group,
+          lastMessage: `[Bình chọn] ${newPoll.title}`,
+          messages: mergeChatEntries(group.messages, [pollEntry]),
+        }));
+      }
+
+      Alert.alert('Thành công', 'Bình chọn đã được tạo');
+    } catch (error) {
+      Alert.alert('Lỗi', error.response?.data?.message || error.message || 'Không thể tạo bình chọn');
+    } finally {
+      setIsCreatingPoll(false);
+    }
+  };
+
+  const handleVotePoll = async (pollId, optionId) => {
+    try {
+      const voterId = currentUserId || ownerId;
+      const cleanPollId = String(pollId || '').replace(/^poll-/, '');
+      const cleanOptionId = String(optionId || '');
+      const updatedPoll = await votePoll(cleanPollId, cleanOptionId, voterId);
+      if (!updatedPoll) return;
+
+      setPolls((prev) => {
+        const exists = prev.some((p) => String(p._id || p.id) === cleanPollId);
+        if (exists) {
+          return prev.map((p) => (String(p._id || p.id) === cleanPollId ? updatedPoll : p));
+        }
+        return [updatedPoll, ...prev];
+      });
+
+      updateGroupById(selectedGroup.id, (group) => ({
+        ...group,
+        messages: group.messages.map((msg) =>
+          (msg.type === 'poll' || msg.poll) && (String(msg.pollId || msg.poll?._id || msg.poll?.id || msg.id).replace(/^poll-/, '') === cleanPollId)
+            ? { ...msg, poll: updatedPoll }
+            : msg
+        ),
+      }));
+    } catch (error) {
+      console.warn('Lỗi khi bình chọn:', error.response?.data?.message || error.message);
+      Alert.alert('Lỗi', error.response?.data?.message || 'Không thể bình chọn. Vui lòng thử lại.');
+    }
+  };
+
+  const openPollModal = () => {
+    setPollTitle('');
+    setPollOptions(['', '']);
+    setPollModalVisible(true);
+  };
   const handleOpenUserProfile = (username) => {
     setTargetUsername(username);
     setProfileModalVisible(true);
@@ -2139,13 +2300,21 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                         <View key={message.id} style={[styles.msgWrapper, isMe ? styles.msgWrapperMe : null]}>
                           {isMe ? (
                             <View style={{ alignItems: 'flex-end' }}>
-                              <LinearGradient colors={['#f43f5e', '#e11d48']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.msgBubble, styles.msgBubbleMe]}>
-                                <Text style={styles.msgTextMe}>{message.text}</Text>
-                              </LinearGradient>
-                              <View style={styles.msgMetaMe}>
-                                <Text style={[styles.msgTimeTextMe, { color: theme.textMuted }]}>{messageTime}</Text>
-                                <CheckCheck size={11} color="#f43f5e" />
-                              </View>
+                              <Pressable onLongPress={() => typeof handleLongPress === 'function' && handleLongPress(message)}>
+                                <LinearGradient colors={['#f43f5e', '#e11d48']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.msgBubble, styles.msgBubbleMe]}>
+                                  {message.type === 'image' && message.mediaUrl ? (
+                                    <Image source={{ uri: message.mediaUrl }} style={{ width: 220, height: 220, borderRadius: 14 }} resizeMode="cover" />
+                                  ) : (typeof sharedLocation !== 'undefined' && sharedLocation) ? (
+                                    renderSharedLocationCard(sharedLocation, true)
+                                  ) : (
+                                    <Text style={styles.msgTextMe}>{(typeof displayMessageText !== 'undefined' && displayMessageText) || message.text}</Text>
+                                  )}
+                                </LinearGradient>
+                                <View style={styles.msgMetaMe}>
+                                  <Text style={[styles.msgTimeTextMe, { color: theme.textMuted }]}>{messageTime}</Text>
+                                  <CheckCheck size={11} color="#f43f5e" />
+                                </View>
+                              </Pressable>
                             </View>
                           ) : (
                             <View style={styles.otherMsgRow}>
@@ -2158,15 +2327,6 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                                   <Pressable onPress={() => { setChatModalVisible(false); handleOpenUserProfile(message.user); }}>
                                     <Text style={[styles.msgUserNameText, { color: theme.textPrimary }]}>{senderDisplayName}</Text>
                                   </Pressable>
-                                  {(() => {
-                                    const rank = getUserRankColors(message.user);
-                                    return (
-                                      <LinearGradient colors={rank.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.msgUserRankBadge}>
-                                        <Award size={8} color={rank.iconColor} />
-                                        <Text style={[styles.msgUserRankText, { color: rank.textColor }]}>{getUserLevelByName(message.user)}</Text>
-                                      </LinearGradient>
-                                    );
-                                  })()}
                                 </View>
 
                                 <View
@@ -2176,12 +2336,18 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                                     {
                                       backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.5)' : '#ffffff',
                                       borderColor: theme.border,
-                                      borderLeftWidth: 3.5,
-                                      borderLeftColor: getUserRankColors(message.user).colors[0],
                                     },
                                   ]}
                                 >
-                                  <Text style={[styles.msgTextContent, { color: theme.textPrimary }]}>{message.text}</Text>
+                                  {message.type === 'image' && message.mediaUrl ? (
+                                    <Image source={{ uri: message.mediaUrl }} style={{ width: 220, height: 220, borderRadius: 14 }} resizeMode="cover" />
+                                  ) : (typeof sharedLocation !== 'undefined' && sharedLocation) ? (
+                                    renderSharedLocationCard(sharedLocation, false)
+                                  ) : (
+                                    <Text style={[styles.msgTextContent, { color: theme.textPrimary }]}>
+                                      {(typeof displayMessageText !== 'undefined' && displayMessageText) || message.text}
+                                    </Text>
+                                  )}
                                 </View>
                                 <Text style={[styles.msgTimeTextOther, { color: theme.textMuted }]}>{messageTime}</Text>
                               </View>
@@ -2219,6 +2385,21 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                         onPress={() => setCreatePollModalVisible(true)}
                       >
                         <BarChart3 size={16} color="#8b5cf6" />
+                      </Pressable>
+                      <Pressable
+                        disabled={typeof isUploadingChatImage !== 'undefined' && isUploadingChatImage}
+                        style={[
+                          styles.chatInputAttachBtn,
+                          { backgroundColor: theme.searchBg, marginRight: 4 },
+                          typeof isUploadingChatImage !== 'undefined' && isUploadingChatImage && { opacity: 0.5 },
+                        ]}
+                        onPress={handlePickChatImage}
+                      >
+                        {typeof isUploadingChatImage !== 'undefined' && isUploadingChatImage ? (
+                          <ActivityIndicator size="small" color="#3b82f6" />
+                        ) : (
+                          <Paperclip size={16} color={theme.textSecondary} />
+                        )}
                       </Pressable>
                       <Pressable
                         style={[styles.chatInputAttachBtn, { backgroundColor: theme.searchBg, marginRight: 4 }]}

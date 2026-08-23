@@ -5,6 +5,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { loadAppData, saveAppData } from '../services/appDataService';
 import { createPost, deletePost, updatePost, getFeed, togglePostLike, addPostComment, mapMongoPostToFeedPost } from '../services/postService';
 import { searchFriends } from '../services/userService';
+import { getFriendships, sendFriendRequest, acceptFriendRequest, rejectFriendRequest } from '../services/friendshipService';
+import { getSocialNotifications, markSocialNotificationsRead } from '../services/socialNotificationService';
+import { getOrCreateDirectChat } from '../services/chatService';
+import { uploadPostImage } from '../services/postService';
 import {
   Heart,
   MessageSquare,
@@ -476,6 +480,13 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
   const [targetUserUid, setTargetUserUid] = useState(null);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [shareAlertVisible, setShareAlertVisible] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newCategory, setNewCategory] = useState('Thời sự');
+  const [newContent, setNewContent] = useState('');
+  const [newLocation, setNewLocation] = useState('');
+  const [newImgUrl, setNewImgUrl] = useState('');
+  const [selectedPostImage, setSelectedPostImage] = useState(null);
+  const [isUploadingPostImage, setIsUploadingPostImage] = useState(false);
 
   const handlePickImage = async () => {
     try {
@@ -616,10 +627,6 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
         .catch(err => console.warn('[Social] Đồng bộ like MongoDB thất bại:', err.message));
     }
   };
-
-  // Open Edit Post modal — điền sẵn dữ liệu bài viết
-
-
   // Delete Post handler
   const handleDeletePost = (targetPostId) => {
     Alert.alert(
@@ -643,6 +650,59 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
         }
       ]
     );
+  };
+
+  const handlePickPostImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Quyền truy cập ảnh', 'Vui lòng cho phép Vivu360 truy cập thư viện ảnh.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets?.length > 0) {
+        setSelectedPostImage(result.assets[0]);
+        setNewImgUrl('');
+      }
+    } catch (error) {
+      console.warn('Không thể chọn ảnh:', error);
+      Alert.alert('Ảnh bài viết', 'Không thể mở thư viện ảnh.');
+    }
+  };
+
+  const handleSubmitPost = async () => {
+    if (!newContent.trim()) {
+      Alert.alert('Đăng bài', 'Vui lòng nhập nội dung bài viết.');
+      return;
+    }
+    try {
+      setIsUploadingPostImage(true);
+      let finalImg = '';
+      if (selectedPostImage) {
+        finalImg = await uploadPostImage(ownerId, selectedPostImage);
+      }
+      await createPost(ownerId, {
+        content: newContent.trim(),
+        category: newCategory,
+        location: newLocation.trim() || 'Việt Nam',
+        images: finalImg ? [finalImg] : [],
+      });
+      fetchFeed(true);
+      setNewTitle('');
+      setNewContent('');
+      setNewLocation('');
+      setNewImgUrl('');
+      setSelectedPostImage(null);
+      setActiveView('feed');
+    } catch (error) {
+      Alert.alert('Đăng bài thất bại', error.response?.data?.message || error.message || 'Không thể đăng bài. Vui lòng thử lại.');
+    } finally {
+      setIsUploadingPostImage(false);
+    }
   };
 
   // Open User Profile view modal
@@ -1427,36 +1487,7 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                     )}
                   </Pressable>
 
-                  {/* Info */}
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <Text style={{ color: isDarkMode ? '#f8fafc' : '#1e1b2e', fontSize: 14, fontWeight: '800' }} numberOfLines={1}>
-                        {user.name}
-                      </Text>
-                      {isAccepted && (
-                        <View style={{ backgroundColor: 'rgba(16,185,129,0.15)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
-                          <Text style={{ color: '#10b981', fontSize: 9.5, fontWeight: '800' }}>BẠN BÈ</Text>
-                        </View>
-                      )}
-                      {isPending && !isAccepted && (
-                        <View style={{ backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
-                          <Text style={{ color: '#f59e0b', fontSize: 9.5, fontWeight: '800' }}>ĐÃ GỬI</Text>
-                        </View>
-                      )}
-                      {isIncoming && (
-                        <View style={{ backgroundColor: 'rgba(59,130,246,0.15)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
-                          <Text style={{ color: '#3b82f6', fontSize: 9.5, fontWeight: '800' }}>ĐỢI DỰ DUYỆT</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={{ color: isDarkMode ? '#64748b' : '#94a3b8', fontSize: 11.5, marginTop: 2 }} numberOfLines={1}>
-                      {user.email}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                      <Text style={{ color: isDarkMode ? '#475569' : '#cbd5e1', fontSize: 10.5, fontWeight: '600' }}>
-                        {user.level || 'Cấp 1'}
-                      </Text>
-                      {user.bio ? (
+                                     {user.bio ? (
                         <Text style={{ color: isDarkMode ? '#475569' : '#cbd5e1', fontSize: 10.5, fontWeight: '500' }} numberOfLines={1}>
                           • {user.bio}
                         </Text>
@@ -1544,6 +1575,90 @@ export function SocialScreen({ ownerId, isDarkMode, theme, currentUser, onNaviga
                 </Text>
               </View>
             )}
+          </ScrollView>
+        </Animated.View>
+      )}
+
+    </View>
+  );
+}me.textSecondary,
+      marginBottom: 6,
+      fontWeight: '700',
+    },
+  ]}
+>
+  Ảnh bài viết (tùy chọn)
+</Text>
+
+{/* Nút chọn ảnh */}
+<Pressable
+  onPress={handlePickPostImage}
+  style={[
+    styles.formInputGroup,
+    {
+      backgroundColor: theme.searchBg,
+      borderColor: theme.searchBorder,
+      marginBottom: selectedPostImage ? 12 : 30,
+    },
+  ]}
+>
+  <ImageIcon size={18} color="#10b981" />
+
+  <Text
+    style={[
+      styles.formTextInput,
+      {
+        color: selectedPostImage
+          ? theme.textPrimary
+          : theme.textMuted,
+      },
+    ]}
+  >
+    {selectedPostImage
+      ? 'Đã chọn ảnh - Nhấn để chọn ảnh khác'
+      : 'Chọn ảnh từ thư viện điện thoại...'}
+  </Text>
+</Pressable>
+
+{/* Xem trước ảnh đã chọn */}
+{selectedPostImage && (
+  <View
+    style={{
+      position: 'relative',
+      marginBottom: 30,
+    }}
+  >
+    <Image
+      source={{ uri: selectedPostImage.uri }}
+      style={{
+        width: '100%',
+        height: 220,
+        borderRadius: 14,
+        backgroundColor: theme.searchBg,
+      }}
+      resizeMode="cover"
+    />
+
+    {/* Nút X để bỏ ảnh */}
+    <Pressable
+      onPress={() => setSelectedPostImage(null)}
+      style={{
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <X size={18} color="#ffffff" />
+    </Pressable>
+  </View>
+)}
+>>>>>>> origin/truong-update
           </ScrollView>
         </Animated.View>
       )}

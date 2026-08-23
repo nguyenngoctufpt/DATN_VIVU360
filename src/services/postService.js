@@ -62,7 +62,6 @@ export async function addPostComment(userId, postId, text) {
   const response = await api.post(`/posts/${postId}/comments`, { text }, auth(userId));
   return response.data.data;
 }
-
 export async function updatePost(userId, postId, fields) {
   const response = await api.put(`/posts/${postId}`, fields, auth(userId));
   return response.data.data;
@@ -104,4 +103,42 @@ export function mapMongoPostToFeedPost(mPost) {
       level: mPost.author?.level || mPost.user?.level || 'Cấp 1',
     }
   };
+}
+
+export async function uploadPostImage(ownerId, imageAsset) {
+  if (!ownerId) {
+    throw new Error('Thiếu ownerId khi upload ảnh');
+  }
+
+  if (!imageAsset?.uri) {
+    throw new Error('Không tìm thấy ảnh để upload');
+  }
+
+  const formData = new FormData();
+
+  const fileName =
+    imageAsset.fileName ||
+    `post-${Date.now()}.jpg`;
+
+  const mimeType =
+    imageAsset.mimeType ||
+    'image/jpeg';
+
+  formData.append('image', {
+    uri: imageAsset.uri,
+    name: fileName,
+    type: mimeType,
+  });
+
+  const response = await api.post(
+    '/posts/upload-image',
+    formData,
+    {
+      headers: {
+        'x-user-id': ownerId,
+      },
+    }
+  );
+
+  return response.data?.data?.imageUrl;
 }
