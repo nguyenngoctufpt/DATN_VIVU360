@@ -278,14 +278,7 @@ const getUserAvatarByName = (name) => {
   return `https://i.pravatar.cc/150?img=${imgIndex}`;
 };
 
-const getUserLevelByName = (name) => {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
 
-  return `Cấp ${Math.abs(hash % 12) + 3}`;
-};
 
 const getFormattedMsgTime = (msgId) => {
   if (!msgId || msgId < 10000000000) return '10:24';
@@ -298,32 +291,6 @@ const getFormattedMsgTime = (msgId) => {
   }
 };
 
-const getUserRankColors = (name) => {
-  const level = getUserLevelByName(name);
-  const levelNum = parseInt(level.replace(/[^0-9]/g, ''), 10) || 1;
-
-  if (levelNum >= 12) {
-    return {
-      colors: ['#eab308', '#ca8a04'],
-      textColor: '#ffffff',
-      iconColor: '#fef08a',
-    };
-  }
-
-  if (levelNum >= 8) {
-    return {
-      colors: ['#94a3b8', '#475569'],
-      textColor: '#ffffff',
-      iconColor: '#cbd5e1',
-    };
-  }
-
-  return {
-    colors: ['#b45309', '#78350f'],
-    textColor: '#ffffff',
-    iconColor: '#fed7aa',
-  };
-};
 
 const getTagColors = (tag, isDarkMode) => {
   const cleanTag = String(tag || '').trim().toLowerCase();
@@ -2234,15 +2201,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                                   <Pressable onPress={() => { setChatModalVisible(false); handleOpenUserProfile(message.user); }}>
                                     <Text style={[styles.msgUserNameText, { color: theme.textPrimary }]}>{message.user}</Text>
                                   </Pressable>
-                                  {(() => {
-                                    const rank = getUserRankColors(message.user);
-                                    return (
-                                      <LinearGradient colors={rank.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.msgUserRankBadge}>
-                                        <Award size={8} color={rank.iconColor} />
-                                        <Text style={[styles.msgUserRankText, { color: rank.textColor }]}>{getUserLevelByName(message.user)}</Text>
-                                      </LinearGradient>
-                                    );
-                                  })()}
+                                  
                                 </View>
 
                                 <View
@@ -2252,8 +2211,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                                     {
                                       backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.5)' : '#ffffff',
                                       borderColor: theme.border,
-                                      borderLeftWidth: 3.5,
-                                      borderLeftColor: getUserRankColors(message.user).colors[0],
+                                      
                                     },
                                   ]}
                                 >
