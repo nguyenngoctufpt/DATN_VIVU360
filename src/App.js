@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { ClipboardList, Globe, Home, Map as MapIcon, User } from 'lucide-react-native';
+import { ClipboardList, Globe, Home, Map as MapIcon, MessageCircle, User } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './auth/firebaseConfig';
@@ -301,8 +301,8 @@ useEffect(() => {
     [userSettings.blockedUsers]
   );
   const navigationLabels = userSettings.language === 'en'
-    ? { home: 'Home', explore: 'Explore', map: 'Map', profile: 'Profile' }
-    : { home: 'Trang chủ', explore: 'Khám phá', map: 'Bản đồ', profile: 'Cá nhân' };
+    ? { home: 'Home', explore: 'Explore', map: 'Map', chat: 'Messages', profile: 'Profile' }
+    : { home: 'Trang chủ', explore: 'Khám phá', map: 'Bản đồ', chat: 'Tin nhắn', profile: 'Cá nhân' };
 
   const resetAuthenticatedState = () => {
     const nextSettings = mergeUserSettings(
@@ -1149,6 +1149,20 @@ useEffect(() => {
               {navigationLabels.map}
             </Text>
             {activeNav === 'map' && <View style={styles.activeDot} />}
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.navItem,
+              pressed && { transform: [{ scale: 0.92 }], opacity: 0.95 },
+            ]}
+            onPress={() => setActiveNav('chat')}
+          >
+            <MessageCircle size={20} color={activeNav === 'chat' ? '#3b82f6' : theme.textSecondary} />
+            <Text style={[styles.navText, { color: activeNav === 'chat' ? '#3b82f6' : theme.textSecondary }]}>
+              {navigationLabels.chat}
+            </Text>
+            {activeNav === 'chat' && <View style={styles.activeDot} />}
           </Pressable>
 
           <Pressable
