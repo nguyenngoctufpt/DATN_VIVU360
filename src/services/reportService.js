@@ -1,8 +1,8 @@
 import api from "./api";
 
-export const reportPost = async (postId, reason, description, reporterId) => {
+export const reportPost = async (postId, reasons, description, reporterId) => {
     try {
-        const response = await api.post('/reports', { postId, reason, description, reporterId });
+        const response = await api.post('/reports', { postId, reasons, description, reporterId });
         return response.data;
     } catch (error) {
         if (error.response) {

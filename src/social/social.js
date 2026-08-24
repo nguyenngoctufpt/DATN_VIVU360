@@ -6,6 +6,8 @@ import { getFriendships, sendFriendRequest, acceptFriendRequest, rejectFriendReq
 import { getFeed, createPost, togglePostLike, addPostComment, editPost, deletePost, editComment, deleteComment, uploadPostImage } from '../services/postService';
 import { getSocialNotifications, markSocialNotificationsRead } from '../services/socialNotificationService';
 import { getOrCreateDirectChat } from '../services/chatService';
+import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Heart,
   MessageSquare,
@@ -49,6 +51,7 @@ import { getSafeAvatarSource, getSafeImageSource, hasImageUri } from '../utils/i
 import ReportModal from '../components/ReportModal';
 import { reportPost } from '../services/reportService';
 const EMPTY_BLOCKED_USER_IDS = [];
+const REPORTED_POSTS_KEY = '@Vivu360_reported_posts';
 
 const getUserRankColors = (name) => {
   const lvl = getUserLevelByName(name);
@@ -392,6 +395,10 @@ const [isUploadingPostImage, setIsUploadingPostImage] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editCommentText, setEditCommentText] = useState('');
 
+  useEffect(() => {
+    loadReportedPosts().then(setReportedPosts);
+  }, []);
+
   const relationFor = userId => friendships.find(item => item.users?.includes(userId));
 
   const handleFriendAction = async (action, targetId) => {
@@ -500,15 +507,14 @@ const [isUploadingPostImage, setIsUploadingPostImage] = useState(false);
   }, [filteredPosts]);
 
   const openDropdown = () => {
-    if (!selectedPost) return;
-
     if (menuButtonRef.current) {
       menuButtonRef.current.measure((x, y, width, height, pageX, pageY) => {
         if (x !== undefined && y !== undefined) {
-          setDropdownPosition({
-            top: pageY + height + 6,
-            right: pageX + width - menuWidth - 4,
-          });
+          const top = pageY + height + 4;
+          const { width: screenWidth } = Dimensions.get('window');
+          const right = screenWidth - pageX - width + 4;
+
+          setDropdownPosition({ top, right });
           setDropdownVisible(true);
           return;
         }
@@ -520,7 +526,7 @@ const [isUploadingPostImage, setIsUploadingPostImage] = useState(false);
   };
 
   const fallbackDropdownPosition = () => {
-    setDropdownPosition({ top: 160, left: Dimensions.get('window').width - 210 });
+    setDropdownPosition({ top: 200, right: 20 });
     setDropdownVisible(true);
   };
 
@@ -886,11 +892,15 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
   };
 
   // Report post
-  const handleReportSubmit = async (postId, reason, description) => {
+  const handleReportSubmit = async (postId, reasons, description) => {
     try {
-      await reportPost(postId, reason, description, ownerId);
+      await reportPost(postId, reasons, description, ownerId);
       
-      setReportedPosts(prev => new Set(prev).add(postId));
+      setReportedPosts(prev => {
+        const newSet = new Set(prev).add(postId);
+        saveReportedPosts(newSet); // Lưu ngay
+        return newSet;
+      });
       setReportModalVisible(false);
       setReportingPostId(null);
       
@@ -899,14 +909,45 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
     } catch (error) {
       // Nếu lỗi 409 (đã báo cáo), cũng thêm vào Set và thông báo
       if (error.message.includes('đã báo cáo') || error.message.includes('409')) {
-          setReportedPosts(prev => new Set(prev).add(postId));
-          Alert.alert('Thông báo', 'Bạn đã báo cáo bài viết này trước đó.');
+        setReportedPosts(prev => {
+          const newSet = new Set(prev).add(postId);
+          saveReportedPosts(newSet);
+          return newSet;
+        });
+        Alert.alert('Thông báo', 'Bạn đã báo cáo bài viết này trước đó.');
       } else {
-          Alert.alert('Lỗi', error.message);
+        Alert.alert('Lỗi', error.message);
       }
       setReportModalVisible(false);
       setReportingPostId(null);
+    } finally {
+      setReportModalVisible(false);
+      setReportingPostId(null);
     }
+  };
+
+  // Lưu danh sách postId đã báo cáo
+  const saveReportedPosts = async (reportedSet) => {
+    try {
+      const array = Array.from(reportedSet);
+      await AsyncStorage.setItem(REPORTED_POSTS_KEY, JSON.stringify(array));
+    } catch (error) {
+      console.warn('Không thể lưu danh sách báo cáo:', error);
+    }
+  };
+
+  // Đọc danh sách đã báo cáo
+  const loadReportedPosts = async () => {
+    try {
+      const json = await AsyncStorage.getItem(REPORTED_POSTS_KEY);
+      if (json) {
+        const array = JSON.parse(json);
+        return new Set(array);
+      }
+    } catch (error) {
+      console.warn('Không thể đọc danh sách báo cáo:', error);
+    }
+    return new Set();
   };
 
   return (

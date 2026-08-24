@@ -2854,7 +2854,7 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
             <View style={{ flex: 1, padding: 16 }}>
               <Text style={[styles.inputLabel, { color: theme.textPrimary }]}>Nội dung mới</Text>
               <TextInput
-                style={[styles.formInputGroup, { color: '#fff', backgroundColor: theme.searchBg, borderColor: theme.searchBorder, marginTop: 6, height: 80, textAlignVertical: 'top', paddingTop: 8 }]}
+                style={[styles.formInputGroup, { color: textPrimary, backgroundColor: theme.searchBg, borderColor: theme.searchBorder, marginTop: 6, height: 80, textAlignVertical: 'top', paddingTop: 8 }]}
                 multiline
                 value={editMessageContent}
                 onChangeText={setEditMessageContent}

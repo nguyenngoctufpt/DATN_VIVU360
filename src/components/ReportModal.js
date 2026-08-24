@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { X } from 'lucide-react-native';
 
@@ -12,24 +12,46 @@ const REPORT_REASONS = [
 ];
 
 const ReportModal = ({ visible, onClose, onSubmit, isDarkMode, theme, postId, currentUserId }) => {
-  const [selectedReason, setSelectedReason] = useState('');
+  const [selectedReasons, setSelectedReasons] = useState([]);
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (!visible) {
+      setLoading(false);
+      setSelectedReasons([]);
+      setDescription('');
+    }
+  }, [visible]);
+
+  const toggleReason = (value) => {
+    if (selectedReasons.includes(value)) {
+      // Bỏ chọn
+      setSelectedReasons(prev => prev.filter(v => v !== value));
+    } else {
+      // Chỉ cho phép thêm nếu chưa đạt 3
+      if (selectedReasons.length < 3) {
+        setSelectedReasons(prev => [...prev, value]);
+      } else {
+        Alert.alert('Thông báo', 'Bạn chỉ có thể chọn tối đa 3 lý do.');
+      }
+    }
+  };
+
   const resetForm = () => {
-    setSelectedReason('');
+    setSelectedReasons([]);
     setDescription('');
   };
 
   const handleSubmit = async () => {
-    if (!selectedReason) {
+    if (!selectedReasons) {
       Alert.alert('Vui lòng chọn lý do báo cáo');
       return;
     }
     setLoading(true);
 
     try {
-      await onSubmit(postId, selectedReason, description);
+      await onSubmit(postId, selectedReasons, description);
       resetForm();
       onClose();
       Alert.alert('Thành công', 'Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét.');
@@ -60,36 +82,45 @@ const ReportModal = ({ visible, onClose, onSubmit, isDarkMode, theme, postId, cu
 
           <Text style={[styles.label, { color: theme.textSecondary }]}>
             Lý do báo cáo <Text style={{ color: '#ef4444' }}>*</Text>
+            <Text style={{ fontWeight: '400', fontSize: 11, color: theme.textMuted }}>
+              {' '}(Chọn tối đa 3)
+            </Text>
           </Text>
           <View style={styles.reasonList}>
-            {REPORT_REASONS.map((item) => (
-              <Pressable
-                key={item.value}
-                style={[
-                  styles.reasonItem,
-                  {
-                    backgroundColor:
-                      selectedReason === item.value
+            {REPORT_REASONS.map((item) => {
+              const isSelected = selectedReasons.includes(item.value);
+              const isDisabled = selectedReasons.length >= 3 && !isSelected;
+              return (
+                <Pressable
+                  key={item.value}
+                  style={[
+                    styles.reasonItem,
+                    {
+                      backgroundColor: isSelected
                         ? isDarkMode
                           ? 'rgba(59, 130, 246, 0.2)'
                           : '#dbeafe'
                         : 'transparent',
-                    borderColor:
-                      selectedReason === item.value ? '#3b82f6' : theme.border,
-                  },
-                ]}
-                onPress={() => setSelectedReason(item.value)}
-              >
-                <Text
-                  style={[
-                    styles.reasonText,
-                    { color: selectedReason === item.value ? '#3b82f6' : theme.textPrimary },
+                      borderColor: isSelected ? '#3b82f6' : theme.border,
+                      opacity: isDisabled ? 0.4 : 1,
+                    },
                   ]}
+                  onPress={() => !isDisabled && toggleReason(item.value)}
+                  disabled={isDisabled}
                 >
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    style={[
+                      styles.reasonText,
+                      {
+                        color: isSelected ? '#3b82f6' : theme.textPrimary,
+                      },
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           <Text style={[styles.label, { color: theme.textSecondary, marginTop: 12 }]}>
