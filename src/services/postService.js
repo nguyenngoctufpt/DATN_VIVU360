@@ -12,6 +12,16 @@ export async function createPost(userId, post) {
   return response.data.data;
 }
 
+export async function editPost(userId, postId, postData) {
+  const response = await api.put(`/posts/${postId}`, postData, auth(userId));
+  return response.data.data;
+}
+
+export async function deletePost(userId, postId) {
+  const response = await api.delete(`/posts/${postId}`, auth(userId));
+  return response.data;
+}
+
 export async function togglePostLike(userId, postId) {
   const response = await api.post(`/posts/${postId}/like`, {}, auth(userId));
   return response.data.data;
@@ -26,6 +36,7 @@ export async function addPostComment(userId, postId, text) {
   const response = await api.post(`/posts/${postId}/comments`, { text }, auth(userId));
   return response.data.data;
 }
+
 export async function uploadPostImage(ownerId, imageAsset) {
   if (!ownerId) {
     throw new Error('Thiếu ownerId khi upload ảnh');
@@ -62,4 +73,14 @@ export async function uploadPostImage(ownerId, imageAsset) {
   );
 
   return response.data?.data?.imageUrl;
+}
+
+export async function editComment(userId, postId, commentId, text) {
+  const response = await api.put(`/posts/${postId}/comments/${commentId}`, { text }, auth(userId));
+  return response.data.data;
+}
+
+export async function deleteComment(userId, postId, commentId) {
+  const response = await api.delete(`/posts/${postId}/comments/${commentId}`, auth(userId));
+  return response.data;
 }
