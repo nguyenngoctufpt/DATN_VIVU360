@@ -37,6 +37,44 @@ export async function addPostComment(userId, postId, text) {
   return response.data.data;
 }
 
+export async function uploadPostImage(ownerId, imageAsset) {
+  if (!ownerId) {
+    throw new Error('Thiếu ownerId khi upload ảnh');
+  }
+
+  if (!imageAsset?.uri) {
+    throw new Error('Không tìm thấy ảnh để upload');
+  }
+
+  const formData = new FormData();
+
+  const fileName =
+    imageAsset.fileName ||
+    `post-${Date.now()}.jpg`;
+
+  const mimeType =
+    imageAsset.mimeType ||
+    'image/jpeg';
+
+  formData.append('image', {
+    uri: imageAsset.uri,
+    name: fileName,
+    type: mimeType,
+  });
+
+  const response = await api.post(
+    '/posts/upload-image',
+    formData,
+    {
+      headers: {
+        'x-user-id': ownerId,
+      },
+    }
+  );
+
+  return response.data?.data?.imageUrl;
+}
+
 export async function editComment(userId, postId, commentId, text) {
   const response = await api.put(`/posts/${postId}/comments/${commentId}`, { text }, auth(userId));
   return response.data.data;

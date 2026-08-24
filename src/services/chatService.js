@@ -60,6 +60,69 @@ export async function sendChatMessage(groupId, senderId, content) {
   return response.data.data;
 }
 
+// Upload ảnh từ điện thoại lên API cho nhóm chat
+export async function uploadChatImage(
+  groupId,
+  senderId,
+  imageAsset
+) {
+  if (!groupId) {
+    throw new Error('Thiếu groupId');
+  }
+
+  if (!senderId) {
+    throw new Error('Thiếu senderId');
+  }
+
+  if (!imageAsset?.uri) {
+    throw new Error('Không tìm thấy ảnh để upload');
+  }
+
+  const formData = new FormData();
+
+  formData.append('senderId', senderId);
+
+  formData.append('image', {
+    uri: imageAsset.uri,
+    name:
+      imageAsset.fileName ||
+      `chat-${Date.now()}.jpg`,
+    type:
+      imageAsset.mimeType ||
+      'image/jpeg',
+  });
+
+  const response = await api.post(
+    `/chat/groups/${encodeURIComponent(groupId)}/upload-image`,
+    formData
+  );
+
+  return response.data?.data?.imageUrl;
+}
+
+
+// Gửi tin nhắn dạng ảnh
+export async function sendChatImageMessage(
+  groupId,
+  senderId,
+  mediaUrl
+) {
+  if (!mediaUrl) {
+    throw new Error('Thiếu đường dẫn ảnh');
+  }
+
+  const response = await api.post(
+    `/chat/groups/${encodeURIComponent(groupId)}/messages`,
+    {
+      senderId,
+      content: '',
+      type: 'image',
+      mediaUrl,
+    }
+  );
+
+  return response.data.data;
+}
 export async function updateChatGroupWorkspace(groupId, requesterId, updates, options = {}) {
   const proofImageFile = options.proofImageFile || null;
   if (proofImageFile) {
