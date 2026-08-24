@@ -2604,22 +2604,6 @@ export function ChatScreen({ ownerId, isDarkMode, theme, currentUser, onNavigate
                     )}
                   </View>
 
-                  <View style={{ marginTop: 12 }}>
-                    <Text style={[styles.sampleProofLabel, { color: theme.textSecondary }]}>Ảnh mẫu để test trên emulator</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sampleProofRow}>
-                      {CONTRIBUTION_PROOF_SAMPLES.map((sample) => (
-                        <Pressable
-                          key={sample.id}
-                          onPress={() => handlePickContributionProofSample(sample)}
-                          style={[styles.sampleProofCard, { backgroundColor: theme.background, borderColor: theme.searchBorder }]}
-                        >
-                          <Image source={sample.source} style={styles.sampleProofImage} resizeMode="cover" />
-                          <Text style={[styles.sampleProofText, { color: theme.textPrimary }]}>{sample.label}</Text>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-                  </View>
-
                     <Pressable
                       style={[styles.primaryActionBtn, !fundContributionProof && { opacity: 0.55 }]}
                       onPress={handleAddContribution}
