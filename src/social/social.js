@@ -53,6 +53,10 @@ import { reportPost } from '../services/reportService';
 const EMPTY_BLOCKED_USER_IDS = [];
 const REPORTED_POSTS_KEY = '@Vivu360_reported_posts';
 
+const getSafeComments = (comments) => {
+  return Array.isArray(comments) ? comments : [];
+};
+
 const getUserRankColors = (name) => {
   const lvl = getUserLevelByName(name);
   const levelNum = parseInt(lvl.replace(/[^0-9]/g, ''), 10) || 1;
@@ -394,6 +398,8 @@ const [isUploadingPostImage, setIsUploadingPostImage] = useState(false);
   const [selectedComment, setSelectedComment] = useState(null);
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editCommentText, setEditCommentText] = useState('');
+  const [commentMenuPosition, setCommentMenuPosition] = useState(null);
+  const commentRefs = useRef({});
 
   useEffect(() => {
     loadReportedPosts().then(setReportedPosts);
@@ -706,9 +712,32 @@ const handleSubmitPost = async () => {
     setCommentModalVisible(true);
   };
 
-  const openCommentMenu = (comment) => {
-    setSelectedComment(comment);
-    setCommentMenuVisible(true);
+  const openCommentMenu = (comment, ref) => {
+    if (ref) {
+      ref.measure((x, y, width, height, pageX, pageY) => {
+        const screenWidth = Dimensions.get('window').width;
+        const menuWidth = 180;
+        let left = pageX;
+        // Nếu menu tràn ra ngoài màn hình bên phải, đẩy sang trái
+        if (left + menuWidth > screenWidth - 8) {
+          left = screenWidth - menuWidth - 8;
+        }
+        // Đảm bảo không bị tràn bên trái
+        left = Math.max(8, left);
+
+        setCommentMenuPosition({
+          top: pageY + height + 4, // hiển thị bên dưới icon
+          left,
+        });
+        setSelectedComment(comment);
+        setCommentMenuVisible(true);
+      });
+    } else {
+      // fallback nếu không đo được
+      setCommentMenuPosition({ top: 200, left: 20 });
+      setSelectedComment(comment);
+      setCommentMenuVisible(true);
+    }
   };
 
   // Submit dynamic comment
@@ -1424,7 +1453,7 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
                       Chưa có ý kiến nào. Hãy là người đầu tiên! 💬
                     </Text>
                   ) : (
-                    selectedPost.comments && selectedPost.comments.map((comment) => {
+                    getSafeComments(selectedPost.comments).map((comment) => {
                       return (
                         <View key={comment.id} style={{ flexDirection: 'row', gap: 10 }}>
                           <Pressable onPress={() => { setCommentModalVisible(false); handleOpenUserProfile(comment.user); }}>
@@ -1446,7 +1475,8 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
 
                               {comment.authorId === ownerId && (
                                 <Pressable
-                                  onPress={() => openCommentMenu(comment)}
+                                  ref={ref => (commentRefs.current[comment.id] = ref)}
+                                  onPress={() => openCommentMenu(comment, commentRefs.current[comment.id])}
                                   style={{ padding: 4 }}
                                 >
                                   <MoreVertical size={14} color={theme.textSecondary} />
@@ -1679,24 +1709,31 @@ Tải ngay ứng dụng Vivu360 để cùng trải nghiệm du lịch ảo 360 �
         onRequestClose={() => setCommentMenuVisible(false)}
       >
         <TouchableWithoutFeedback onPress={() => setCommentMenuVisible(false)}>
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-            <View style={[styles.commentMenuCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <Pressable
-                style={styles.commentMenuItem}
-                onPress={handleEditComment}
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0)' }}>
+            {commentMenuPosition && (
+              <View
+                style={[
+                  styles.commentMenuCard,
+                  {
+                    position: 'absolute',
+                    top: commentMenuPosition.top,
+                    left: commentMenuPosition.left,
+                    backgroundColor: theme.card,
+                    borderColor: theme.border,
+                  },
+                ]}
               >
-                <Edit size={18} color={theme.textPrimary} />
-                <Text style={[styles.commentMenuItemText, { color: theme.textPrimary }]}>Sửa bình luận</Text>
-              </Pressable>
-              <View style={[styles.commentMenuDivider, { backgroundColor: theme.border }]} />
-              <Pressable
-                style={styles.commentMenuItem}
-                onPress={handleDeleteComment}
-              >
-                <Trash2 size={18} color="#ef4444" />
-                <Text style={[styles.commentMenuItemText, { color: '#ef4444' }]}>Xóa bình luận</Text>
-              </Pressable>
-            </View>
+                <Pressable style={styles.commentMenuItem} onPress={handleEditComment}>
+                  <Edit size={18} color={theme.textPrimary} />
+                  <Text style={[styles.commentMenuItemText, { color: theme.textPrimary }]}>Sửa bình luận</Text>
+                </Pressable>
+                <View style={[styles.commentMenuDivider, { backgroundColor: theme.border }]} />
+                <Pressable style={styles.commentMenuItem} onPress={handleDeleteComment}>
+                  <Trash2 size={18} color="#ef4444" />
+                  <Text style={[styles.commentMenuItemText, { color: '#ef4444' }]}>Xóa bình luận</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         </TouchableWithoutFeedback>
       </Modal>
@@ -3009,6 +3046,13 @@ const styles = StyleSheet.create({
   },
 
   // Comment menu styles
+  commentMenuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   commentMenuCard: {
     width: 220,
     borderRadius: 16,

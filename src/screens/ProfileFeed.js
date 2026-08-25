@@ -38,6 +38,8 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
   const [selectedComment, setSelectedComment] = useState(null);
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editCommentText, setEditCommentText] = useState('');
+  const [commentMenuPosition, setCommentMenuPosition] = useState(null);
+  const commentRefs = useRef({});
 
   useEffect(() => {
     let active = true;
@@ -349,9 +351,29 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
     );
   };
 
-  const openCommentMenu = (comment) => {
-    setSelectedComment(comment);
-    setCommentMenuVisible(true);
+  const openCommentMenu = (comment, ref) => {
+    if (ref) {
+      ref.measure((x, y, width, height, pageX, pageY) => {
+        const screenWidth = Dimensions.get('window').width;
+        const menuWidth = 180;
+        let left = pageX;
+        if (left + menuWidth > screenWidth - 8) {
+          left = screenWidth - menuWidth - 8;
+        }
+        left = Math.max(8, left);
+
+        setCommentMenuPosition({
+          top: pageY + height + 4,
+          left,
+        });
+        setSelectedComment(comment);
+        setCommentMenuVisible(true);
+      });
+    } else {
+      setCommentMenuPosition({ top: 200, left: 20 });
+      setSelectedComment(comment);
+      setCommentMenuVisible(true);
+    }
   };
 
   const handleEditPost = () => {
@@ -680,7 +702,8 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
 
                               {comment.authorId === ownerId && (
                                 <Pressable
-                                  onPress={() => openCommentMenu(comment)}
+                                  ref={ref => (commentRefs.current[comment.id] = ref)}
+                                  onPress={() => openCommentMenu(comment, commentRefs.current[comment.id])}
                                   style={{ padding: 4 }}
                                 >
                                   <MoreVertical size={14} color={theme.textSecondary} />
@@ -731,31 +754,31 @@ export function ProfileFeedScreen({ theme, isDarkMode, userInfo = {}, ownerId, o
         onRequestClose={() => setCommentMenuVisible(false)}
       >
         <TouchableWithoutFeedback onPress={() => setCommentMenuVisible(false)}>
-          <View style={styles.commentMenuBackdrop}>
-            <View
-              style={[
-                styles.commentMenuCard,
-                { backgroundColor: theme.card, borderColor: theme.border },
-              ]}
-            >
-              <Pressable style={styles.commentMenuItem} onPress={handleEditComment}>
-                <Edit size={18} color={theme.textPrimary} />
-
-                <Text style={[styles.commentMenuItemText, { color: theme.textPrimary }]}>
-                  Sửa bình luận
-                </Text>
-              </Pressable>
-
-              <View style={[styles.commentMenuDivider,{ backgroundColor: theme.border }]} />
-
-              <Pressable style={styles.commentMenuItem} onPress={handleDeleteComment}>
-                <Trash2 size={18} color="#ef4444" />
-
-                <Text style={[styles.commentMenuItemText, { color: '#ef4444' }]}>
-                  Xóa bình luận
-                </Text>
-              </Pressable>
-            </View>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0)' }}>
+            {commentMenuPosition && (
+              <View
+                style={[
+                  styles.commentMenuCard,
+                  {
+                    position: 'absolute',
+                    top: commentMenuPosition.top,
+                    left: commentMenuPosition.left,
+                    backgroundColor: theme.card,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Pressable style={styles.commentMenuItem} onPress={handleEditComment}>
+                  <Edit size={18} color={theme.textPrimary} />
+                  <Text style={[styles.commentMenuItemText, { color: theme.textPrimary }]}>Sửa bình luận</Text>
+                </Pressable>
+                <View style={[styles.commentMenuDivider, { backgroundColor: theme.border }]} />
+                <Pressable style={styles.commentMenuItem} onPress={handleDeleteComment}>
+                  <Trash2 size={18} color="#ef4444" />
+                  <Text style={[styles.commentMenuItemText, { color: '#ef4444' }]}>Xóa bình luận</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         </TouchableWithoutFeedback>
       </Modal>
@@ -1044,6 +1067,13 @@ const styles = StyleSheet.create({
   postUserName: { fontSize: 13.5, fontWeight: '800', letterSpacing: -0.2 },
 
   // ----- Comments -----
+  commentMenuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   commentMenuBackdrop: {
     flex: 1,
     justifyContent: 'center',
